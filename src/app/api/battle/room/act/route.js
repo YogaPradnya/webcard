@@ -54,8 +54,9 @@ export async function POST(req) {
 
     if (!battle.over) {
       if (room.mode === 'ai') {
-        room.turn = String(session.id);
+        room.turn = 'AI';
         playAiTurns(room);
+        if (!battle.over) room.turn = String(session.id);
       } else {
         room.turn = side === 'player' ? String(room.p2Id) : String(room.p1Id);
       }

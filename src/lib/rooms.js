@@ -61,6 +61,15 @@ export async function ensureBattleRooms() {
     )
   `);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_p1 ON battle_rooms (p1_id)');
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS battle_leaderboard (
+      user_id TEXT PRIMARY KEY,
+      username TEXT NOT NULL DEFAULT '',
+      wins INTEGER DEFAULT 0,
+      losses INTEGER DEFAULT 0,
+      updated_at INTEGER NOT NULL
+    )
+  `);
 }
 
 function jakartaDateKey(d = new Date()) {
@@ -203,17 +212,31 @@ export async function finishIfOver(room) {
   const winnerSide = battle.winner === 'you' ? 'player' : 'enemy';
   room.winner = userIdOfSide(room, winnerSide);
   const xp = {};
+  // XP + leaderboard hanya untuk PvP. Vs AI: tanpa XP, tanpa leaderboard.
+  if (room.mode !== 'pvp') {
+    room.xpPaid = true;
+    room.result = { winner: room.winner, xp };
+    return { finished: true, xp };
+  }
   if (!room.xpPaid) {
     const db = getDb();
     const rewards = await readBattleRewards();
     const humans = [
       { id: room.p1Id, username: room.p1Username },
-      ...(room.mode === 'pvp' && room.p2Id ? [{ id: room.p2Id, username: room.p2Username }] : []),
+      ...(room.p2Id ? [{ id: room.p2Id, username: room.p2Username }] : []),
     ];
     for (const h of humans) {
       try {
-        const r = await awardXpFor(db, h.id, h.username, String(room.winner) === String(h.id), rewards);
+        const won = String(room.winner) === String(h.id);
+        const r = await awardXpFor(db, h.id, h.username, won, rewards);
         xp[String(h.id)] = r;
+        await db.execute({
+          sql: `INSERT INTO battle_leaderboard (user_id, username, wins, losses, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET username = excluded.username,
+                wins = wins + ?, losses = losses + ?, updated_at = excluded.updated_at`,
+          args: [String(h.id), String(h.username || ''), won ? 1 : 0, won ? 0 : 1, Date.now(), won ? 1 : 0, won ? 0 : 1],
+        });
       } catch (e) {
         console.error('[BATTLE XP]', e.message);
         xp[String(h.id)] = { gain: 0, capped: false };
