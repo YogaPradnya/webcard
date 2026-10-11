@@ -692,13 +692,20 @@ body {
 }
 
 .floating-bar .btn {
-  max-width: 1068px;
+  max-width: 1060px;
   margin: 0 auto;
 }
 
 @media (min-width: 721px) {
   .floating-bar {
     left: 220px;
+    padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 720px) {
+  .floating-bar {
+    bottom: 72px;
   }
 }
 
