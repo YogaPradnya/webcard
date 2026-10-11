@@ -16,7 +16,8 @@ function HpBar({ hp, maxHp }) {
 
 function ConsPips({ value }) {
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+    <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center' }}>
+      <span style={{ fontSize: 11, fontWeight: 800, marginRight: 4 }}>Cons {value}/10</span>
       {Array.from({ length: 10 }).map((_, i) => (
         <span
           key={i}

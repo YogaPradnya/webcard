@@ -180,7 +180,8 @@ export function act(battle, side, action, rng = Math.random) {
   const foeActive = foe.fighters[foe.active];
   const combo = me.lastWasSkill;
 
-  if (action?.type === 'skill' && me.cons >= actor.cons) {
+  if (action?.type === 'skill') {
+    if (me.cons < actor.cons) return false;
     me.cons -= actor.cons;
     me.lastWasSkill = true;
     const comboMult = combo ? 1.25 : 1;
@@ -196,6 +197,7 @@ export function act(battle, side, action, rng = Math.random) {
       if (!target) {
         me.cons = Math.min(MAX_CONS, me.cons + actor.cons); // batal: kembalikan
         me.lastWasSkill = false;
+        return false;
       } else if (fx === 'regen') {
         const amount = Math.round(actor.skill * 0.35 * comboMult);
         target.regen = { amount, turns: 3 };
