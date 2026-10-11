@@ -4,6 +4,17 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
+function formatSisa(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400);
+  if (d >= 1) return `${d} hari lagi`;
+  const h = Math.floor(s / 3600);
+  if (h >= 1) return `${h} jam lagi`;
+  const m = Math.floor(s / 60);
+  if (m >= 1) return `${m} mnt lagi`;
+  return `${s} dtk lagi`;
+}
+
 export default function TradePage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -24,6 +35,15 @@ export default function TradePage() {
   const [giveCard, setGiveCard] = useState('');
   const [check, setCheck] = useState(null);
   const [result, setResult] = useState(null);
+
+  // List global trade ready (10/page + search usn/nama kartu/kode)
+  const [tradeQ, setTradeQ] = useState('');
+  const [tradeQInput, setTradeQInput] = useState('');
+  const [tradePage, setTradePage] = useState(1);
+  const [tradeList, setTradeList] = useState([]);
+  const [tradeTotal, setTradeTotal] = useState(0);
+  const [tradeTotalPages, setTradeTotalPages] = useState(1);
+  const [tradeLoading, setTradeLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -55,10 +75,33 @@ export default function TradePage() {
     })();
   }, [router]);
 
+  async function fetchTradeReady(page = tradePage, q = tradeQ) {
+    setTradeLoading(true);
+    try {
+      const res = await fetch(`/api/trade/offers?q=${encodeURIComponent(q)}&page=${page}`);
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setTradeList(data.offers || []);
+        setTradeTotal(data.pagination?.total || 0);
+        setTradeTotalPages(data.pagination?.totalPages || 1);
+      }
+    } catch {
+      // abaikan
+    } finally {
+      setTradeLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!loading) fetchTradeReady(tradePage, tradeQ);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, tradePage, tradeQ]);
+
   async function refreshOffers() {
     const res = await fetch('/api/trade/create');
     const data = await res.json().catch(() => ({}));
     if (data.success) setMyOffers(data.offers || []);
+    fetchTradeReady(tradePage, tradeQ);
   }
 
   async function onCreate(e) {
@@ -84,20 +127,34 @@ export default function TradePage() {
     refreshOffers();
   }
 
-  async function onPreview(e) {
-    e.preventDefault();
+  async function loadPreviewFor(code) {
     setError('');
     setPreview(null);
     setResult(null);
     setCheck(null);
     setGiveCard('');
-    const res = await fetch(`/api/trade/offer?code=${encodeURIComponent(inCode)}`);
+    setInCode(code);
+    const res = await fetch(`/api/trade/offer?code=${encodeURIComponent(code)}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
       setError(data.message || 'Kode tidak ditemukan.');
       return;
     }
     setPreview(data);
+  }
+
+  function onPickTrade(code) {
+    setMode('enter');
+    setError('');
+    setCreated(null);
+    setResult(null);
+    loadPreviewFor(code);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function onPreview(e) {
+    e.preventDefault();
+    loadPreviewFor(inCode);
   }
 
   // Cek live tiap ganti kartu: sudah punya? milik sendiri? penawar sudah punya?
@@ -138,6 +195,13 @@ export default function TradePage() {
     }
     setResult(data);
     setPreview(null);
+    refreshOffers();
+  }
+
+  function onSearchTrade(e) {
+    e.preventDefault();
+    setTradePage(1);
+    setTradeQ(tradeQInput.trim());
   }
 
   if (loading) {
@@ -165,6 +229,68 @@ export default function TradePage() {
           {error ? <div className="alert-error">{error}</div> : null}
 
           <div className="card" style={{ marginBottom: 16 }}>
+            <div className="section-title">Trade ready ({tradeTotal})</div>
+            <form onSubmit={onSearchTrade} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input
+                className="input"
+                placeholder="Cari usn / nama kartu / kode..."
+                value={tradeQInput}
+                onChange={(e) => setTradeQInput(e.target.value)}
+              />
+              <button className="btn" type="submit" style={{ width: 'auto', padding: '0 20px' }}>
+                Cari
+              </button>
+            </form>
+            {tradeLoading ? <div style={{ fontSize: 13 }}>Memuat...</div> : null}
+            {!tradeLoading && tradeList.length === 0 ? (
+              <div style={{ fontSize: 13 }}>Belum ada trade ready.</div>
+            ) : null}
+            {tradeList.map((o) => (
+              <div className="user-row" key={o.code}>
+                <span>
+                  <strong>@{o.ownerUsername}</strong>
+                  <span style={{ color: 'var(--body)' }}> — {o.charName} [{o.rarity}]</span>
+                  <br />
+                  <span style={{ fontWeight: 800, letterSpacing: 2 }}>{o.code}</span>
+                  <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)' }}>
+                    {formatSisa(o.expiresAt - Date.now())}
+                  </span>
+                </span>
+                <button
+                  className="btn btn-ghost"
+                  style={{ width: 'auto', minHeight: 0, padding: '6px 12px', marginLeft: 'auto' }}
+                  onClick={() => onPickTrade(o.code)}
+                >
+                  Trade
+                </button>
+              </div>
+            ))}
+            {tradeTotalPages > 1 ? (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
+                <button
+                  className="btn btn-ghost"
+                  style={{ width: 'auto' }}
+                  disabled={tradePage <= 1}
+                  onClick={() => setTradePage((p) => Math.max(1, p - 1))}
+                >
+                  Prev
+                </button>
+                <span style={{ fontSize: 12 }}>
+                  {tradePage}/{tradeTotalPages}
+                </span>
+                <button
+                  className="btn btn-ghost"
+                  style={{ width: 'auto' }}
+                  disabled={tradePage >= tradeTotalPages}
+                  onClick={() => setTradePage((p) => p + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
             <div className="field" style={{ marginBottom: 0 }}>
               <label className="label" htmlFor="tradeMode">
                 Pilih aksi
@@ -189,7 +315,7 @@ export default function TradePage() {
 
           {mode === 'create' ? (
             <div className="card" style={{ marginBottom: 16 }}>
-              <div className="section-title">Buat kode trade</div>
+              <div className="section-title">Buat kode trade ({myOffers.length}/10)</div>
               <form onSubmit={onCreate}>
                 <div className="field">
                   <label className="label" htmlFor="pickCard">
@@ -210,7 +336,7 @@ export default function TradePage() {
                     ))}
                   </select>
                 </div>
-                <button className="btn" type="submit">
+                <button className="btn" type="submit" disabled={myOffers.length >= 10}>
                   Buat Kode Angka
                 </button>
               </form>
@@ -218,7 +344,7 @@ export default function TradePage() {
                 <div>
                   <div className="trade-code-big">{created.code}</div>
                   <div className="trade-hint">
-                    {created.charName} — berlaku 30 menit, sekali pakai. Bagikan kode ini ke lawan
+                    {created.charName} — berlaku 10 menit, sekali pakai. Bagikan kode ini ke lawan
                     trademu.
                   </div>
                 </div>

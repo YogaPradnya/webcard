@@ -3,7 +3,7 @@ import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
-import { ensureBattleRooms, getRoom, saveRoom } from '@/lib/rooms';
+import { ensureBattleRooms, getRoom, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms } from '@/lib/rooms';
 
 // POST /api/battle/room/join { code, team: [3 nama] } — gabung room PvP.
 export async function POST(req) {
@@ -24,10 +24,15 @@ export async function POST(req) {
 
   try {
     await ensureBattleRooms();
+    await cleanupExpiredWaitingRooms(Date.now());
     const db = getDb();
     const room = await getRoom(code);
     if (!room || room.mode !== 'pvp' || room.status !== 'waiting') {
       return NextResponse.json({ success: false, message: 'Room tidak tersedia.' }, { status: 404 });
+    }
+    if (isWaitingExpired(room)) {
+      await deleteRoom(room.code);
+      return NextResponse.json({ success: false, message: 'Kode hangus (5 menit). Minta lawan buat baru.' }, { status: 410 });
     }
     if (String(room.p1Id) === String(session.id)) {
       return NextResponse.json({ success: false, message: 'Tidak bisa gabung room sendiri.' }, { status: 400 });

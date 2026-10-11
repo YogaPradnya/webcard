@@ -6,10 +6,12 @@ import {
   generateTradeCode,
   getCardOwner,
   getOffer,
+  MAX_ACTIVE_TRADES_PER_USER,
   TRADE_TTL_MS,
 } from '@/lib/trade';
 
 // POST /api/trade/create { charName } — buat kode angka untuk 1 kartu milik sendiri.
+// 1 user boleh punya s/d MAX_ACTIVE_TRADES_PER_USER penawaran aktif, tiap kode TTL 10 menit.
 export async function POST(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
@@ -35,8 +37,17 @@ export async function POST(req) {
       return NextResponse.json({ success: false, message: 'Kamu tidak punya kartu itu.' }, { status: 400 });
     }
 
-    // 1 user 1 penawaran aktif (buat baru menggantikan yang lama).
-    await db.execute({ sql: 'DELETE FROM trade_offers WHERE owner_id = ?', args: [session.id] });
+    const countRes = await db.execute({
+      sql: 'SELECT COUNT(*) AS total FROM trade_offers WHERE owner_id = ? AND expires_at > ?',
+      args: [session.id, Date.now()],
+    });
+    const activeCount = Number(countRes.rows[0]?.total || 0);
+    if (activeCount >= MAX_ACTIVE_TRADES_PER_USER) {
+      return NextResponse.json(
+        { success: false, message: `Batas ${MAX_ACTIVE_TRADES_PER_USER} penawaran aktif. Batalkan salah satu dulu.` },
+        { status: 400 },
+      );
+    }
 
     let code = '';
     for (let i = 0; i < 10; i++) {

@@ -3,6 +3,8 @@ import { createBattle, act as engineAct, aiChoose } from './engine.js';
 
 export const TURN_TIMEOUT_MS = 60 * 1000;
 export const ROOM_TTL_MS = 30 * 60 * 1000;
+// Room PvP yang masih menunggu lawan: hangus dalam 5 menit bila tidak ada yang gabung.
+export const WAITING_TTL_MS = 5 * 60 * 1000;
 // Default XP battle (bisa diubah dari dashboard bot: menu Web Kartu).
 export const WIN_XP = 100;
 export const LOSE_XP = 20;
@@ -61,6 +63,7 @@ export async function ensureBattleRooms() {
     )
   `);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_p1 ON battle_rooms (p1_id)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_waiting ON battle_rooms (mode, status, created_at)');
   await db.execute(`
     CREATE TABLE IF NOT EXISTS battle_leaderboard (
       user_id TEXT PRIMARY KEY,
@@ -101,8 +104,32 @@ export function parseRoom(row) {
     winner: row.winner ? String(row.winner) : null,
     result: row.result ? JSON.parse(row.result) : null,
     xpPaid: Number(row.xp_paid) === 1,
+    createdAt: Number(row.created_at) || 0,
     updatedAt: Number(row.updated_at) || 0,
   };
+}
+
+export function isWaitingExpired(room, now = Date.now()) {
+  if (!room || room.mode !== 'pvp' || room.status !== 'waiting') return false;
+  return now - (Number(room.createdAt) || 0) > WAITING_TTL_MS;
+}
+
+export function waitingSecondsLeft(room, now = Date.now()) {
+  const left = WAITING_TTL_MS - (now - (Number(room.createdAt) || 0));
+  return Math.max(0, Math.ceil(left / 1000));
+}
+
+export async function deleteRoom(code) {
+  await getDb().execute({ sql: 'DELETE FROM battle_rooms WHERE code = ?', args: [String(code)] });
+}
+
+export async function cleanupExpiredWaitingRooms(now = Date.now()) {
+  try {
+    await getDb().execute({
+      sql: `DELETE FROM battle_rooms WHERE mode = 'pvp' AND status = 'waiting' AND created_at < ?`,
+      args: [now - WAITING_TTL_MS],
+    });
+  } catch (_) { /* tabel belum ada -> abaikan */ }
 }
 
 export async function getRoom(code) {

@@ -1,7 +1,8 @@
 import { getDb } from './db';
 
 export const TRADE_CODE_LENGTH = 6;
-export const TRADE_TTL_MS = 30 * 60 * 1000;
+export const TRADE_TTL_MS = 10 * 60 * 1000;
+export const MAX_ACTIVE_TRADES_PER_USER = 10;
 
 // Kode trade hanya angka (keypad numerik di HP).
 export function generateTradeCode() {
@@ -30,6 +31,12 @@ export async function ensureTradeTable() {
   `);
   await getDb().execute(
     'CREATE INDEX IF NOT EXISTS idx_trade_owner ON trade_offers (owner_id)',
+  );
+  await getDb().execute(
+    'CREATE INDEX IF NOT EXISTS idx_trade_expires ON trade_offers (expires_at)',
+  );
+  await getDb().execute(
+    'CREATE INDEX IF NOT EXISTS idx_trade_search ON trade_offers (owner_username, char_name, code)',
   );
 }
 

@@ -199,7 +199,7 @@ export function act(battle, side, action, rng = Math.random) {
         me.lastWasSkill = false;
         return false;
       } else if (fx === 'regen') {
-        const amount = Math.round(actor.skill * 0.35 * comboMult);
+        const amount = Math.round(actor.skill * 0.22 * comboMult);
         target.regen = { amount, turns: 3 };
         battle.log.push({
           t: battle.turnCount, type: 'regen', side, name: actor.name,
@@ -208,7 +208,7 @@ export function act(battle, side, action, rng = Math.random) {
         });
         return true;
       } else {
-        const mult = fx === 'energize' ? 0.6 : 1;
+        const mult = fx === 'energize' ? 0.45 : 0.7;
         const amount = Math.min(target.maxHp - target.hp, Math.round(base * mult * comboMult));
         target.hp += amount;
         if (fx === 'energize') me.cons = Math.min(MAX_CONS, me.cons + 2);

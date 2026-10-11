@@ -12,6 +12,9 @@ import {
   finishIfOver,
   playAiTurns,
   sideOf,
+  isWaitingExpired,
+  deleteRoom,
+  cleanupExpiredWaitingRooms,
 } from '@/lib/rooms';
 
 function publicState(room, youId) {
@@ -62,6 +65,7 @@ export async function POST(req) {
 
   try {
     await ensureBattleRooms();
+    await cleanupExpiredWaitingRooms(Date.now());
     const db = getDb();
     const err = await validateTeam(db, session.id, body.team);
     if (err) return NextResponse.json({ success: false, message: err }, { status: 400 });
@@ -156,6 +160,10 @@ export async function GET(req) {
     await ensureBattleRooms();
     const room = await getRoom(code);
     if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
+    if (isWaitingExpired(room)) {
+      await deleteRoom(room.code);
+      return NextResponse.json({ success: false, message: 'Kode hangus (5 menit). Buat room baru.' }, { status: 410 });
+    }
     if (!sideOf(room, session.id)) {
       return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
     }

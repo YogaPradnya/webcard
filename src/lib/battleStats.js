@@ -33,9 +33,9 @@ export const SKILL_EFFECTS = {
     { effect: 'bulwark', val: 50 }, // damage 70% + shield 50% ke diri sendiri
   ],
   Support: [
-    { effect: 'heal', val: 100 }, // heal instan 100%
-    { effect: 'regen', val: 35 }, // heal 35%/giliran 3 giliran
-    { effect: 'energize', val: 60 }, // heal 60% + tim +2 cons
+    { effect: 'heal', val: 70 }, // heal instan 70%
+    { effect: 'regen', val: 22 }, // heal 22%/giliran 3 giliran
+    { effect: 'energize', val: 45 }, // heal 45% + tim +2 cons
   ],
   Assist: [
     { effect: 'surge', val: 50 }, // damage 50% + tim +2 cons

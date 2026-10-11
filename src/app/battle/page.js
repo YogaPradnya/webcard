@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
@@ -88,6 +88,16 @@ export default function BattlePage() {
   const [joinCode, setJoinCode] = useState('');
   const [pickFlipped, setPickFlipped] = useState(null);
 
+  // List room PvP ready (10/page, hanya usn + kode + sisa waktu)
+  const [roomQInput, setRoomQInput] = useState('');
+  const [roomQ, setRoomQ] = useState('');
+  const [roomPage, setRoomPage] = useState(1);
+  const [roomList, setRoomList] = useState([]);
+  const [roomTotal, setRoomTotal] = useState(0);
+  const [roomTotalPages, setRoomTotalPages] = useState(1);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
+
   // Arena
   const [st, setSt] = useState(null);
   const [acting, setActing] = useState(false);
@@ -155,6 +165,63 @@ export default function BattlePage() {
       body: body ? JSON.stringify(body) : undefined,
     });
     return res.json().catch(() => ({}));
+  }
+
+  async function fetchRooms(page = roomPage, q = roomQ) {
+    setRoomLoading(true);
+    try {
+      const res = await fetch(`/api/battle/rooms?q=${encodeURIComponent(q)}&page=${page}`);
+      const data = await res.json().catch(() => ({}));
+      if (data.success) {
+        setRoomList(data.rooms || []);
+        setRoomTotal(data.pagination?.total || 0);
+        setRoomTotalPages(data.pagination?.totalPages || 1);
+      }
+    } catch {
+      // abaikan
+    } finally {
+      setRoomLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (loading || st) return;
+    fetchRooms(roomPage, roomQ);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, st, roomPage, roomQ]);
+
+  useEffect(() => {
+    if (loading || st) return;
+    const t = setInterval(() => {
+      setNowTick(Date.now());
+      fetchRooms(roomPage, roomQ);
+    }, 10000);
+    const tick = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => {
+      clearInterval(t);
+      clearInterval(tick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, st, roomPage, roomQ]);
+
+  function fmtSisa(expiresAt) {
+    const s = Math.max(0, Math.ceil((expiresAt - nowTick) / 1000));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return `${m}:${String(r).padStart(2, '0')}`;
+  }
+
+  function onPickRoom(code) {
+    setMode('join');
+    setJoinCode(code);
+    setError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function onSearchRoom(e) {
+    e.preventDefault();
+    setRoomPage(1);
+    setRoomQ(roomQInput.trim());
   }
 
   // Urutan tim: vanguard (maju duluan) dulu, sisanya ikut urutan pilih.
@@ -276,6 +343,69 @@ export default function BattlePage() {
             <h1>Battle Kartu</h1>
           </div>
           {error ? <div className="alert-error">{error}</div> : null}
+
+          {!st ? (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="section-title">Battle ready ({roomTotal})</div>
+              <form onSubmit={onSearchRoom} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <input
+                  className="input"
+                  placeholder="Cari usn / kode..."
+                  value={roomQInput}
+                  onChange={(e) => setRoomQInput(e.target.value)}
+                />
+                <button className="btn" type="submit" style={{ width: 'auto', padding: '0 20px' }}>
+                  Cari
+                </button>
+              </form>
+              {roomLoading ? <div style={{ fontSize: 13 }}>Memuat...</div> : null}
+              {!roomLoading && roomList.length === 0 ? (
+                <div style={{ fontSize: 13 }}>Belum ada battle ready.</div>
+              ) : null}
+              {roomList.map((r) => (
+                <div className="user-row" key={r.code}>
+                  <span>
+                    <strong>@{r.username}</strong>
+                    <span style={{ marginLeft: 8, fontWeight: 800, letterSpacing: 2 }}>{r.code}</span>
+                    <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)' }}>
+                      {fmtSisa(r.expiresAt)}
+                    </span>
+                  </span>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ width: 'auto', minHeight: 0, padding: '6px 12px', marginLeft: 'auto' }}
+                    disabled={r.isMine}
+                    onClick={() => onPickRoom(r.code)}
+                  >
+                    {r.isMine ? 'Milikmu' : 'Gabung'}
+                  </button>
+                </div>
+              ))}
+              {roomTotalPages > 1 ? (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ width: 'auto' }}
+                    disabled={roomPage <= 1}
+                    onClick={() => setRoomPage((p) => Math.max(1, p - 1))}
+                  >
+                    Prev
+                  </button>
+                  <span style={{ fontSize: 12 }}>
+                    {roomPage}/{roomTotalPages}
+                  </span>
+                  <button
+                    className="btn btn-ghost"
+                    style={{ width: 'auto' }}
+                    disabled={roomPage >= roomTotalPages}
+                    onClick={() => setRoomPage((p) => p + 1)}
+                  >
+                    Next
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {!st ? (
             <div>
@@ -443,7 +573,7 @@ export default function BattlePage() {
             <div className="card">
               <div className="section-title">Room {st.code}</div>
               <div className="trade-code-big">{st.code}</div>
-              <div className="trade-hint">Bagikan kode ini ke lawan. Menunggu gabung...</div>
+              <div className="trade-hint">Bagikan kode ini ke lawan. Menunggu gabung... (hangus dalam 5 menit)</div>
               <button className="btn btn-ghost" onClick={refresh}>
                 Cek Lagi
               </button>{' '}
