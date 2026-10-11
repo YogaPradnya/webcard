@@ -53,7 +53,7 @@ export default function LeaderboardPage() {
                     {u.isMe ? ' (kamu)' : ''}
                   </span>
                   <span style={{ marginLeft: 'auto', color: 'var(--body)', fontSize: 12 }}>
-                    {u.wins}M - {u.losses}K ({u.winRate}%)
+                    {u.wins}W - {u.losses}L | WR {u.winRate}%
                   </span>
                 </div>
               ))
