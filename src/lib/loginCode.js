@@ -1,0 +1,40 @@
+import { randomBytes, createHash } from 'node:crypto';
+import { getDb } from './db.js';
+
+// Kode login lahir di WEB, diklaim dari CHAT (.login KODE).
+// Tanpa password: bukti kepemilikan = senderUserId pengirim di chat.
+
+export const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+export function generateLoginCode() {
+  const bytes = randomBytes(6);
+  let code = '';
+  for (let i = 0; i < 6; i++) code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  return code;
+}
+
+export function normalizeLoginCode(value) {
+  return String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+}
+
+export function hashToken(token) {
+  return createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+export function newToken() {
+  return randomBytes(32).toString('hex');
+}
+
+export async function ensureLoginCodeTable() {
+  await getDb().execute(`
+    CREATE TABLE IF NOT EXISTS web_login_codes (
+      code TEXT PRIMARY KEY,
+      token_hash TEXT NOT NULL,
+      user_id TEXT DEFAULT NULL,
+      username TEXT NOT NULL DEFAULT '',
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `);
+}
