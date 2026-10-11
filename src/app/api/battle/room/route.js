@@ -178,3 +178,26 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat room.' }, { status: 500 });
   }
 }
+
+// DELETE /api/battle/room?code=123456 — batalkan room waiting milik sendiri.
+export async function DELETE(req) {
+  const session = getSessionFromRequest(req);
+  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+  const code = new URL(req.url).searchParams.get('code') || '';
+  try {
+    await ensureBattleRooms();
+    const room = await getRoom(code);
+    if (!room) return NextResponse.json({ success: true });
+    if (String(room.p1Id) !== String(session.id)) {
+      return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
+    }
+    if (room.status !== 'waiting') {
+      return NextResponse.json({ success: false, message: 'Battle sudah mulai, tidak bisa dibatalkan.' }, { status: 400 });
+    }
+    await deleteRoom(room.code);
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error('[BATTLE CANCEL]', e.message);
+    return NextResponse.json({ success: false, message: 'Gagal membatalkan room.' }, { status: 500 });
+  }
+}

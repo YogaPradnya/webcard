@@ -98,6 +98,10 @@ export default function BattlePage() {
   const [roomLoading, setRoomLoading] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
 
+  // Room aktif milik sendiri (persist biar bebas pindah page + auto masuk saat lawan gabung)
+  const MY_ROOM_KEY = 'battle_my_room';
+  const [myRooms, setMyRooms] = useState([]);
+
   // Arena
   const [st, setSt] = useState(null);
   const [acting, setActing] = useState(false);
@@ -123,6 +127,25 @@ export default function BattlePage() {
           const artMap = {};
           for (const c of all) if (c.imageUrl) artMap[c.name.toLowerCase()] = c.imageUrl;
           setArts(artMap);
+        }
+        // Auto-restore room aktif (biar bebas pindah page lalu balik auto masuk battle)
+        try {
+          const mineRes = await fetch('/api/battle/mine');
+          const mineData = await mineRes.json().catch(() => ({}));
+          if (mineData.success && mineData.rooms?.length) {
+            setMyRooms(mineData.rooms);
+            const first = mineData.rooms[0];
+            seenLog.current = 0;
+            applyState(first);
+            try { localStorage.setItem(MY_ROOM_KEY, first.code); } catch { /* abaikan */ }
+          } else {
+            try {
+              const saved = localStorage.getItem(MY_ROOM_KEY);
+              if (saved) localStorage.removeItem(MY_ROOM_KEY);
+            } catch { /* abaikan */ }
+          }
+        } catch {
+          // abaikan
         }
       } catch {
         setError('Tidak bisa menghubungi server.');
@@ -184,9 +207,20 @@ export default function BattlePage() {
     }
   }
 
+  async function fetchMine(silent = true) {
+    try {
+      const res = await fetch('/api/battle/mine');
+      const data = await res.json().catch(() => ({}));
+      if (data.success) setMyRooms(data.rooms || []);
+    } catch {
+      if (!silent) setError('Gagal memuat room aktifmu.');
+    }
+  }
+
   useEffect(() => {
     if (loading || st) return;
     fetchRooms(roomPage, roomQ);
+    fetchMine();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, st, roomPage, roomQ]);
 
@@ -195,7 +229,8 @@ export default function BattlePage() {
     const t = setInterval(() => {
       setNowTick(Date.now());
       fetchRooms(roomPage, roomQ);
-    }, 10000);
+      fetchMine();
+    }, 3000);
     const tick = setInterval(() => setNowTick(Date.now()), 1000);
     return () => {
       clearInterval(t);
@@ -211,11 +246,27 @@ export default function BattlePage() {
     return `${m}:${String(r).padStart(2, '0')}`;
   }
 
-  function onPickRoom(code) {
+  async function onPickRoom(code) {
+    // Kalau tim sudah 3, langsung join (1 klik). Kalau belum, isi kode + minta pilih kartu.
+    if (picked.length === 3) {
+      setError('');
+      setJoinCode(code);
+      const data = await api('/api/battle/room/join', { code, team: orderedTeam() });
+      if (!data.success) {
+        setError(data.message || 'Gagal gabung room.');
+        setMode('join');
+        fetchRooms(roomPage, roomQ);
+        return;
+      }
+      seenLog.current = 0;
+      applyState(data.state);
+      try { localStorage.setItem(MY_ROOM_KEY, data.state.code); } catch { /* abaikan */ }
+      setRoomList((prev) => prev.filter((r) => r.code !== code));
+      return;
+    }
     setMode('join');
     setJoinCode(code);
-    setError('');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setError('Pilih 3 kartumu dulu, lalu tekan Gabung & Mulai.');
   }
 
   function onSearchRoom(e) {
@@ -251,18 +302,55 @@ export default function BattlePage() {
     }
     seenLog.current = 0;
     applyState(data.state);
+    try { localStorage.setItem(MY_ROOM_KEY, data.state.code); } catch { /* abaikan */ }
+    fetchMine();
   }
 
   async function joinPvp(e) {
     e.preventDefault();
     setError('');
+    if (picked.length !== 3) {
+      setError('Pilih 3 kartumu dulu sebelum gabung.');
+      return;
+    }
     const data = await api('/api/battle/room/join', { code: joinCode, team: orderedTeam() });
     if (!data.success) {
       setError(data.message || 'Gagal gabung room.');
+      fetchRooms(roomPage, roomQ);
       return;
     }
     seenLog.current = 0;
     applyState(data.state);
+    try { localStorage.setItem(MY_ROOM_KEY, data.state.code); } catch { /* abaikan */ }
+    // Room yang baru dimasuki langsung hilang dari list (status jadi ongoing)
+    setRoomList((prev) => prev.filter((r) => r.code !== data.state.code));
+  }
+
+  function clearMyRoom() {
+    try { localStorage.removeItem(MY_ROOM_KEY); } catch { /* abaikan */ }
+  }
+
+  async function cancelRoom() {
+    if (!st) return;
+    try {
+      await fetch(`/api/battle/room?code=${encodeURIComponent(st.code)}`, { method: 'DELETE' });
+    } catch {
+      // abaikan, tetap keluar
+    }
+    clearMyRoom();
+    setSt(null);
+    setPicked([]);
+    fetchMine();
+    fetchRooms(roomPage, roomQ);
+  }
+
+  function exitBattle() {
+    clearMyRoom();
+    setSt(null);
+    setPicked([]);
+    setFx(null);
+    fetchMine();
+    fetchRooms(roomPage, roomQ);
   }
 
   async function doAct(action) {
@@ -285,7 +373,17 @@ export default function BattlePage() {
   async function refresh() {
     if (!st) return;
     const data = await api(`/api/battle/room?code=${encodeURIComponent(st.code)}`);
-    if (data.success) applyState(data.state);
+    if (!data.success) {
+      // Kode hangus / room hilang / bukan room kamu -> keluar otomatis
+      clearMyRoom();
+      setSt(null);
+      setPicked([]);
+      setError(data.message || 'Room tidak tersedia lagi.');
+      fetchMine();
+      fetchRooms(roomPage, roomQ);
+      return;
+    }
+    if (data.state) applyState(data.state);
   }
 
   // Polling PvP: tunggu lawan / giliran lawan.
@@ -343,6 +441,50 @@ export default function BattlePage() {
             <h1>Battle Kartu</h1>
           </div>
           {error ? <div className="alert-error">{error}</div> : null}
+
+          {!st && myRooms.length > 0 ? (
+            <div className="card" style={{ marginBottom: 16, borderColor: 'var(--link)' }}>
+              <div className="section-title">Room aktifmu (bebas pindah page, auto masuk saat lawan gabung)</div>
+              {myRooms.map((r) => (
+                <div className="user-row" key={r.code}>
+                  <span>
+                    <span style={{ fontWeight: 800, letterSpacing: 2 }}>{r.code}</span>
+                    <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--body)' }}>
+                      {r.status === 'waiting' ? `menunggu... ${fmtSisa(r.expiresAt)}` : `vs @${r.yourSide === 'player' ? r.p2Username : r.p1Username} — giliran ${r.turn === me?.id ? 'kamu' : 'lawan'}`}
+                    </span>
+                  </span>
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn"
+                      style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }}
+                      onClick={() => {
+                        seenLog.current = 0;
+                        applyState(r);
+                        try { localStorage.setItem(MY_ROOM_KEY, r.code); } catch { /* abaikan */ }
+                      }}
+                    >
+                      Masuk
+                    </button>
+                    {r.status === 'waiting' ? (
+                      <button
+                        className="btn btn-ghost"
+                        style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }}
+                        onClick={async () => {
+                          try {
+                            await fetch(`/api/battle/room?code=${encodeURIComponent(r.code)}`, { method: 'DELETE' });
+                          } catch { /* abaikan */ }
+                          fetchMine();
+                          fetchRooms(roomPage, roomQ);
+                        }}
+                      >
+                        Batal
+                      </button>
+                    ) : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {!st ? (
             <div className="card" style={{ marginBottom: 16 }}>
@@ -579,10 +721,7 @@ export default function BattlePage() {
               </button>{' '}
               <button
                 className="btn btn-ghost"
-                onClick={() => {
-                  setSt(null);
-                  setPicked([]);
-                }}
+                onClick={cancelRoom}
               >
                 Batal
               </button>
@@ -679,11 +818,7 @@ export default function BattlePage() {
                   <button
                     className="btn"
                     style={{ marginTop: 12 }}
-                    onClick={() => {
-                      setSt(null);
-                      setPicked([]);
-                      setFx(null);
-                    }}
+                    onClick={exitBattle}
                   >
                     Main Lagi
                   </button>
