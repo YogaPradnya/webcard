@@ -422,7 +422,6 @@ export default function BattlePage() {
                   </form>
                 </div>
               ) : null}
-            </div>
             <div style={{ height: 90 }} />
             <div className="floating-bar">
               {mode === 'join' ? (
@@ -438,6 +437,7 @@ export default function BattlePage() {
                   {mode === 'ai' ? `Mulai vs AI (${picked.length}/3)` : `Buat Kode Room (${picked.length}/3)`}
                 </button>
               )}
+            </div>
             </div>
           ) : st.status === 'waiting' ? (
             <div className="card">
