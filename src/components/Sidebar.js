@@ -26,6 +26,7 @@ export default function Sidebar({ username }) {
       {item('/book', 'Book Kartu')}
       {item('/trade', 'Trade Kartu')}
       {item('/battle', 'Battle')}
+      {item('/leaderboard', 'Leaderboard')}
     </>
   );
 

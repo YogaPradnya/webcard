@@ -87,7 +87,6 @@ export default function BattlePage() {
   const [vanguard, setVanguard] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [pickFlipped, setPickFlipped] = useState(null);
-  const [lb, setLb] = useState([]);
 
   // Arena
   const [st, setSt] = useState(null);
@@ -115,9 +114,6 @@ export default function BattlePage() {
           for (const c of all) if (c.imageUrl) artMap[c.name.toLowerCase()] = c.imageUrl;
           setArts(artMap);
         }
-        const lbRes = await fetch('/api/battle/leaderboard');
-        const lbData = await lbRes.json().catch(() => ({}));
-        if (lbData.success) setLb(lbData.leaderboard || []);
       } catch {
         setError('Tidak bisa menghubungi server.');
       } finally {
@@ -403,32 +399,10 @@ export default function BattlePage() {
                 ) : null}
               </div>
 
-              <div className="card" style={{ marginBottom: 16 }}>
-                <div className="section-title">Leaderboard PvP</div>
-                {lb.length === 0 ? (
-                  <div style={{ fontSize: 13 }}>Belum ada battle PvP.</div>
-                ) : (
-                  lb.map((u, i) => (
-                    <div className="user-row" key={u.username}>
-                      <span style={{ fontWeight: 700, width: 28 }}>{i + 1}.</span>
-                      <span style={{ fontWeight: 700 }}>
-                        @{u.username}
-                        {u.isMe ? ' (kamu)' : ''}
-                      </span>
-                      <span style={{ marginLeft: 'auto', color: 'var(--body)', fontSize: 12 }}>
-                        {u.wins}M - {u.losses}K ({u.winRate}%)
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-
               {mode === 'join' ? (
                 <div className="card" style={{ marginBottom: 16 }}>
-                  <form
-                    onSubmit={joinPvp}
-                  >
-                    <div className="field">
+                  <form id="joinForm" onSubmit={joinPvp}>
+                    <div className="field" style={{ marginBottom: 0 }}>
                       <label className="label" htmlFor="joinCode">
                         Kode room angka
                       </label>
@@ -445,11 +419,16 @@ export default function BattlePage() {
                         style={{ letterSpacing: 4, fontWeight: 700, fontSize: 18 }}
                       />
                     </div>
-                    <button className="btn" disabled={picked.length !== 3}>
-                      Gabung & Mulai ({picked.length}/3)
-                    </button>
                   </form>
                 </div>
+              ) : null}
+            </div>
+            <div style={{ height: 90 }} />
+            <div className="floating-bar">
+              {mode === 'join' ? (
+                <button className="btn" disabled={picked.length !== 3} type="submit" form="joinForm">
+                  Gabung & Mulai ({picked.length}/3)
+                </button>
               ) : (
                 <button
                   className="btn"

@@ -679,6 +679,29 @@ body {
   margin-top: 12px;
 }
 
+/* Tombol aksi setup battle: selalu floating di bawah */
+.floating-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 15;
+  background: var(--surface);
+  border-top: 1px solid var(--hairline-strong);
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+}
+
+.floating-bar .btn {
+  max-width: 1068px;
+  margin: 0 auto;
+}
+
+@media (min-width: 721px) {
+  .floating-bar {
+    left: 220px;
+  }
+}
+
 /* ===== Trade ===== */
 .trade-code-big {
   font-size: 40px;
