@@ -282,8 +282,16 @@ export default function TradePage() {
                     <div className="alert-error">Ini penawaranmu sendiri.</div>
                   ) : null}
                   {preview.alreadyOwned ? (
-                    <div className="alert-error">
-                      Kamu sudah punya {preview.offer.charName} — tidak bisa tukar.
+                    <div
+                      style={{
+                        border: '1px solid var(--hairline-strong)',
+                        borderRadius: 'var(--r-md)',
+                        padding: '10px 14px',
+                        fontSize: 13,
+                        marginBottom: 16,
+                      }}
+                    >
+                      Kamu sudah punya {preview.offer.charName} — jadi Limit Break +XP otomatis.
                     </div>
                   ) : null}
                   <div className="field" style={{ marginTop: 12 }}>
@@ -311,18 +319,23 @@ export default function TradePage() {
                     ) : check.same ? (
                       <div className="alert-error">Kartunya sama, tidak perlu tukar.</div>
                     ) : check.offererHas ? (
-                      <div className="alert-error">Penawar sudah punya {giveCard}.</div>
+                      <div
+                        style={{
+                          border: '1px solid var(--hairline-strong)',
+                          borderRadius: 'var(--r-md)',
+                          padding: '10px 14px',
+                          fontSize: 13,
+                          marginBottom: 16,
+                        }}
+                      >
+                        Penawar sudah punya {giveCard} — kartumu jadi Limit Break +XP untuknya.
+                      </div>
                     ) : null
                   ) : null}
                   <button
                     className="btn"
                     type="submit"
-                    disabled={
-                      !giveCard ||
-                      preview.offer.isMine ||
-                      preview.alreadyOwned ||
-                      !(check && check.ok)
-                    }
+                    disabled={!giveCard || preview.offer.isMine || !(check && check.ok)}
                   >
                     Konfirmasi Tukar
                   </button>
@@ -334,8 +347,15 @@ export default function TradePage() {
                   <div className="section-title">Trade berhasil</div>
                   <div className="user-row">
                     <span>
-                      Kamu menerima <strong>{result.received.charName}</strong> dan memberikan{' '}
-                      <strong>{result.given.charName}</strong>.
+                      Kamu menerima <strong>{result.received.charName}</strong>
+                      {result.dupeReceived
+                        ? ` (duplikat: Limit Break ★${result.dupeReceived.level} +${result.dupeReceived.xpBonus} XP)`
+                        : ''}{' '}
+                      dan memberikan <strong>{result.given.charName}</strong>
+                      {result.dupeGiven
+                        ? ` (duplikat untuk lawan: Limit Break ★${result.dupeGiven.level} +${result.dupeGiven.xpBonus} XP)`
+                        : ''}
+                      .
                     </span>
                   </div>
                 </div>

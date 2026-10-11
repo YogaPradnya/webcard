@@ -67,7 +67,29 @@ export async function getCardOwner(db, userId, charName) {
   };
 }
 
-// Tukar 2 kartu antar user secara atomik. Return { ok } atau { ok:false, message }.
+// Bonus XP duplikat (sama seperti Limit Break gacha di bot).
+export const DUPE_XP_REWARD = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
+const MAX_CARD_LEVEL = 5;
+
+function calcLevel(xp) {
+  let lv = 1;
+  while (xp >= Math.floor(20 * Math.pow(lv, 3))) lv++;
+  return lv;
+}
+
+async function getUserXp(db, userId) {
+  try {
+    const r = await db.execute({ sql: 'SELECT xp FROM user_stats WHERE user_id = ?', args: [String(userId)] });
+    if (r.rows.length > 0) return Number(r.rows[0].xp) || 0;
+  } catch { /* user baru */ }
+  return 0;
+}
+
+// Tukar 2 kartu antar user secara atomik.
+// Bila penerima SUDAH punya kartu yang diterima -> jadi Limit Break:
+// baris lama naik level (maks 5) + bonus XP, baris yang diberikan hangus.
+// Kartu yang sama persis tetap ditolak (mencegah farm XP bolak-balik).
+// Return { ok, received, given, dupeReceived, dupeGiven } atau { ok:false, message }.
 export async function executeTrade(db, offer, accepterId, accepterUsername, accepterCharName) {
   const giverCard = await getCardOwner(db, offer.ownerId, offer.charName);
   const takerCard = await getCardOwner(db, accepterId, accepterCharName);
@@ -79,23 +101,66 @@ export async function executeTrade(db, offer, accepterId, accepterUsername, acce
   if (giverCard.charName.toLowerCase() === takerCard.charName.toLowerCase()) {
     return { ok: false, message: 'Kartunya sama, tidak perlu tukar.' };
   }
-  if (await getCardOwner(db, accepterId, giverCard.charName)) {
-    return { ok: false, message: `Kamu sudah punya ${giverCard.charName}.` };
-  }
-  if (await getCardOwner(db, offer.ownerId, takerCard.charName)) {
-    return { ok: false, message: `Penawar sudah punya ${takerCard.charName}.` };
-  }
+  const accepterHas = await getCardOwner(db, accepterId, giverCard.charName);
+  const offererHas = await getCardOwner(db, offer.ownerId, takerCard.charName);
 
-  await db.batch([
-    {
+  const stmts = [];
+  let dupeReceived = null;
+  let dupeGiven = null;
+
+  if (accepterHas) {
+    const newLevel = Math.min(MAX_CARD_LEVEL, accepterHas.level + 1);
+    const leveled = newLevel > accepterHas.level;
+    const xpBonus = DUPE_XP_REWARD[giverCard.rarity] || 0;
+    stmts.push({
+      sql: 'UPDATE user_cards SET level = ?, power = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [newLevel, leveled ? accepterHas.power + 10 : accepterHas.power, String(accepterId), giverCard.charName],
+    });
+    stmts.push({
+      sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [String(offer.ownerId), giverCard.charName],
+    });
+    const curXp = await getUserXp(db, accepterId);
+    stmts.push({
+      sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level`,
+      args: [String(accepterId), String(accepterUsername || ''), curXp + xpBonus, calcLevel(curXp + xpBonus)],
+    });
+    dupeReceived = { charName: giverCard.charName, level: newLevel, leveled, xpBonus };
+  } else {
+    stmts.push({
       sql: 'UPDATE user_cards SET user_id = ?, username = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [String(accepterId), String(accepterUsername || ''), String(offer.ownerId), giverCard.charName],
-    },
-    {
+    });
+  }
+
+  if (offererHas) {
+    const newLevel = Math.min(MAX_CARD_LEVEL, offererHas.level + 1);
+    const leveled = newLevel > offererHas.level;
+    const xpBonus = DUPE_XP_REWARD[takerCard.rarity] || 0;
+    stmts.push({
+      sql: 'UPDATE user_cards SET level = ?, power = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [newLevel, leveled ? offererHas.power + 10 : offererHas.power, String(offer.ownerId), takerCard.charName],
+    });
+    stmts.push({
+      sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [String(accepterId), takerCard.charName],
+    });
+    const curXp = await getUserXp(db, offer.ownerId);
+    stmts.push({
+      sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level`,
+      args: [String(offer.ownerId), String(offer.ownerUsername || ''), curXp + xpBonus, calcLevel(curXp + xpBonus)],
+    });
+    dupeGiven = { charName: takerCard.charName, level: newLevel, leveled, xpBonus };
+  } else {
+    stmts.push({
       sql: 'UPDATE user_cards SET user_id = ?, username = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [String(offer.ownerId), String(offer.ownerUsername || ''), String(accepterId), takerCard.charName],
-    },
-    { sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] },
-  ]);
-  return { ok: true, received: giverCard, given: takerCard };
+    });
+  }
+
+  stmts.push({ sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] });
+  await db.batch(stmts);
+  return { ok: true, received: giverCard, given: takerCard, dupeReceived, dupeGiven };
 }

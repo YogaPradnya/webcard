@@ -33,7 +33,8 @@ export async function GET(req) {
         owned: Boolean(mine),
         offererHas: Boolean(offererHas),
         same: Boolean(same),
-        ok: Boolean(mine) && !offererHas && !same && !isMine && !alreadyOwned,
+        // Duplikat tidak lagi ditolak: jadi Limit Break + XP otomatis.
+        ok: Boolean(mine) && !same && !isMine,
       };
     }
     return NextResponse.json({
