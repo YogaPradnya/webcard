@@ -22,6 +22,7 @@ export default function TradePage() {
   const [inCode, setInCode] = useState('');
   const [preview, setPreview] = useState(null);
   const [giveCard, setGiveCard] = useState('');
+  const [check, setCheck] = useState(null);
   const [result, setResult] = useState(null);
 
   useEffect(() => {
@@ -88,6 +89,8 @@ export default function TradePage() {
     setError('');
     setPreview(null);
     setResult(null);
+    setCheck(null);
+    setGiveCard('');
     const res = await fetch(`/api/trade/offer?code=${encodeURIComponent(inCode)}`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
@@ -96,6 +99,29 @@ export default function TradePage() {
     }
     setPreview(data);
   }
+
+  // Cek live tiap ganti kartu: sudah punya? milik sendiri? penawar sudah punya?
+  useEffect(() => {
+    if (!preview || !giveCard) {
+      setCheck(null);
+      return;
+    }
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/trade/offer?code=${encodeURIComponent(inCode)}&my=${encodeURIComponent(giveCard)}`,
+        );
+        const data = await res.json().catch(() => ({}));
+        if (data.success) {
+          setPreview(data);
+          setCheck(data.mineOk);
+        }
+      } catch {
+        // abaikan, validasi final tetap di server
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [giveCard]);
 
   async function onAccept(e) {
     e.preventDefault();
@@ -252,6 +278,14 @@ export default function TradePage() {
                       {preview.offer.rarity}] milik @{preview.offer.ownerUsername}
                     </span>
                   </div>
+                  {preview.offer.isMine ? (
+                    <div className="alert-error">Ini penawaranmu sendiri.</div>
+                  ) : null}
+                  {preview.alreadyOwned ? (
+                    <div className="alert-error">
+                      Kamu sudah punya {preview.offer.charName} — tidak bisa tukar.
+                    </div>
+                  ) : null}
                   <div className="field" style={{ marginTop: 12 }}>
                     <label className="label" htmlFor="giveCard">
                       Kartumu sebagai gantinya
@@ -271,7 +305,25 @@ export default function TradePage() {
                       ))}
                     </select>
                   </div>
-                  <button className="btn" type="submit">
+                  {check && giveCard ? (
+                    !check.owned ? (
+                      <div className="alert-error">Kamu tidak punya kartu itu.</div>
+                    ) : check.same ? (
+                      <div className="alert-error">Kartunya sama, tidak perlu tukar.</div>
+                    ) : check.offererHas ? (
+                      <div className="alert-error">Penawar sudah punya {giveCard}.</div>
+                    ) : null
+                  ) : null}
+                  <button
+                    className="btn"
+                    type="submit"
+                    disabled={
+                      !giveCard ||
+                      preview.offer.isMine ||
+                      preview.alreadyOwned ||
+                      !(check && check.ok)
+                    }
+                  >
                     Konfirmasi Tukar
                   </button>
                 </form>
