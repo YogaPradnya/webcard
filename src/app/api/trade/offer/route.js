@@ -1,17 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
+import { isDisplayOwned } from '@/lib/display';
 import { ensureTradeTable, executeTrade, getCardOwner, getOffer, normalizeTradeCode } from '@/lib/trade';
+import { checkRateCount } from '@/lib/rateLimit';
 
-// GET /api/trade/offer?code=123456[&my=Nama] — intip penawaran sebelum tukar.
-// Balik juga alreadyOwned (sudah punya kartu ini) dan penawaran milik sendiri.
+// GET /api/trade/offer?code=123456[&my=Nama&myQty=N] — intip penawaran sebelum tukar.
+// Balik juga alreadyOwned dan penawaran milik sendiri.
 export async function GET(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const params = new URL(req.url).searchParams;
   const code = normalizeTradeCode(params.get('code'));
   const myCharName = String(params.get('my') || '').trim();
+  const myQty = Math.max(1, parseInt(params.get('myQty'), 10) || 1);
   if (!code) return NextResponse.json({ success: false, message: 'Kode wajib angka.' }, { status: 400 });
+  const attempt = await checkRateCount(`tradeview:${session.id}`, 30, 60 * 1000);
+  if (!attempt.ok) {
+    return NextResponse.json({ success: false, message: 'Terlalu banyak percobaan. Tunggu sebentar.' }, { status: 429 });
+  }
 
   try {
     await ensureTradeTable();
@@ -27,14 +34,13 @@ export async function GET(req) {
     let mineOk = null;
     if (myCharName) {
       const mine = await getCardOwner(db, session.id, myCharName);
-      const offererHas = await getCardOwner(db, offer.ownerId, myCharName);
       const same = mine && mine.charName.toLowerCase() === offer.charName.toLowerCase();
       mineOk = {
         owned: Boolean(mine),
-        offererHas: Boolean(offererHas),
+        quantity: mine ? mine.quantity : 0,
+        enough: mine ? mine.quantity >= myQty : false,
         same: Boolean(same),
-        // Duplikat tidak lagi ditolak: jadi Limit Break + XP otomatis.
-        ok: Boolean(mine) && !same && !isMine,
+        ok: Boolean(mine) && mine.quantity >= myQty && !same && !isMine,
       };
     }
     return NextResponse.json({
@@ -50,7 +56,7 @@ export async function GET(req) {
   }
 }
 
-// POST /api/trade/offer { code, myCharName } — tukar kartumu dengan kartu penawar.
+// POST /api/trade/offer { code, myCharName, myAmount } — tukar copy kartumu dengan penawar.
 export async function POST(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
@@ -63,6 +69,7 @@ export async function POST(req) {
   }
   const code = normalizeTradeCode(body.code);
   const myCharName = String(body.myCharName || '').trim();
+  const myAmount = Math.max(1, Math.floor(Number(body.myAmount) || 1));
   if (!code || !myCharName) {
     return NextResponse.json({ success: false, message: 'Kode dan kartumu wajib diisi.' }, { status: 400 });
   }
@@ -75,7 +82,14 @@ export async function POST(req) {
     if (!offer) {
       return NextResponse.json({ success: false, message: 'Kode tidak ditemukan / kedaluwarsa.' }, { status: 404 });
     }
-    const result = await executeTrade(db, offer, session.id, session.username, myCharName);
+    // Kartu pajangan (display-only) tidak bisa di-trade.
+    if (await isDisplayOwned(session.id, myCharName)) {
+      return NextResponse.json({ success: false, message: 'Kartu pajangan tidak bisa di-trade.' }, { status: 400 });
+    }
+    if (await isDisplayOwned(offer.ownerId, offer.charName)) {
+      return NextResponse.json({ success: false, message: 'Kartu itu kartu pajangan, tidak bisa di-trade.' }, { status: 400 });
+    }
+    const result = await executeTrade(db, offer, session.id, session.username, myCharName, myAmount);
     if (!result.ok) return NextResponse.json({ success: false, message: result.message }, { status: 400 });
     return NextResponse.json({ success: true, received: result.received, given: result.given });
   } catch (e) {

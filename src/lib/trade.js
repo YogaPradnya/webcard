@@ -1,4 +1,7 @@
 import { getDb } from './db';
+import { ensureQuantityColumn } from './cards.js';
+
+export const MAX_CARD_COPIES = 999;
 
 export const TRADE_CODE_LENGTH = 6;
 export const TRADE_TTL_MS = 10 * 60 * 1000;
@@ -18,6 +21,7 @@ export function normalizeTradeCode(value) {
 }
 
 export async function ensureTradeTable() {
+  await ensureQuantityColumn();
   await getDb().execute(`
     CREATE TABLE IF NOT EXISTS trade_offers (
       code TEXT PRIMARY KEY,
@@ -38,11 +42,14 @@ export async function ensureTradeTable() {
   await getDb().execute(
     'CREATE INDEX IF NOT EXISTS idx_trade_search ON trade_offers (owner_username, char_name, code)',
   );
+  // Jumlah copy per penawaran (stacking). Best-effort untuk DB lama.
+  try { await getDb().execute('ALTER TABLE trade_offers ADD COLUMN amount INTEGER DEFAULT 1'); } catch { /* sudah ada */ }
+  try { await getDb().execute('UPDATE trade_offers SET amount = 1 WHERE amount IS NULL OR amount < 1'); } catch { /* abaikan */ }
 }
 
 export async function getOffer(db, code) {
   const res = await db.execute({
-    sql: 'SELECT code, owner_id, owner_username, char_name, rarity, expires_at FROM trade_offers WHERE code = ?',
+    sql: 'SELECT code, owner_id, owner_username, char_name, rarity, expires_at, amount FROM trade_offers WHERE code = ?',
     args: [code],
   });
   if (res.rows.length === 0) return null;
@@ -54,50 +61,40 @@ export async function getOffer(db, code) {
     charName: String(r.char_name),
     rarity: String(r.rarity || 'Common'),
     expiresAt: Number(r.expires_at) || 0,
+    amount: Math.max(1, Number(r.amount) || 1),
   };
 }
 
 export async function getCardOwner(db, userId, charName) {
   const res = await db.execute({
-    sql: 'SELECT char_name, rarity, level, power, image_url, is_showcase FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+    sql: 'SELECT char_name, anime, rarity, level, power, image_url, is_showcase, quantity FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
     args: [String(userId), String(charName)],
   });
   if (res.rows.length === 0) return null;
   const r = res.rows[0];
   return {
     charName: String(r.char_name),
+    anime: String(r.anime || ''),
     rarity: String(r.rarity || 'Common'),
     level: Number(r.level) || 1,
     power: Number(r.power) || 0,
     imageUrl: r.image_url || null,
     showcase: Number(r.is_showcase) === 1,
+    quantity: Math.max(1, Number(r.quantity) || 1),
   };
 }
 
-// Bonus XP duplikat (sama seperti Limit Break gacha di bot).
-export const DUPE_XP_REWARD = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
-const MAX_CARD_LEVEL = 5;
+// Catatan: konversi kartu -> XP pindah ke fitur Konversi (rate di lib/gacha.js).
 
-function calcLevel(xp) {
-  let lv = 1;
-  while (xp >= Math.floor(20 * Math.pow(lv, 3))) lv++;
-  return lv;
-}
-
-async function getUserXp(db, userId) {
-  try {
-    const r = await db.execute({ sql: 'SELECT xp FROM user_stats WHERE user_id = ?', args: [String(userId)] });
-    if (r.rows.length > 0) return Number(r.rows[0].xp) || 0;
-  } catch { /* user baru */ }
-  return 0;
-}
-
-// Tukar 2 kartu antar user secara atomik.
-// Bila penerima SUDAH punya kartu yang diterima -> jadi Limit Break:
-// baris lama naik level (maks 5) + bonus XP, baris yang diberikan hangus.
-// Kartu yang sama persis tetap ditolak (mencegah farm XP bolak-balik).
-// Return { ok, received, given, dupeReceived, dupeGiven } atau { ok:false, message }.
-export async function executeTrade(db, offer, accepterId, accepterUsername, accepterCharName) {
+// Tukar copy kartu antar user (semantik stack, tanpa auto-XP / Limit Break).
+// - offer.amount copy kartu penawar pindah ke penerima (menumpuk bila sudah punya).
+// - accepterAmount copy kartu penerima pindah ke penawar (menumpuk bila sudah punya).
+// - Baris quantity 0 dihapus. Kartu pajangan yang habis ikut terhapus (flag ikut baris).
+// - Kartu yang sama persis tetap ditolak.
+// Return { ok, received, given } atau { ok:false, message }.
+export async function executeTrade(db, offer, accepterId, accepterUsername, accepterCharName, accepterAmount = 1) {
+  const giveAmount = Math.max(1, Math.floor(Number(offer.amount) || 1));
+  const takeAmount = Math.max(1, Math.floor(Number(accepterAmount) || 1));
   const giverCard = await getCardOwner(db, offer.ownerId, offer.charName);
   const takerCard = await getCardOwner(db, accepterId, accepterCharName);
   if (!giverCard) return { ok: false, message: 'Kartu penawar sudah tidak ada.' };
@@ -108,66 +105,83 @@ export async function executeTrade(db, offer, accepterId, accepterUsername, acce
   if (giverCard.charName.toLowerCase() === takerCard.charName.toLowerCase()) {
     return { ok: false, message: 'Kartunya sama, tidak perlu tukar.' };
   }
-  const accepterHas = await getCardOwner(db, accepterId, giverCard.charName);
-  const offererHas = await getCardOwner(db, offer.ownerId, takerCard.charName);
+  if (giverCard.quantity < giveAmount) {
+    return { ok: false, message: `Penawar hanya punya ${giverCard.quantity} copy.` };
+  }
+  if (takerCard.quantity < takeAmount) {
+    return { ok: false, message: `Kamu hanya punya ${takerCard.quantity} copy ${takerCard.charName}.` };
+  }
+  // Cap tumpukan 999: penerima tidak boleh melewatinya.
+  const giverTarget = await getCardOwner(db, accepterId, giverCard.charName);
+  const takerTarget = await getCardOwner(db, offer.ownerId, takerCard.charName);
+  if (giverTarget && giverTarget.quantity + giveAmount > MAX_CARD_COPIES) {
+    return { ok: false, message: `${giverCard.charName} milikmu akan melebihi ${MAX_CARD_COPIES} copy.` };
+  }
+  if (takerTarget && takerTarget.quantity + takeAmount > MAX_CARD_COPIES) {
+    return { ok: false, message: `${takerCard.charName} milik penawar akan melebihi ${MAX_CARD_COPIES} copy.` };
+  }
 
-  const stmts = [];
-  let dupeReceived = null;
-  let dupeGiven = null;
-
-  if (accepterHas) {
-    const newLevel = Math.min(MAX_CARD_LEVEL, accepterHas.level + 1);
-    const leveled = newLevel > accepterHas.level;
-    const xpBonus = DUPE_XP_REWARD[giverCard.rarity] || 0;
-    stmts.push({
-      sql: 'UPDATE user_cards SET level = ?, power = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-      args: [newLevel, leveled ? accepterHas.power + 10 : accepterHas.power, String(accepterId), giverCard.charName],
-    });
-    stmts.push({
+  // Kurangi pengirim (hapus baris bila habis).
+  if (giverCard.quantity === giveAmount) {
+    await db.execute({
       sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [String(offer.ownerId), giverCard.charName],
     });
-    const curXp = await getUserXp(db, accepterId);
-    stmts.push({
-      sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level`,
-      args: [String(accepterId), String(accepterUsername || ''), curXp + xpBonus, calcLevel(curXp + xpBonus)],
-    });
-    dupeReceived = { charName: giverCard.charName, level: newLevel, leveled, xpBonus };
   } else {
-    stmts.push({
-      sql: 'UPDATE user_cards SET user_id = ?, username = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-      args: [String(accepterId), String(accepterUsername || ''), String(offer.ownerId), giverCard.charName],
+    await db.execute({
+      sql: 'UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [giveAmount, String(offer.ownerId), giverCard.charName],
     });
   }
-
-  if (offererHas) {
-    const newLevel = Math.min(MAX_CARD_LEVEL, offererHas.level + 1);
-    const leveled = newLevel > offererHas.level;
-    const xpBonus = DUPE_XP_REWARD[takerCard.rarity] || 0;
-    stmts.push({
-      sql: 'UPDATE user_cards SET level = ?, power = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-      args: [newLevel, leveled ? offererHas.power + 10 : offererHas.power, String(offer.ownerId), takerCard.charName],
-    });
-    stmts.push({
+  if (takerCard.quantity === takeAmount) {
+    await db.execute({
       sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [String(accepterId), takerCard.charName],
     });
-    const curXp = await getUserXp(db, offer.ownerId);
-    stmts.push({
-      sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level`,
-      args: [String(offer.ownerId), String(offer.ownerUsername || ''), curXp + xpBonus, calcLevel(curXp + xpBonus)],
-    });
-    dupeGiven = { charName: takerCard.charName, level: newLevel, leveled, xpBonus };
   } else {
-    stmts.push({
-      sql: 'UPDATE user_cards SET user_id = ?, username = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-      args: [String(offer.ownerId), String(offer.ownerUsername || ''), String(accepterId), takerCard.charName],
+    await db.execute({
+      sql: 'UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [takeAmount, String(accepterId), takerCard.charName],
     });
   }
 
-  stmts.push({ sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] });
-  await db.batch(stmts);
-  return { ok: true, received: giverCard, given: takerCard, dupeReceived, dupeGiven };
+  // Tambahkan ke penerima (menumpuk) — gagal di satu sisi = gagal semua (lempar error).
+  try {
+    await grantCopies(db, accepterId, accepterUsername, giverCard, giveAmount);
+    await grantCopies(db, offer.ownerId, offer.ownerUsername, takerCard, takeAmount);
+  } catch (e) {
+    console.error('[TRADE GRANT]', e.message);
+    return { ok: false, message: 'Gagal memindahkan kartu. Coba lagi.' };
+  }
+
+  await db.execute({ sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] });
+  return {
+    ok: true,
+    received: { ...giverCard, amount: giveAmount },
+    given: { ...takerCard, amount: takeAmount },
+  };
+}
+
+// Tambah N copy ke user: menumpuk bila sudah punya, baris baru (lv1) bila belum.
+async function grantCopies(db, userId, username, card, amount) {
+  const { calcPower } = await import('./gacha.js');
+  const has = await getCardOwner(db, userId, card.charName);
+  if (has) {
+    if (has.quantity + amount > MAX_CARD_COPIES) {
+      throw new Error(`Cap ${MAX_CARD_COPIES} copy terlampaui untuk ${card.charName}.`);
+    }
+    await db.execute({
+      sql: 'UPDATE user_cards SET quantity = quantity + ?, username = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+      args: [amount, String(username || ''), String(userId), card.charName],
+    });
+    return;
+  }
+  await db.execute({
+    sql: `INSERT INTO user_cards (user_id, username, char_name, anime, rarity, level, power, image_url, is_showcase, quantity, pulled_at)
+          VALUES (?, ?, ?, ?, ?, 1, ?, ?, 0, ?, CURRENT_TIMESTAMP)`,
+    args: [
+      String(userId), String(username || ''), card.charName, card.anime || '', card.rarity || 'Common',
+      calcPower(card.rarity || 'Common', 1, card.charName), card.imageUrl || null, amount,
+    ],
+  });
 }

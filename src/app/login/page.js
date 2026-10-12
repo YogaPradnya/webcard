@@ -9,11 +9,13 @@ export default function LoginPage() {
   const [expiresAt, setExpiresAt] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const pollTimer = useRef(null);
 
   async function makeCode() {
     setError('');
     setCode('');
+    setCopied(false);
     setLoading(true);
     try {
       const res = await fetch('/api/auth/code', { method: 'POST' });
@@ -28,6 +30,19 @@ export default function LoginPage() {
       setError('Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function copyCode() {
+    if (!code) return;
+    const text = `.login ${code}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback: select manual
+      setError('Gagal salin otomatis. Salin manual: ' + text);
     }
   }
 
@@ -71,9 +86,14 @@ export default function LoginPage() {
           <div>
             <div className="trade-code-big">{code}</div>
             <div className="trade-hint">Ketik .login {code} di chat. Menunggu klaim...</div>
-            <button className="btn btn-ghost" onClick={makeCode} disabled={loading}>
-              Kode Baru
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn" onClick={copyCode} type="button" style={{ flex: 1 }}>
+                {copied ? 'Tersalin!' : 'Salin .login'}
+              </button>
+              <button className="btn btn-ghost" onClick={makeCode} disabled={loading} type="button" style={{ flex: 1 }}>
+                Kode Baru
+              </button>
+            </div>
           </div>
         )}
       </div>

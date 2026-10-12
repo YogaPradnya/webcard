@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import ConfirmModal from '@/components/ConfirmModal';
 
 function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
@@ -16,7 +17,7 @@ function HpBar({ hp, maxHp }) {
 
 function ConsPips({ value }) {
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
       <span style={{ fontSize: 11, fontWeight: 800, marginRight: 4 }}>Cons {value}/10</span>
       {Array.from({ length: 10 }).map((_, i) => (
         <span
@@ -45,7 +46,7 @@ function FighterCard({ f, active, art, fx, foe, onTap, tappable }) {
     >
       {art ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="fighter-img" src={art} alt={f.name} loading="lazy" />
+        <img className="fighter-img" src={art} alt={f.name} loading="lazy" decoding="async" />
       ) : (
         <div className="fighter-img" />
       )}
@@ -73,6 +74,13 @@ function FighterCard({ f, active, art, fx, foe, onTap, tappable }) {
   );
 }
 
+function fmtClock(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, '0')}`;
+}
+
 export default function BattlePage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -81,14 +89,19 @@ export default function BattlePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Setup
   const [mode, setMode] = useState('ai');
+  const [difficulty, setDifficulty] = useState('normal');
   const [picked, setPicked] = useState([]);
   const [vanguard, setVanguard] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [pickFlipped, setPickFlipped] = useState(null);
+  const [pickQ, setPickQ] = useState('');
+  const [pickRole, setPickRole] = useState('All');
+  const [pickTier, setPickTier] = useState('All');
 
-  // List room PvP ready (10/page, hanya usn + kode + sisa waktu)
+  const [presets, setPresets] = useState([]);
+  const [history, setHistory] = useState([]);
+
   const [roomQInput, setRoomQInput] = useState('');
   const [roomQ, setRoomQ] = useState('');
   const [roomPage, setRoomPage] = useState(1);
@@ -98,16 +111,23 @@ export default function BattlePage() {
   const [roomLoading, setRoomLoading] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
 
-  // Room aktif milik sendiri (persist biar bebas pindah page + auto masuk saat lawan gabung)
   const MY_ROOM_KEY = 'battle_my_room';
+  const PRESET_KEY = 'battle_presets';
   const [myRooms, setMyRooms] = useState([]);
 
-  // Arena
   const [st, setSt] = useState(null);
   const [acting, setActing] = useState(false);
-  const [fx, setFx] = useState(null); // { actor, target, kind, num, key }
+  const [askSurrender, setAskSurrender] = useState(false);
+  const [fx, setFx] = useState(null);
   const fxTimer = useRef(null);
   const seenLog = useRef(0);
+
+  // Chat battle sementara
+  const [chatMsgs, setChatMsgs] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const chatAfter = useRef(0);
+  const chatBoxRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -128,7 +148,15 @@ export default function BattlePage() {
           for (const c of all) if (c.imageUrl) artMap[c.name.toLowerCase()] = c.imageUrl;
           setArts(artMap);
         }
-        // Auto-restore room aktif (biar bebas pindah page lalu balik auto masuk battle)
+        try {
+          const raw = localStorage.getItem(PRESET_KEY);
+          if (raw) setPresets(JSON.parse(raw) || []);
+        } catch { /* abaikan */ }
+        try {
+          const hRes = await fetch('/api/battle/history?limit=10');
+          const hData = await hRes.json().catch(() => ({}));
+          if (hData.success) setHistory(hData.history || []);
+        } catch { /* abaikan */ }
         try {
           const mineRes = await fetch('/api/battle/mine');
           const mineData = await mineRes.json().catch(() => ({}));
@@ -153,7 +181,8 @@ export default function BattlePage() {
         setLoading(false);
       }
     })();
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function applyState(state) {
     setSt(state);
@@ -217,6 +246,14 @@ export default function BattlePage() {
     }
   }
 
+  async function fetchHistory() {
+    try {
+      const res = await fetch('/api/battle/history?limit=10');
+      const data = await res.json().catch(() => ({}));
+      if (data.success) setHistory(data.history || []);
+    } catch { /* abaikan */ }
+  }
+
   useEffect(() => {
     if (loading || st) return;
     fetchRooms(roomPage, roomQ);
@@ -227,10 +264,11 @@ export default function BattlePage() {
   useEffect(() => {
     if (loading || st) return;
     const t = setInterval(() => {
+      if (document.hidden) return;
       setNowTick(Date.now());
       fetchRooms(roomPage, roomQ);
       fetchMine();
-    }, 3000);
+    }, 5000);
     const tick = setInterval(() => setNowTick(Date.now()), 1000);
     return () => {
       clearInterval(t);
@@ -239,6 +277,78 @@ export default function BattlePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, st, roomPage, roomQ]);
 
+  // Chat battle: load awal + polling saat battle ongoing
+  useEffect(() => {
+    if (!st?.code) {
+      setChatMsgs([]);
+      chatAfter.current = 0;
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/battle/chat?code=${encodeURIComponent(st.code)}&afterId=0`);
+        const data = await res.json().catch(() => ({}));
+        if (alive && data.success) {
+          setChatMsgs(data.messages || []);
+          const last = (data.messages || []).at(-1);
+          if (last) chatAfter.current = last.id;
+          scrollChat();
+        }
+      } catch { /* abaikan */ }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.code]);
+
+  useEffect(() => {
+    if (!st?.code || st.status === 'finished') return;
+    const t = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const res = await fetch(`/api/battle/chat?code=${encodeURIComponent(st.code)}&afterId=${chatAfter.current}`);
+        const data = await res.json().catch(() => ({}));
+        if (data.success && data.messages?.length) {
+          setChatMsgs((prev) => [...prev, ...data.messages].slice(-100));
+          chatAfter.current = data.messages.at(-1).id;
+          scrollChat();
+        }
+      } catch { /* abaikan */ }
+    }, 2500);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.code, st?.status]);
+
+  function scrollChat() {
+    requestAnimationFrame(() => {
+      const el = chatBoxRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  async function sendBattleChat(e) {
+    e.preventDefault();
+    const text = chatInput.trim();
+    if (!text || !st?.code || chatSending) return;
+    setChatSending(true);
+    try {
+      const res = await fetch('/api/battle/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: st.code, message: text.slice(0, 200) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success && data.message) {
+        setChatMsgs((prev) => [...prev, data.message].slice(-100));
+        chatAfter.current = Math.max(chatAfter.current, data.message.id || 0);
+        setChatInput('');
+        scrollChat();
+      }
+    } finally {
+      setChatSending(false);
+    }
+  }
+
   function fmtSisa(expiresAt) {
     const s = Math.max(0, Math.ceil((expiresAt - nowTick) / 1000));
     const m = Math.floor(s / 60);
@@ -246,8 +356,17 @@ export default function BattlePage() {
     return `${m}:${String(r).padStart(2, '0')}`;
   }
 
+  function forfeitLeft() {
+    if (!st || st.status !== 'ongoing' || st.battle?.over) return null;
+    // Hitung dari updatedAt server agar countdown jalan meski state snapshot lama.
+    if (st.updatedAt) {
+      return Math.max(0, 2 * 60 * 1000 - (nowTick - st.updatedAt));
+    }
+    if (typeof st.forfeitMsLeft === 'number') return Math.max(0, st.forfeitMsLeft);
+    return null;
+  }
+
   async function onPickRoom(code) {
-    // Kalau tim sudah 3, langsung join (1 klik). Kalau belum, isi kode + minta pilih kartu.
     if (picked.length === 3) {
       setError('');
       setJoinCode(code);
@@ -275,16 +394,31 @@ export default function BattlePage() {
     setRoomQ(roomQInput.trim());
   }
 
-  // Urutan tim: vanguard (maju duluan) dulu, sisanya ikut urutan pilih.
   function orderedTeam() {
     if (picked.length !== 3) return picked;
     const first = vanguard && picked.includes(vanguard) ? vanguard : picked[0];
     return [first, ...picked.filter((n) => n !== first)];
   }
 
+  function savePreset() {
+    if (picked.length !== 3) {
+      setError('Pilih 3 kartu dulu untuk simpan preset.');
+      return;
+    }
+    const name = `Tim ${presets.length + 1}`;
+    const next = [...presets, { name, team: orderedTeam() }].slice(-5);
+    setPresets(next);
+    try { localStorage.setItem(PRESET_KEY, JSON.stringify(next)); } catch { /* abaikan */ }
+  }
+
+  function loadPreset(p) {
+    setPicked(p.team.filter((n) => cards.some((c) => c.name === n)));
+    setVanguard(p.team[0] || '');
+  }
+
   async function startAi() {
     setError('');
-    const data = await api('/api/battle/room', { mode: 'ai', team: orderedTeam() });
+    const data = await api('/api/battle/room', { mode: 'ai', team: orderedTeam(), difficulty });
     if (!data.success) {
       setError(data.message || 'Gagal mulai battle.');
       return;
@@ -322,7 +456,6 @@ export default function BattlePage() {
     seenLog.current = 0;
     applyState(data.state);
     try { localStorage.setItem(MY_ROOM_KEY, data.state.code); } catch { /* abaikan */ }
-    // Room yang baru dimasuki langsung hilang dari list (status jadi ongoing)
     setRoomList((prev) => prev.filter((r) => r.code !== data.state.code));
   }
 
@@ -344,13 +477,29 @@ export default function BattlePage() {
     fetchRooms(roomPage, roomQ);
   }
 
+  async function surrenderBattle() {
+    if (!st) return;
+    setError('');
+    const data = await api('/api/battle/room/forfeit', { code: st.code });
+    setAskSurrender(false);
+    if (!data.success) {
+      setError(data.message || 'Gagal menyerah.');
+      refresh();
+      return;
+    }
+    refresh();
+  }
+
   function exitBattle() {
     clearMyRoom();
     setSt(null);
     setPicked([]);
     setFx(null);
+    setChatMsgs([]);
+    chatAfter.current = 0;
     fetchMine();
     fetchRooms(roomPage, roomQ);
+    fetchHistory();
   }
 
   async function doAct(action) {
@@ -374,7 +523,6 @@ export default function BattlePage() {
     if (!st) return;
     const data = await api(`/api/battle/room?code=${encodeURIComponent(st.code)}`);
     if (!data.success) {
-      // Kode hangus / room hilang / bukan room kamu -> keluar otomatis
       clearMyRoom();
       setSt(null);
       setPicked([]);
@@ -386,13 +534,12 @@ export default function BattlePage() {
     if (data.state) applyState(data.state);
   }
 
-  // Polling PvP: tunggu lawan / giliran lawan.
   useEffect(() => {
     if (!st || st.status === 'finished') return;
     const waiting = st.status === 'waiting';
     const myTurn = st.turn === me?.id;
     if (!waiting && myTurn) return;
-    const t = setInterval(refresh, 2500);
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, 2500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st?.code, st?.status, st?.turn, me?.id]);
@@ -404,6 +551,9 @@ export default function BattlePage() {
   const myTurn = st && st.status === 'ongoing' && !st.battle.over && st.turn === me?.id;
   const activeFighter = myTeam?.fighters[myTeam?.active];
   const canSkill = activeFighter && myTeam && activeFighter.alive && myTeam.cons >= activeFighter.cons;
+  const hasSkill2 = Boolean(activeFighter?.skill2Name) && (activeFighter?.skill2 || 0) > 0;
+  const canSkill2 = activeFighter && myTeam && activeFighter.alive && hasSkill2 && myTeam.cons >= (activeFighter.cons2 ?? 99);
+  const fLeft = forfeitLeft();
 
   function fxFor(name) {
     if (!fx || !name) return '';
@@ -419,13 +569,23 @@ export default function BattlePage() {
     return fx.num;
   }
 
+  const filteredCards = cards.filter((c) => {
+    if (pickRole !== 'All' && c.stats?.role !== pickRole) return false;
+    if (pickTier !== 'All' && c.tier !== pickTier) return false;
+    if (pickQ.trim() && !`${c.name} ${c.tier}`.toLowerCase().includes(pickQ.trim().toLowerCase())) return false;
+    return true;
+  });
+
   if (loading) {
     return (
       <div className="layout">
         <Sidebar username={me?.username} />
         <div className="layout-main">
           <div className="page">
-            <div className="card">Memuat battle...</div>
+            <div className="card">
+              <div className="skeleton-line" style={{ width: '40%' }} />
+              <div className="skeleton-line" style={{ width: '80%' }} />
+            </div>
           </div>
         </div>
       </div>
@@ -488,7 +648,7 @@ export default function BattlePage() {
 
           {!st ? (
             <div className="card" style={{ marginBottom: 16 }}>
-              <div className="section-title">Battle ready ({roomTotal})</div>
+              <div className="section-title">Battle aktif ({roomTotal})</div>
               <form onSubmit={onSearchRoom} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
                 <input
                   className="input"
@@ -531,7 +691,7 @@ export default function BattlePage() {
                     disabled={roomPage <= 1}
                     onClick={() => setRoomPage((p) => Math.max(1, p - 1))}
                   >
-                    Prev
+                    Sebelumnya
                   </button>
                   <span style={{ fontSize: 12 }}>
                     {roomPage}/{roomTotalPages}
@@ -542,7 +702,7 @@ export default function BattlePage() {
                     disabled={roomPage >= roomTotalPages}
                     onClick={() => setRoomPage((p) => p + 1)}
                   >
-                    Next
+                    Berikutnya
                   </button>
                 </div>
               ) : null}
@@ -552,24 +712,51 @@ export default function BattlePage() {
           {!st ? (
             <div>
               <div className="card" style={{ marginBottom: 16 }}>
-                <div className="field" style={{ marginBottom: 12 }}>
-                  <label className="label" htmlFor="battleMode">
-                    Mode
-                  </label>
-                  <select
-                    id="battleMode"
-                    className="select"
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value)}
-                  >
-                    <option value="ai">Lawan AI</option>
-                    <option value="create">Buat room PvP (kode angka)</option>
-                    <option value="join">Gabung room (kode angka)</option>
-                  </select>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <div className="field" style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
+                    <label className="label" htmlFor="battleMode">Mode</label>
+                    <select id="battleMode" className="select" value={mode} onChange={(e) => setMode(e.target.value)}>
+                      <option value="ai">Lawan AI</option>
+                      <option value="create">Buat room PvP (kode angka)</option>
+                      <option value="join">Gabung room (kode angka)</option>
+                    </select>
+                  </div>
+                  {mode === 'ai' ? (
+                    <div className="field" style={{ flex: 1, minWidth: 140, marginBottom: 0 }}>
+                      <label className="label" htmlFor="difficulty">Difficulty AI</label>
+                      <select id="difficulty" className="select" value={difficulty} onChange={(e) => setDifficulty(e.target.value)}>
+                        <option value="easy">Easy</option>
+                        <option value="normal">Normal</option>
+                        <option value="hard">Hard</option>
+                      </select>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="section-title">Pilih 3 kartumu</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Cari kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} aria-label="Cari kartu battle" />
+                  <select className="select" style={{ width: 130 }} value={pickRole} onChange={(e) => setPickRole(e.target.value)} aria-label="Filter role">
+                    {['All', 'Damage', 'Tank', 'Support', 'Assist'].map((r) => (
+                      <option key={r} value={r}>{r === 'All' ? 'Semua role' : r}</option>
+                    ))}
+                  </select>
+                  <select className="select" style={{ width: 130 }} value={pickTier} onChange={(e) => setPickTier(e.target.value)} aria-label="Filter tier">
+                    {['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'].map((t) => (
+                      <option key={t} value={t}>{t === 'All' ? 'Semua tier' : t}</option>
+                    ))}
+                  </select>
+                </div>
+                {presets.length > 0 ? (
+                  <div className="chip-row" style={{ marginBottom: 12 }}>
+                    {presets.map((p, i) => (
+                      <button key={i} type="button" className="chip" onClick={() => loadPreset(p)} title={p.team.join(', ')}>
+                        {p.name}: {p.team.length}/3
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="pick-grid">
-                  {cards.map((c) => {
+                  {filteredCards.map((c) => {
                     const idx = picked.indexOf(c.name);
                     const selected = idx >= 0;
                     const flipped = pickFlipped === c.name;
@@ -603,7 +790,7 @@ export default function BattlePage() {
                           <div className="flip-front">
                             {c.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" />
+                              <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
                             ) : (
                               <div className="card-art" />
                             )}
@@ -647,29 +834,41 @@ export default function BattlePage() {
                     );
                   })}
                 </div>
+                {filteredCards.length === 0 ? <div style={{ fontSize: 13, marginTop: 8 }}>Tidak ada kartu cocok. Ubah filter.</div> : null}
                 {picked.length === 3 ? (
-                  <div className="field" style={{ marginTop: 4 }}>
-                    <label className="label" htmlFor="vanguard">
-                      Yang maju duluan
-                    </label>
-                    <select
-                      id="vanguard"
-                      className="select"
-                      value={vanguard}
-                      onChange={(e) => setVanguard(e.target.value)}
-                    >
-                      {picked.map((n) => (
-                        <option key={n} value={n}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                    <div className="field" style={{ flex: 1, minWidth: 160, marginBottom: 0 }}>
+                      <label className="label" htmlFor="vanguard">Yang maju duluan</label>
+                      <select id="vanguard" className="select" value={vanguard} onChange={(e) => setVanguard(e.target.value)}>
+                        {picked.map((n) => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <button type="button" className="btn btn-ghost" style={{ width: 'auto' }} onClick={savePreset}>
+                      Simpan preset
+                    </button>
                   </div>
                 ) : null}
                 {cards.length === 0 ? (
                   <div style={{ fontSize: 13 }}>Kamu belum punya kartu. Gacha dulu.</div>
                 ) : null}
               </div>
+
+              {history.length > 0 ? (
+                <div className="card" style={{ marginBottom: 16 }}>
+                  <div className="section-title">Riwayat battle (10 terakhir)</div>
+                  {history.map((h, i) => (
+                    <div className="user-row" key={`${h.code}-${i}`}>
+                      <span>
+                        <b style={{ color: h.won ? 'var(--success)' : 'var(--body)' }}>{h.won ? 'Menang' : 'Kalah'}</b>
+                        {' '}vs @{h.foe} [{h.mode}] <span style={{ color: 'var(--muted)', fontSize: 11 }}>{h.reason}</span>
+                      </span>
+                      <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)' }}>{h.code}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {mode === 'join' ? (
                 <div className="card" style={{ marginBottom: 16 }}>
@@ -706,14 +905,23 @@ export default function BattlePage() {
                   disabled={picked.length !== 3}
                   onClick={mode === 'ai' ? startAi : createPvp}
                 >
-                  {mode === 'ai' ? `Mulai vs AI (${picked.length}/3)` : `Buat Kode Room (${picked.length}/3)`}
+                  {mode === 'ai' ? `Mulai vs AI ${difficulty} (${picked.length}/3)` : `Buat Kode Room (${picked.length}/3)`}
                 </button>
               )}
             </div>
             </div>
           ) : st.status === 'waiting' ? (
-            <div className="card">
+            <div className="card waiting-card">
               <div className="section-title">Room {st.code}</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                className="waiting-art pulse"
+                src="/battle-waiting.png"
+                alt="Menunggu lawan"
+                width={768}
+                height={429}
+                decoding="async"
+              />
               <div className="trade-code-big">{st.code}</div>
               <div className="trade-hint">Bagikan kode ini ke lawan. Menunggu gabung... (hangus dalam 5 menit)</div>
               <button className="btn btn-ghost" onClick={refresh}>
@@ -728,6 +936,32 @@ export default function BattlePage() {
             </div>
           ) : (
             <div>
+              <div className="card" style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 800 }}>Room {st.code} • {st.mode === 'ai' ? `AI (${difficulty})` : 'PvP'}</span>
+                  {fLeft != null && !st.battle.over ? (
+                    <span className={fLeft < 30000 ? 'turn-badge danger' : 'turn-badge'} title="2 menit tanpa aksi = menyerah otomatis">
+                      ⏱ {fmtClock(fLeft)}
+                    </span>
+                  ) : null}
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                    {!st.battle.over ? (
+                      <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={() => setAskSurrender(true)}>
+                        Menyerah
+                      </button>
+                    ) : null}
+                    <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={refresh}>
+                      Refresh
+                    </button>
+                  </span>
+                </div>
+                {fLeft != null && !st.battle.over ? (
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
+                    Diam 2 menit = otomatis menyerah dan battle berakhir.
+                  </div>
+                ) : null}
+              </div>
+
               <div className="card" style={{ marginBottom: 16 }}>
                 <div className="arena-side-title">
                   {st.mode === 'ai' ? 'Lawan (AI)' : `@${mySide === 'player' ? st.p2Username : st.p1Username}`}
@@ -788,6 +1022,17 @@ export default function BattlePage() {
                     >
                       Skill ({activeFighter?.cons} cons)
                     </button>
+                    {hasSkill2 ? (
+                      <button
+                        className="btn"
+                        style={{ width: 'auto' }}
+                        disabled={!canSkill2}
+                        onClick={() => doAct({ type: 'skill2' })}
+                        title={activeFighter ? `${activeFighter.skill2Name} - ${activeFighter.cons2} cons (★5)` : ''}
+                      >
+                        Skill2 ({activeFighter?.cons2} cons)
+                      </button>
+                    ) : null}
                     <div style={{ width: '100%', fontSize: 11, color: 'var(--body)' }}>
                       Ketuk kartu cadanganmu untuk ganti (1 giliran).
                     </div>
@@ -795,7 +1040,7 @@ export default function BattlePage() {
                 ) : null}
                 {st.turn && !myTurn && st.status === 'ongoing' && !st.battle.over ? (
                   <div style={{ marginTop: 8, fontSize: 12, color: 'var(--body)' }}>
-                    Menunggu lawan... (otomatis jalan bila 60 detik)
+                    Menunggu lawan... (menyerah otomatis bila 2 menit diam)
                   </div>
                 ) : null}
               </div>
@@ -803,7 +1048,8 @@ export default function BattlePage() {
               {st.status === 'finished' || st.battle.over ? (
                 <div className="card" style={{ marginBottom: 16 }}>
                   <div className="section-title">
-                    {String(st.winner) === String(me?.id) ? 'Menang!' : 'Kalah'}
+                    {String(st.winner) === String(me?.id) ? 'Menang!' : st.winner === 'AI' && st.mode === 'ai' ? 'Kalah' : 'Kalah'}
+                    {st.result?.reason ? <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>({st.result.reason})</span> : null}
                   </div>
                   <div style={{ fontSize: 13 }}>
                     {st.result?.xp?.[me?.id] ? (
@@ -826,28 +1072,48 @@ export default function BattlePage() {
               ) : null}
 
               <div className="card">
-                <div className="section-title">Log</div>
-                <div style={{ maxHeight: 220, overflow: 'auto', fontSize: 12 }}>
-                  {st.battle.log.map((ev, i) => (
-                    <div key={i} className="user-row">
-                      <span>
-                        {ev.side === mySide ? 'Kamu' : ev.side === 'enemy' || ev.side === 'player' ? 'Lawan' : '-'} —{' '}
-                        {ev.type}
-                        {ev.name ? ` ${ev.name}` : ''}
-                        {ev.skill ? ` (${ev.skill})` : ''}
-                        {ev.dmg ? ` -${ev.dmg}` : ''}
-                        {ev.amount ? ` +${ev.amount}` : ''}
-                        {ev.combo ? ' [KOMBO]' : ''}
-                        {ev.crit ? ' [CRIT]' : ''}
-                        {ev.status ? ` (${ev.status})` : ''}
-                        {ev.target ? ` -> ${ev.target}` : ''}
-                      </span>
+                <div className="section-title">Chat battle (sementara, hanya room ini)</div>
+                <div ref={chatBoxRef} style={{ maxHeight: 220, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, background: 'var(--hairline-soft)', borderRadius: 8, padding: 10 }}>
+                  {chatMsgs.length === 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Belum ada chat. Sapa lawanmu!</div>
+                  ) : chatMsgs.map((m) => (
+                    <div key={m.id} style={{ fontSize: 12, textAlign: m.isMine ? 'right' : 'left' }}>
+                      <span style={{ fontWeight: 800, color: m.isMine ? 'var(--link)' : 'var(--body)' }}>@{m.username}</span>
+                      <div style={{ display: 'inline-block', marginLeft: 6, background: m.isMine ? '#d9fdd3' : 'var(--surface)', border: '1px solid var(--hairline-strong)', borderRadius: 8, padding: '4px 8px', maxWidth: '80%' }}>
+                        {m.message}
+                      </div>
                     </div>
                   ))}
                 </div>
+                {!st.battle.over ? (
+                  <form onSubmit={sendBattleChat} style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      className="input"
+                      placeholder="Chat lawan..."
+                      value={chatInput}
+                      maxLength={200}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      aria-label="Chat battle"
+                    />
+                    <button className="btn" type="submit" disabled={!chatInput.trim() || chatSending} style={{ width: 'auto', padding: '0 20px' }}>
+                      Kirim
+                    </button>
+                  </form>
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Chat ditutup karena battle selesai.</div>
+                )}
               </div>
             </div>
           )}
+          {askSurrender ? (
+            <ConfirmModal
+              title="Menyerah?"
+              message="Battle langsung berakhir dan lawan menang."
+              confirmLabel="Menyerah"
+              onCancel={() => setAskSurrender(false)}
+              onConfirm={surrenderBattle}
+            />
+          ) : null}
         </div>
       </div>
     </div>

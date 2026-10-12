@@ -2,6 +2,8 @@ import { getDb } from './db.js';
 import { createBattle, act as engineAct, aiChoose } from './engine.js';
 
 export const TURN_TIMEOUT_MS = 60 * 1000;
+// Forfeit: 2 menit tanpa aksi manual dianggap menyerah (permintaan user).
+export const FORFEIT_TIMEOUT_MS = 2 * 60 * 1000;
 export const ROOM_TTL_MS = 30 * 60 * 1000;
 // Room PvP yang masih menunggu lawan: hangus dalam 5 menit bila tidak ada yang gabung.
 export const WAITING_TTL_MS = 5 * 60 * 1000;
@@ -73,6 +75,21 @@ export async function ensureBattleRooms() {
       updated_at INTEGER NOT NULL
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS battle_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'pvp',
+      p1_id TEXT NOT NULL,
+      p1_username TEXT NOT NULL DEFAULT '',
+      p2_id TEXT DEFAULT NULL,
+      p2_username TEXT NOT NULL DEFAULT '',
+      winner_id TEXT DEFAULT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL
+    )
+  `);
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_bhist_user ON battle_history (p1_id, p2_id, created_at DESC)');
 }
 
 function jakartaDateKey(d = new Date()) {
@@ -174,9 +191,12 @@ export function playAiTurns(room) {
   return n;
 }
 
-// Timeout 60 dtk: sisi yang ber giliran otomatis ATK biasa.
+// Timeout 60 dtk: sisi yang bergiliran otomatis ATK biasa (legacy, dipakai mode AI saja).
+// PvP memakai forfeit 2 menit (applyForfeit) agar game berakhir bila lawan AFK.
 export function applyTimeout(room, now = Date.now()) {
   if (room.status !== 'ongoing' || room.battle.over) return false;
+  // PvP: jangan auto-ATK, biarkan applyForfeit yang menangani (2 menit -> menyerah).
+  if (room.mode === 'pvp') return false;
   if (now - room.updatedAt < TURN_TIMEOUT_MS) return false;
   const side = room.turn === String(room.p1Id) ? 'player' : 'enemy';
   const battle = room.battle;
@@ -198,6 +218,60 @@ export function applyTimeout(room, now = Date.now()) {
     }
   }
   return true;
+}
+
+// 2 menit tanpa aksi -> pihak yang dapat giliran dianggap menyerah, game berakhir.
+// Berlaku untuk PvP dan vs AI (pemain AFK kalah). Return true bila forfeit terjadi.
+export function applyForfeit(room, now = Date.now()) {
+  if (room.status !== 'ongoing' || room.battle.over) return false;
+  if (now - room.updatedAt < FORFEIT_TIMEOUT_MS) return false;
+  const turnId = String(room.turn || '');
+  const p1 = String(room.p1Id);
+  const p2 = room.p2Id ? String(room.p2Id) : 'AI';
+  // Tentukan sisi yang menyerah dari turn holder.
+  let loserSide = 'player';
+  let winnerSide = 'enemy';
+  if (room.mode === 'ai') {
+    // Vs AI: hanya pemain yang bisa forfeit (AI selalu jalan instan).
+    loserSide = 'player';
+    winnerSide = 'enemy';
+  } else if (turnId === p2) {
+    loserSide = 'enemy';
+    winnerSide = 'player';
+  } else {
+    loserSide = 'player';
+    winnerSide = 'enemy';
+  }
+  room.battle.turnCount += 1;
+  room.battle.over = true;
+  // 'you' = player menang, 'ai' = enemy menang (konvensi engine).
+  room.battle.winner = winnerSide === 'player' ? 'you' : 'ai';
+  room.battle.log.push({
+    t: room.battle.turnCount,
+    type: 'forfeit',
+    side: loserSide,
+    reason: 'timeout-2m',
+  });
+  return true;
+}
+
+// Sisa waktu sebelum forfeit (ms). Untuk countdown UI.
+export function forfeitMsLeft(room, now = Date.now()) {
+  if (!room || room.status !== 'ongoing' || room.battle?.over) return 0;
+  return Math.max(0, FORFEIT_TIMEOUT_MS - (now - (Number(room.updatedAt) || 0)));
+}
+
+// Menyerah manual. Return { side } atau null bila tidak valid.
+export function surrender(room, userId) {
+  if (room.status !== 'ongoing' || room.battle.over) return null;
+  const side = sideOf(room, userId);
+  if (!side) return null;
+  const winnerSide = side === 'player' ? 'enemy' : 'player';
+  room.battle.turnCount += 1;
+  room.battle.over = true;
+  room.battle.winner = winnerSide === 'player' ? 'you' : 'ai';
+  room.battle.log.push({ t: room.battle.turnCount, type: 'surrender', side });
+  return { side };
 }
 
 async function awardXpFor(db, userId, username, won, rewards) {
@@ -238,14 +312,14 @@ export async function finishIfOver(room) {
   room.status = 'finished';
   const winnerSide = battle.winner === 'you' ? 'player' : 'enemy';
   room.winner = userIdOfSide(room, winnerSide);
+  const lastLog = Array.isArray(battle.log) ? battle.log[battle.log.length - 1] : null;
+  const reason = lastLog?.type === 'forfeit' ? 'forfeit' : lastLog?.type === 'surrender' ? 'surrender' : lastLog?.type === 'end' ? 'ko' : 'battle';
   const xp = {};
   // XP + leaderboard hanya untuk PvP. Vs AI: tanpa XP, tanpa leaderboard.
   if (room.mode !== 'pvp') {
     room.xpPaid = true;
-    room.result = { winner: room.winner, xp };
-    return { finished: true, xp };
-  }
-  if (!room.xpPaid) {
+    room.result = { winner: room.winner, xp, reason };
+  } else if (!room.xpPaid) {
     const db = getDb();
     const rewards = await readBattleRewards();
     const humans = [
@@ -270,7 +344,20 @@ export async function finishIfOver(room) {
       }
     }
     room.xpPaid = true;
+    room.result = { winner: room.winner, xp, reason };
+  } else {
+    room.result = { winner: room.winner, xp: room.result?.xp || xp, reason };
   }
-  room.result = { winner: room.winner, xp };
+  // Catat riwayat (best-effort, jangan gagalkan finish).
+  try {
+    const db = getDb();
+    await db.execute({
+      sql: `INSERT INTO battle_history (code, mode, p1_id, p1_username, p2_id, p2_username, winner_id, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [room.code, room.mode, String(room.p1Id), String(room.p1Username || ''),
+        room.p2Id ? String(room.p2Id) : null, String(room.p2Username || ''),
+        room.winner ? String(room.winner) : null, reason, Date.now()],
+    });
+  } catch { /* abaikan */ }
   return { finished: true, xp };
 }

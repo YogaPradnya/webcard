@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
-import { ensureBattleRooms, WAITING_TTL_MS, cleanupExpiredWaitingRooms } from '@/lib/rooms';
+import { ensureBattleRooms, WAITING_TTL_MS, FORFEIT_TIMEOUT_MS, forfeitMsLeft, cleanupExpiredWaitingRooms, parseRoom } from '@/lib/rooms';
 
 // GET /api/battle/mine — room aktif milik user (waiting + ongoing) untuk auto-restore.
 export async function GET(req) {
@@ -23,7 +23,9 @@ export async function GET(req) {
       try { battle = JSON.parse(r.state || '{}'); } catch { battle = {}; }
       try { result = r.result ? JSON.parse(r.result) : null; } catch { result = null; }
       const createdAt = Number(r.created_at) || 0;
+      const updatedAt = Number(r.updated_at) || 0;
       const yourSide = String(r.p1_id) === String(session.id) ? 'player' : 'enemy';
+      const pseudo = { status: String(r.status || 'waiting'), battle, updatedAt };
       return {
         code: String(r.code),
         mode: String(r.mode || 'ai'),
@@ -37,6 +39,9 @@ export async function GET(req) {
         winner: r.winner ? String(r.winner) : null,
         result,
         createdAt,
+        updatedAt,
+        forfeitMsLeft: forfeitMsLeft(pseudo, now),
+        forfeitTimeoutMs: FORFEIT_TIMEOUT_MS,
         expiresAt: createdAt + WAITING_TTL_MS,
         secondsLeft: Math.max(0, Math.ceil((createdAt + WAITING_TTL_MS - now) / 1000)),
       };

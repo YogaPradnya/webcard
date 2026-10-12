@@ -925,6 +925,35 @@ body {
   font-weight: 800;
   color: var(--link);
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wa-title-pill {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--link);
+  border: 1px solid var(--link);
+  border-radius: 9999px;
+  padding: 0 8px;
+  line-height: 1.6;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wa-title-ico {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.wa-title-pill.mine {
+  align-self: flex-end;
+  margin-bottom: 3px;
 }
 
 .wa-text {
@@ -946,4 +975,517 @@ body {
   padding: 10px 12px;
   border-top: 1px solid var(--hairline-strong);
   background: var(--surface);
+}
+
+/* ===== Tambahan peningkatan (book/battle/trade/leaderboard) ===== */
+.nav-item {
+  position: relative;
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: 9999px;
+  background: var(--link);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.book-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--hairline) 25%, var(--hairline-soft) 50%, var(--hairline) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  margin-bottom: 10px;
+}
+
+.skeleton-card {
+  aspect-ratio: 3 / 4;
+  border-radius: var(--r-lg);
+  background: linear-gradient(90deg, var(--hairline) 25%, var(--hairline-soft) 50%, var(--hairline) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border: 1px solid var(--hairline-strong);
+}
+
+@keyframes shimmer {
+  to { background-position: -200% 0; }
+}
+
+.turn-badge.danger {
+  background: #ef4444;
+  color: #fff;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.7; }
+}
+
+.trade-fair {
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  border: 1px solid var(--hairline-strong);
+}
+
+.trade-fair.ok {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.trade-fair.warn {
+  background: #fefce8;
+  border-color: #fde047;
+  color: #a16207;
+}
+
+[data-theme='dark'] .trade-fair.ok {
+  background: #0f2e1f;
+  color: #86efac;
+}
+
+[data-theme='dark'] .trade-fair.warn {
+  background: #2e250f;
+  color: #fde047;
+}
+
+/* ===== Chat reply (tahan lama) ===== */
+.wa-hint {
+  align-self: center;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 9999px;
+  padding: 2px 10px;
+}
+
+.wa-quote {
+  border-left: 3px solid var(--link);
+  background: rgba(13, 116, 206, 0.08);
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wa-quote span {
+  color: var(--body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wa-replybar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--hairline-strong);
+  background: var(--hairline-soft);
+  font-size: 12px;
+}
+
+.wa-replybar span {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== Navigasi 4 menu (mobile) ===== */
+.topbar-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.bottomnav .nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  padding: 10px 6px;
+}
+
+/* ===== Profil ala APK ===== */
+.profile-hero {
+  background: linear-gradient(180deg, var(--surface) 0%, var(--hairline-soft) 100%);
+}
+
+.profile-top {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+  flex-shrink: 0;
+  border: 3px solid var(--hairline-strong);
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--link);
+  margin-top: 2px;
+}
+
+.profile-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin-left: 4px;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.profile-stat {
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  padding: 8px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-stat b {
+  font-size: 14px;
+}
+
+.profile-stat span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.profile-showcase {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-lg);
+  padding: 10px;
+}
+
+.profile-showcase img {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--r-md);
+  background: var(--hairline-soft);
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.menu-tile {
+  background: var(--hairline-soft);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-lg);
+  padding: 14px 6px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.menu-tile:hover {
+  background: var(--hairline);
+}
+
+.menu-ico {
+  font-size: 22px;
+}
+
+.title-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.title-tile {
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  padding: 10px;
+  font-size: 12px;
+}
+
+.title-tile.earned {
+  border-color: #eab308;
+  background: #fefce8;
+}
+
+[data-theme='dark'] .title-tile.earned {
+  background: #2e250f;
+}
+
+.title-tile.active {
+  border-color: var(--link);
+  background: rgba(13, 116, 206, 0.08);
+}
+
+.title-tile.locked {
+  opacity: 0.75;
+}
+
+.title-name {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.title-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.title-badge {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.title-badge.locked-img {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.title-badge-sm {
+  width: 20px;
+  height: 20px;
+  vertical-align: -4px;
+  margin-right: 4px;
+}
+
+/* ===== Modal konfirmasi ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline-strong);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  width: 100%;
+  max-width: 380px;
+}
+
+/* ===== Gacha reveal ===== */
+.gacha-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.gacha-card {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface);
+  border: 3px solid var(--muted-soft);
+  min-height: 220px;
+}
+
+.gacha-card.spinning {
+  animation: gacha-spin 0.45s linear infinite;
+}
+
+@keyframes gacha-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+
+.gacha-card.revealed {
+  animation: gacha-pop 0.35s ease-out;
+}
+
+@keyframes gacha-pop {
+  from { transform: scale(0.92); }
+  to { transform: scale(1); }
+}
+
+.gacha-back {
+  aspect-ratio: 3 / 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.gacha-back.dim {
+  background: var(--hairline-soft);
+  color: var(--muted);
+  font-size: 24px;
+}
+
+.gacha-card.waiting {
+  border-style: dashed;
+  min-height: 0;
+}
+
+.gacha-card.waiting .gacha-back {
+  aspect-ratio: 3 / 4;
+}
+
+.gacha-new, .gacha-dupe {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  color: #fff;
+}
+
+.gacha-new {
+  background: var(--success);
+}
+
+.gacha-dupe {
+  background: var(--link);
+}
+
+.gacha-noart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+/* ===== Stepper jumlah (+/-) ===== */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stepper .btn {
+  min-height: 40px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.stepper-val {
+  font-size: 14px;
+  font-weight: 800;
+  min-width: 64px;
+  text-align: center;
+}
+
+/* ===== Ilustrasi menunggu battle ===== */
+.waiting-card {
+  text-align: center;
+}
+
+.waiting-art {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  border-radius: var(--r-lg);
+  margin: 4px auto 8px;
+  display: block;
+  background: #000;
+}
+
+.waiting-art.pulse {
+  animation: waiting-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes waiting-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.02); filter: brightness(1.15); }
+}
+
+.title-desc {
+  color: var(--body);
+  font-size: 11px;
+  margin: 2px 0 8px;
+}
+
+.title-active {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--link);
 }

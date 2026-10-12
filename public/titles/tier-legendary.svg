@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <polygon points="20,44 26,52 32,44 38,52 44,44 44,64 20,64" fill="#eab308" opacity="0.9"/>
+  <circle cx="32" cy="26" r="21" fill="#eab308"/>
+  <circle cx="32" cy="26" r="16.5" fill="#171717"/>
+  <text x="32" y="31.5" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" font-weight="800" fill="#ffffff">L</text>
+</svg>

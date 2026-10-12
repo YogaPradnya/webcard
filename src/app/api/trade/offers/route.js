@@ -34,7 +34,7 @@ export async function GET(req) {
     const total = Number(countRes.rows[0]?.total || 0);
 
     const res = await db.execute({
-      sql: `SELECT code, owner_id, owner_username, char_name, rarity, expires_at
+      sql: `SELECT code, owner_id, owner_username, char_name, rarity, expires_at, amount
             FROM trade_offers ${where}
             ORDER BY rowid DESC LIMIT ? OFFSET ?`,
       args: [...args, PAGE_SIZE, offset],
@@ -45,6 +45,7 @@ export async function GET(req) {
       charName: String(r.char_name),
       rarity: String(r.rarity || 'Common'),
       expiresAt: Number(r.expires_at) || 0,
+      amount: Math.max(1, Number(r.amount) || 1),
       isMine: String(r.owner_id) === String(session.id),
     }));
     return NextResponse.json({

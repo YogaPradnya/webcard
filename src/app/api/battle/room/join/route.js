@@ -3,7 +3,8 @@ import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
-import { ensureBattleRooms, getRoom, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms } from '@/lib/rooms';
+import { ensureBattleRooms, getRoom, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
+import { checkRateCount } from '@/lib/rateLimit';
 
 // POST /api/battle/room/join { code, team: [3 nama] } — gabung room PvP.
 export async function POST(req) {
@@ -20,6 +21,10 @@ export async function POST(req) {
   const team = Array.isArray(body.team) ? body.team.map((n) => String(n || '').trim()).filter(Boolean) : [];
   if (!code || team.length !== 3 || new Set(team.map((n) => n.toLowerCase())).size !== 3) {
     return NextResponse.json({ success: false, message: 'Kode dan 3 kartumu wajib diisi.' }, { status: 400 });
+  }
+  const attempt = await checkRateCount(`join:${session.id}`, 20, 60 * 1000);
+  if (!attempt.ok) {
+    return NextResponse.json({ success: false, message: 'Terlalu banyak percobaan. Tunggu sebentar.' }, { status: 429 });
   }
 
   try {
@@ -84,6 +89,9 @@ export async function POST(req) {
         battle: saved.battle,
         winner: saved.winner,
         result: saved.result,
+        updatedAt: saved.updatedAt,
+        forfeitMsLeft: forfeitMsLeft(saved, Date.now()),
+        forfeitTimeoutMs: FORFEIT_TIMEOUT_MS,
       },
     });
   } catch (e) {

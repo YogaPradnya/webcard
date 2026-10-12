@@ -6,6 +6,7 @@ import {
   getRoom,
   saveRoom,
   applyTimeout,
+  applyForfeit,
   finishIfOver,
   playAiTurns,
   sideOf,
@@ -24,7 +25,7 @@ export async function POST(req) {
   }
   const code = String(body.code || '').replace(/[^0-9]/g, '');
   const action = body.action || {};
-  if (!['basic', 'skill', 'switch'].includes(action?.type)) {
+  if (!['basic', 'skill', 'skill2', 'switch'].includes(action?.type)) {
     return NextResponse.json({ success: false, message: 'Aksi tidak dikenal.' }, { status: 400 });
   }
 
@@ -36,6 +37,7 @@ export async function POST(req) {
     if (!side) return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
 
     applyTimeout(room, Date.now());
+    applyForfeit(room, Date.now());
     if (room.status !== 'ongoing' || room.battle.over) {
       await finishIfOver(room);
       await saveRoom(room);

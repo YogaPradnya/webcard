@@ -1,0 +1,270 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Sidebar from '@/components/Sidebar';
+
+const TIER_COLORS = {
+  Mythic: '#ef4444',
+  Legendary: '#eab308',
+  Epic: '#a855f7',
+  Rare: '#3b82f6',
+  Common: '#9ca3af',
+};
+
+const REVEAL_MS = 900;
+
+function RevealCard({ pull, face }) {
+  const color = TIER_COLORS[pull.rarity] || '#9ca3af';
+  if (face === 'back') {
+    return (
+      <div className="gacha-card spinning" style={{ borderColor: color, boxShadow: `0 0 24px ${color}` }}>
+        <div className="gacha-back" style={{ background: color }}>
+          <span>?</span>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="gacha-card revealed" style={{ borderColor: color, boxShadow: `0 2px 16px ${color}66` }}>
+      {pull.isNew ? <span className="gacha-new">BARU</span> : <span className="gacha-dupe">+1 stack</span>}
+      {pull.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img className="card-art" src={pull.imageUrl} alt={pull.charName} decoding="async" />
+      ) : (
+        <div className="card-art gacha-noart" style={{ background: `${color}33` }}><span>?</span></div>
+      )}
+      <div className="card-meta">
+        <div className="card-name">{pull.charName}</div>
+        <div className="card-anime">{pull.anime} • {pull.rarity}</div>
+        {pull.downgraded ? <div className="card-anime">turun tier (stok habis)</div> : null}
+      </div>
+    </div>
+  );
+}
+
+export default function GachaPage() {
+  const router = useRouter();
+  const [me, setMe] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [pulling, setPulling] = useState(false);
+  const [pulls, setPulls] = useState([]);
+  const [turn, setTurn] = useState(0); // index kartu yang sedang di-reveal
+  const [face, setFace] = useState('back'); // 'back' (spin) | 'front' (terbuka)
+  const [finished, setFinished] = useState(false);
+  const timers = useRef([]);
+
+  function clearTimers() {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
+  }
+
+  async function load() {
+    setError('');
+    try {
+      const meRes = await fetch('/api/auth/me');
+      const meData = await meRes.json().catch(() => ({}));
+      if (!meRes.ok || !meData.success) {
+        router.push('/login');
+        return;
+      }
+      setMe(meData);
+      const res = await fetch('/api/gacha');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Gagal memuat gacha.');
+        return;
+      }
+      setInfo(data);
+    } catch {
+      setError('Tidak bisa menghubungi server.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    return clearTimers;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function schedule(index) {
+    // Kartu index: tampilkan back spin, lalu front setelah REVEAL_MS.
+    setTurn(index);
+    setFace('back');
+    timers.current.push(setTimeout(() => setFace('front'), REVEAL_MS));
+    timers.current.push(setTimeout(() => {
+      if (index + 1 < pullsRef.current.length) schedule(index + 1);
+      else setFinished(true);
+    }, REVEAL_MS + 450));
+  }
+
+  const pullsRef = useRef([]);
+  useEffect(() => { pullsRef.current = pulls; }, [pulls]);
+
+  async function doPull(count) {
+    if (pulling) return;
+    clearTimers();
+    setPulling(true);
+    setError('');
+    setPulls([]);
+    setFinished(false);
+    try {
+      const res = await fetch('/api/gacha/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Gagal gacha.');
+        return;
+      }
+      setPulls(data.pulls || []);
+      setInfo((prev) => prev ? { ...prev, xp: data.xpAfter, totalPulls: data.total_pulls, pullsToday: data.pulls_today } : prev);
+      // Mulai reveal dari kartu pertama (next tick agar state pulls ter-commit).
+      timers.current.push(setTimeout(() => {
+        setTurn(0);
+        setFace('back');
+        timers.current.push(setTimeout(() => setFace('front'), REVEAL_MS));
+        timers.current.push(setTimeout(() => {
+          if ((data.pulls || []).length > 1) scheduleRef.current(1);
+          else setFinished(true);
+        }, REVEAL_MS + 450));
+      }, 50));
+    } catch {
+      setError('Tidak bisa menghubungi server.');
+    } finally {
+      setPulling(false);
+    }
+  }
+
+  const scheduleRef = useRef(schedule);
+  scheduleRef.current = schedule;
+
+  function skipAll() {
+    clearTimers();
+    setTurn(Math.max(0, pulls.length - 1));
+    setFace('front');
+    setFinished(true);
+  }
+
+  useEffect(() => () => clearTimers(), []);
+
+  const revealing = pulls.length > 0 && !finished;
+  const newCount = pulls.filter((p) => p.isNew).length;
+
+  if (loading) {
+    return (
+      <div className="layout">
+        <Sidebar username={me?.username} />
+        <div className="layout-main">
+          <div className="page">
+            <div className="card">
+              <div className="skeleton-line" style={{ width: '40%' }} />
+              <div className="skeleton-line" style={{ width: '80%' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="layout">
+      <Sidebar username={me?.username} />
+      <div className="layout-main">
+        <div className="page">
+          <div className="brand"><h1>Gacha</h1></div>
+          {error ? (
+            <div className="alert-error">
+              {error}{' '}
+              <button type="button" className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '4px 12px' }} onClick={load}>
+                Coba lagi
+              </button>
+            </div>
+          ) : null}
+
+          {info ? (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ fontSize: 13, fontWeight: 800 }}>XP kamu: {info.xp.toLocaleString('id-ID')}</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)' }}>Total pull: {info.totalPulls} • Tanpa limit harian di web</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                <button className="btn" style={{ flex: 1, minWidth: 140 }} disabled={pulling || revealing} onClick={() => doPull(1)}>
+                  Gacha 1x ({info.cost} XP)
+                </button>
+                <button className="btn" style={{ flex: 1, minWidth: 140 }} disabled={pulling || revealing} onClick={() => doPull(10)}>
+                  Gacha 10x ({info.cost10} XP, hemat 10%)
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
+                Rate: {Object.entries(info.rates || {}).map(([k, v]) => `${k} ${v}%`).join(' • ')}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                Stok tersisa: {['Mythic', 'Legendary', 'Epic'].map((t) => {
+                  const s = info.stocks?.[t];
+                  return `${t} ${s ? `${s.left}/${s.total}` : '-'}`;
+                }).join(' • ')}
+              </div>
+            </div>
+          ) : null}
+
+          {pulls.length > 0 ? (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <div className="section-title" style={{ margin: 0 }}>
+                  Hasil ({finished ? pulls.length : Math.min(pulls.length, turn + 1)}/{pulls.length})
+                  {!finished ? ' — membuka 1-1...' : ` — ${newCount} baru`}
+                </div>
+                {revealing ? (
+                  <button type="button" className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 14px', marginLeft: 'auto' }} onClick={skipAll}>
+                    Lewati
+                  </button>
+                ) : null}
+              </div>
+              <div className="gacha-grid">
+                {pulls.map((p, i) => {
+                  if (finished || i < turn) return <RevealCard key={i} pull={p} face="front" />;
+                  if (i === turn) return <RevealCard key={i} pull={p} face={face} />;
+                  return (
+                    <div key={i} className="gacha-card waiting">
+                      <div className="gacha-back dim"><span>{i + 1}</span></div>
+                    </div>
+                  );
+                })}
+              </div>
+              {finished ? (
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button className="btn btn-ghost" style={{ flex: 1, minWidth: 140 }} onClick={() => doPull(1)}>
+                    Lagi 1x ({info?.cost} XP)
+                  </button>
+                  <button className="btn" style={{ flex: 1, minWidth: 140 }} onClick={() => doPull(10)}>
+                    Lagi 10x ({info?.cost10} XP)
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {info?.history?.length > 0 ? (
+            <div className="card">
+              <div className="section-title">10 pull terakhir</div>
+              {info.history.map((h, i) => (
+                <div className="user-row" key={i}>
+                  <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 9999, background: TIER_COLORS[h.rarity] || '#999' }} />
+                  <span style={{ fontWeight: 700, marginLeft: 8 }}>{h.charName}</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>[{h.rarity}]{h.isNew ? ' BARU' : ''}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}

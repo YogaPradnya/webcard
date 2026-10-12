@@ -82,5 +82,31 @@ export function genCardStats(entry) {
   if (role === 'Assist') cons = Math.min(cons, 3);
   const effectPool = SKILL_EFFECTS[role] || SKILL_EFFECTS.Damage;
   const picked = effectPool[h % effectPool.length];
-  return { name, tier, role, hp, basic, skillName, skill, cons, effect: picked.effect, effectVal: picked.val };
+  const second = genSecondSkill(entry, role, picked.effect);
+  return { name, tier, role, hp, basic, skillName, skill, cons, effect: picked.effect, effectVal: picked.val, ...second };
+}
+
+// Skill kedua (terbuka saat kartu ★5): deterministik, efek dijamin beda dari skill pertama.
+// Kekuatan ~90% skill pertama agar skill-1 tetap utama.
+export function genSecondSkill(entry, role, firstEffect) {
+  const name = entry.name;
+  const tier = entry.tier;
+  const resolvedRole = role || roleForCard(name);
+  const h = hashName(`${name}${tier}:skill2`);
+  const firstWord = String(name).trim().split(/\s+/)[0] || name;
+  const skillPool = SKILL_NAMES[resolvedRole];
+  const skill2Name = `${skillPool[(h + 1) % skillPool.length]} ${firstWord} II`;
+  const skill2 = Math.max(
+    10,
+    Math.round((TIER_SKILL[tier] ?? 25) * (ROLE_SKILL_MULT[resolvedRole] ?? 1) * 0.9 + (h % 7)),
+  );
+  let cons2 = TIER_CONS[tier] ?? 3;
+  if (resolvedRole === 'Support') cons2 = Math.max(2, cons2 - 1);
+  if (resolvedRole === 'Assist') cons2 = Math.min(cons2, 3);
+  const effectPool = SKILL_EFFECTS[resolvedRole] || SKILL_EFFECTS.Damage;
+  let picked = effectPool[(h + 1) % effectPool.length];
+  if (effectPool.length > 1 && picked.effect === firstEffect) {
+    picked = effectPool[(h + 2) % effectPool.length];
+  }
+  return { skill2Name, skill2, cons2, effect2: picked.effect, effectVal2: picked.val };
 }

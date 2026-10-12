@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
+import { isDisplayOwned } from '@/lib/display';
 import {
   ensureTradeTable,
   generateTradeCode,
@@ -10,7 +11,7 @@ import {
   TRADE_TTL_MS,
 } from '@/lib/trade';
 
-// POST /api/trade/create { charName } — buat kode angka untuk 1 kartu milik sendiri.
+// POST /api/trade/create { charName, amount } — buat kode angka untuk N copy kartu milik sendiri.
 // 1 user boleh punya s/d MAX_ACTIVE_TRADES_PER_USER penawaran aktif, tiap kode TTL 10 menit.
 export async function POST(req) {
   const session = getSessionFromRequest(req);
@@ -23,6 +24,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
   }
   const charName = String(body.charName || '').trim();
+  const amount = Math.max(1, Math.floor(Number(body.amount) || 1));
   if (!charName) {
     return NextResponse.json({ success: false, message: 'Pilih kartu dulu.' }, { status: 400 });
   }
@@ -35,6 +37,13 @@ export async function POST(req) {
     const owned = await getCardOwner(db, session.id, charName);
     if (!owned) {
       return NextResponse.json({ success: false, message: 'Kamu tidak punya kartu itu.' }, { status: 400 });
+    }
+    // Kartu pajangan (display-only) tidak bisa di-trade.
+    if (await isDisplayOwned(session.id, owned.charName)) {
+      return NextResponse.json({ success: false, message: 'Kartu pajangan tidak bisa di-trade.' }, { status: 400 });
+    }
+    if (amount > owned.quantity) {
+      return NextResponse.json({ success: false, message: `Kamu hanya punya ${owned.quantity} copy.` }, { status: 400 });
     }
 
     const countRes = await db.execute({
@@ -62,10 +71,10 @@ export async function POST(req) {
     }
     const expiresAt = Date.now() + TRADE_TTL_MS;
     await db.execute({
-      sql: 'INSERT INTO trade_offers (code, owner_id, owner_username, char_name, rarity, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
-      args: [code, session.id, session.username || '', owned.charName, owned.rarity, expiresAt],
+      sql: 'INSERT INTO trade_offers (code, owner_id, owner_username, char_name, rarity, expires_at, amount) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [code, session.id, session.username || '', owned.charName, owned.rarity, expiresAt, amount],
     });
-    return NextResponse.json({ success: true, code, charName: owned.charName, expiresAt });
+    return NextResponse.json({ success: true, code, charName: owned.charName, amount, expiresAt });
   } catch (e) {
     console.error('[TRADE CREATE]', e.message);
     return NextResponse.json({ success: false, message: 'Gagal buat kode.' }, { status: 500 });
@@ -79,7 +88,7 @@ export async function GET(req) {
   try {
     await ensureTradeTable();
     const res = await getDb().execute({
-      sql: 'SELECT code, char_name, rarity, expires_at FROM trade_offers WHERE owner_id = ? AND expires_at > ?',
+      sql: 'SELECT code, char_name, rarity, expires_at, amount FROM trade_offers WHERE owner_id = ? AND expires_at > ?',
       args: [session.id, Date.now()],
     });
     const offers = res.rows.map((r) => ({
@@ -87,6 +96,7 @@ export async function GET(req) {
       charName: String(r.char_name),
       rarity: String(r.rarity || 'Common'),
       expiresAt: Number(r.expires_at) || 0,
+      amount: Math.max(1, Number(r.amount) || 1),
     }));
     return NextResponse.json({ success: true, offers });
   } catch (e) {

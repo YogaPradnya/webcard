@@ -17,6 +17,10 @@ export async function ensureChatTable() {
   await getDb().execute(
     'CREATE INDEX IF NOT EXISTS idx_chat_created ON web_group_messages (created_at DESC, id DESC)',
   );
+  // Kolom reply (tahan lama untuk balas). Best-effort agar DB lama ikut migrasi.
+  try { await getDb().execute('ALTER TABLE web_group_messages ADD COLUMN reply_to_id INTEGER DEFAULT NULL'); } catch { /* sudah ada */ }
+  try { await getDb().execute('ALTER TABLE web_group_messages ADD COLUMN reply_username TEXT DEFAULT NULL'); } catch { /* sudah ada */ }
+  try { await getDb().execute('ALTER TABLE web_group_messages ADD COLUMN reply_message TEXT DEFAULT NULL'); } catch { /* sudah ada */ }
 }
 
 export function sanitizeMessage(value) {

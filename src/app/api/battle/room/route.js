@@ -9,6 +9,9 @@ import {
   getRoom,
   saveRoom,
   applyTimeout,
+  applyForfeit,
+  forfeitMsLeft,
+  FORFEIT_TIMEOUT_MS,
   finishIfOver,
   playAiTurns,
   sideOf,
@@ -30,6 +33,9 @@ function publicState(room, youId) {
     battle: room.battle,
     winner: room.winner,
     result: room.result,
+    updatedAt: room.updatedAt,
+    forfeitMsLeft: forfeitMsLeft(room, Date.now()),
+    forfeitTimeoutMs: FORFEIT_TIMEOUT_MS,
   };
 }
 
@@ -46,6 +52,14 @@ async function validateTeam(db, userId, team) {
   const ownedSet = new Set(ownedRes.rows.map((r) => String(r.char_name || '').toLowerCase()));
   for (const n of names) {
     if (!ownedSet.has(n.toLowerCase())) return `Kamu tidak punya ${n}.`;
+    // Kartu pajangan (display-only) tidak bisa dipakai battle.
+    try {
+      const disp = await db.execute({
+        sql: 'SELECT id FROM user_display_cards WHERE user_id = ? AND LOWER(name) = LOWER(?) LIMIT 1',
+        args: [String(userId), n],
+      });
+      if (disp.rows.length > 0) return `${n} adalah kartu pajangan, tidak bisa dipakai battle.`;
+    } catch { /* tabel belum ada -> abaikan */ }
   }
   return null;
 }
@@ -62,6 +76,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
   }
   const mode = body.mode === 'pvp' ? 'pvp' : 'ai';
+  const difficulty = ['easy', 'normal', 'hard'].includes(body.difficulty) ? body.difficulty : 'normal';
 
   try {
     await ensureBattleRooms();
@@ -75,6 +90,11 @@ export async function POST(req) {
       const st = statsMap[String(key).toLowerCase()];
       if (!st) return null;
       return { ...st, name: st.name || fallback };
+    };
+    const scaleEnemy = (s) => {
+      if (difficulty === 'easy') return { ...s, hp: Math.round(s.hp * 0.8), basic: Math.max(1, Math.round(s.basic * 0.85)), skill: Math.max(1, Math.round(s.skill * 0.85)) };
+      if (difficulty === 'hard') return { ...s, hp: Math.round(s.hp * 1.2), basic: Math.round(s.basic * 1.1), skill: Math.round(s.skill * 1.1) };
+      return s;
     };
     const p1Stats = body.team.map((n) => withName(n, n)).filter(Boolean);
     if (p1Stats.length !== 3) {
@@ -97,7 +117,7 @@ export async function POST(req) {
       const enemyStats = [...poolKeys]
         .sort(() => Math.random() - 0.5)
         .slice(0, 3)
-        .map((k) => withName(k, k))
+        .map((k) => scaleEnemy(withName(k, k)))
         .filter(Boolean);
       if (enemyStats.length !== 3) {
         return NextResponse.json({ success: false, message: 'Gagal susun tim AI.' }, { status: 500 });
@@ -169,6 +189,7 @@ export async function GET(req) {
     }
     let changed = false;
     if (applyTimeout(room, Date.now())) changed = true;
+    if (applyForfeit(room, Date.now())) changed = true;
     const fin = await finishIfOver(room);
     if (fin.finished && !room.result) changed = true;
     if (changed || fin.finished) await saveRoom(room);

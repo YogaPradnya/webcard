@@ -17,6 +17,12 @@ export function makeFighter(stat) {
     cons: stat.cons,
     effect: stat.effect || 'none',
     effectVal: stat.effectVal ?? 0,
+    // Skill kedua (unlock ★5; null di room lama / kartu tanpa skill2 = terkunci).
+    skill2Name: stat.skill2Name || null,
+    skill2: stat.skill2 || 0,
+    cons2: stat.cons2 || 0,
+    effect2: stat.effect2 || 'none',
+    effectVal2: stat.effectVal2 ?? 0,
     alive: true,
     burn: null, // { dmg, turns }
     regen: null, // { amount, turns }
@@ -143,6 +149,108 @@ function tickStatuses(battle, side) {
   return true;
 }
 
+// Eksekusi skill (slot 1 atau 2, mekanik identik). Return false bila ilegal.
+// sk = { name, dmg, cons, effect, val }. Log type tetap 'skill' + slot agar UI lama kompatibel.
+function runSkill(battle, side, actor, foeActive, atkMult, combo, sk, slot, rng) {
+  const me = battle[side];
+  if (me.cons < sk.cons) return false;
+  me.cons -= sk.cons;
+  me.lastWasSkill = true;
+  const comboMult = combo ? 1.25 : 1;
+  const focusMult = actor.focus ? 1.4 : 1;
+  actor.focus = false;
+  const fx = sk.effect;
+  const val = sk.val;
+  const base = sk.dmg * variance(rng);
+
+  // --- Support: heal ---
+  if (actor.role === 'Support') {
+    const target = healTarget(me);
+    if (!target) {
+      me.cons = Math.min(MAX_CONS, me.cons + sk.cons); // batal: kembalikan
+      me.lastWasSkill = false;
+      return false;
+    } else if (fx === 'regen') {
+      const amount = Math.round(sk.dmg * 0.22 * comboMult);
+      target.regen = { amount, turns: 3 };
+      battle.log.push({
+        t: battle.turnCount, type: 'regen', side, name: actor.name,
+        skill: sk.name, slot, target: target.name, amount, turns: 3,
+        cons: me.cons, combo, effect: fx,
+      });
+      return true;
+    } else {
+      const mult = fx === 'energize' ? 0.45 : 0.7;
+      const amount = Math.min(target.maxHp - target.hp, Math.round(base * mult * comboMult));
+      target.hp += amount;
+      if (fx === 'energize') me.cons = Math.min(MAX_CONS, me.cons + 2);
+      battle.log.push({
+        t: battle.turnCount, type: 'heal', side, name: actor.name,
+        skill: sk.name, slot, target: target.name, amount, cons: me.cons,
+        combo, effect: fx,
+      });
+      return true;
+    }
+  } else {
+    // --- Damage/Tank/Assist: serang dengan efek ---
+    let dmg = base * atkMult * comboMult * focusMult;
+    const ev = {
+      t: battle.turnCount, type: 'skill', side, name: actor.name,
+      skill: sk.name, slot, target: foeActive.name, cons: me.cons,
+      combo, effect: fx,
+    };
+    if (fx === 'heavy') dmg *= val / 100;
+    else if (fx === 'slam') dmg *= 0.9;
+    else if (fx === 'bulwark') dmg *= 0.7;
+    else if (fx === 'surge' || fx === 'weaken' || fx === 'focus') dmg *= 0.7;
+    else if (fx === 'double') dmg *= val / 100;
+
+    if (fx === 'crit' && rng() * 100 < val) {
+      dmg *= 2;
+      ev.crit = true;
+    }
+
+    const hits = fx === 'double' ? [dmg, dmg] : [dmg];
+    let totalDealt = 0;
+    let totalAbsorbed = 0;
+    for (const h of hits) {
+      const { dealt, absorbed } = dealDamage(foeActive, h);
+      totalDealt += dealt;
+      totalAbsorbed += absorbed;
+      if (foeActive.hp <= 0) break;
+    }
+    ev.dmg = totalDealt;
+    ev.absorbed = totalAbsorbed;
+
+    // Efek sekunder.
+    if (fx === 'burn') {
+      foeActive.burn = { dmg: Math.round(sk.dmg * (val / 100)), turns: 2 };
+      ev.status = 'burn';
+    } else if (fx === 'shield') {
+      actor.shield += Math.round(sk.dmg * (val / 100));
+      ev.status = 'shield';
+    } else if (fx === 'bulwark') {
+      actor.shield += Math.round(sk.dmg * (val / 100));
+      ev.status = 'shield';
+    } else if (fx === 'slam' && rng() * 100 < val) {
+      foeActive.stun = true;
+      ev.status = 'stun';
+    } else if (fx === 'surge') {
+      me.cons = Math.min(MAX_CONS, me.cons + 2);
+      ev.status = 'surge';
+    } else if (fx === 'weaken') {
+      foeActive.weaken = 2;
+      ev.status = 'weaken';
+    } else if (fx === 'focus') {
+      actor.focus = true;
+      ev.status = 'focus';
+    }
+    battle.log.push(ev);
+    if (foeActive.hp <= 0) markKo(battle, side === 'player' ? 'enemy' : 'player', foeActive);
+    return true;
+  }
+}
+
 // Satu aksi kartu aktif. Return false bila aksi ilegal.
 export function act(battle, side, action, rng = Math.random) {
   if (battle.over) return false;
@@ -180,103 +288,13 @@ export function act(battle, side, action, rng = Math.random) {
   const foeActive = foe.fighters[foe.active];
   const combo = me.lastWasSkill;
 
-  if (action?.type === 'skill') {
-    if (me.cons < actor.cons) return false;
-    me.cons -= actor.cons;
-    me.lastWasSkill = true;
-    const comboMult = combo ? 1.25 : 1;
-    const focusMult = actor.focus ? 1.4 : 1;
-    actor.focus = false;
-    const fx = actor.effect;
-    const val = actor.effectVal;
-    const base = actor.skill * variance(rng);
-
-    // --- Support: heal ---
-    if (actor.role === 'Support') {
-      const target = healTarget(me);
-      if (!target) {
-        me.cons = Math.min(MAX_CONS, me.cons + actor.cons); // batal: kembalikan
-        me.lastWasSkill = false;
-        return false;
-      } else if (fx === 'regen') {
-        const amount = Math.round(actor.skill * 0.22 * comboMult);
-        target.regen = { amount, turns: 3 };
-        battle.log.push({
-          t: battle.turnCount, type: 'regen', side, name: actor.name,
-          skill: actor.skillName, target: target.name, amount, turns: 3,
-          cons: me.cons, combo, effect: fx,
-        });
-        return true;
-      } else {
-        const mult = fx === 'energize' ? 0.45 : 0.7;
-        const amount = Math.min(target.maxHp - target.hp, Math.round(base * mult * comboMult));
-        target.hp += amount;
-        if (fx === 'energize') me.cons = Math.min(MAX_CONS, me.cons + 2);
-        battle.log.push({
-          t: battle.turnCount, type: 'heal', side, name: actor.name,
-          skill: actor.skillName, target: target.name, amount, cons: me.cons,
-          combo, effect: fx,
-        });
-        return true;
-      }
-    } else {
-      // --- Damage/Tank/Assist: serang dengan efek ---
-      let dmg = base * atkMult * comboMult * focusMult;
-      const ev = {
-        t: battle.turnCount, type: 'skill', side, name: actor.name,
-        skill: actor.skillName, target: foeActive.name, cons: me.cons,
-        combo, effect: fx,
-      };
-      if (fx === 'heavy') dmg *= val / 100;
-      else if (fx === 'slam') dmg *= 0.9;
-      else if (fx === 'bulwark') dmg *= 0.7;
-      else if (fx === 'surge' || fx === 'weaken' || fx === 'focus') dmg *= 0.7;
-      else if (fx === 'double') dmg *= val / 100;
-
-      if (fx === 'crit' && rng() * 100 < val) {
-        dmg *= 2;
-        ev.crit = true;
-      }
-
-      const hits = fx === 'double' ? [dmg, dmg] : [dmg];
-      let totalDealt = 0;
-      let totalAbsorbed = 0;
-      for (const h of hits) {
-        const { dealt, absorbed } = dealDamage(foeActive, h);
-        totalDealt += dealt;
-        totalAbsorbed += absorbed;
-        if (foeActive.hp <= 0) break;
-      }
-      ev.dmg = totalDealt;
-      ev.absorbed = totalAbsorbed;
-
-      // Efek sekunder.
-      if (fx === 'burn') {
-        foeActive.burn = { dmg: Math.round(actor.skill * (val / 100)), turns: 2 };
-        ev.status = 'burn';
-      } else if (fx === 'shield') {
-        actor.shield += Math.round(actor.skill * (val / 100));
-        ev.status = 'shield';
-      } else if (fx === 'bulwark') {
-        actor.shield += Math.round(actor.skill * (val / 100));
-        ev.status = 'shield';
-      } else if (fx === 'slam' && rng() * 100 < val) {
-        foeActive.stun = true;
-        ev.status = 'stun';
-      } else if (fx === 'surge') {
-        me.cons = Math.min(MAX_CONS, me.cons + 2);
-        ev.status = 'surge';
-      } else if (fx === 'weaken') {
-        foeActive.weaken = 2;
-        ev.status = 'weaken';
-      } else if (fx === 'focus') {
-        actor.focus = true;
-        ev.status = 'focus';
-      }
-      battle.log.push(ev);
-      if (foeActive.hp <= 0) markKo(battle, side === 'player' ? 'enemy' : 'player', foeActive);
-      return true;
-    }
+  if (action?.type === 'skill' || action?.type === 'skill2') {
+    const slot = action.type === 'skill2' ? 2 : 1;
+    const sk = slot === 2
+      ? { name: actor.skill2Name, dmg: actor.skill2, cons: actor.cons2, effect: actor.effect2, val: actor.effectVal2 }
+      : { name: actor.skillName, dmg: actor.skill, cons: actor.cons, effect: actor.effect, val: actor.effectVal };
+    if (!sk.name || !(sk.dmg > 0)) return false; // skill2 terkunci (belum ★5 / room lama)
+    return runSkill(battle, side, actor, foeActive, atkMult, combo, sk, slot, rng);
   }
 
   // Default: ATK biasa (+1 cons).
@@ -292,21 +310,36 @@ export function act(battle, side, action, rng = Math.random) {
 }
 
 // Heuristik AI: bunuh bila bisa, skill bila mampu, basic bila tidak.
+// Mempertimbangkan skill2 (unlock ★5): pilih yang terjangkau, selang-seling deterministik.
 export function aiChoose(battle, side = 'enemy') {
   const me = battle[side];
   const foe = battle[side === 'player' ? 'enemy' : 'player'];
   const actor = me.fighters[me.active];
   const foeActive = foe.fighters[foe.active];
+  const canS1 = me.cons >= actor.cons;
+  const hasS2 = Boolean(actor.skill2Name) && (actor.skill2 || 0) > 0;
+  const canS2 = hasS2 && me.cons >= (actor.cons2 ?? 99);
   if (actor.role === 'Support') {
     const target = healTarget(me);
-    if (target && target.hp / target.maxHp < 0.6 && me.cons >= actor.cons) {
+    if (target && target.hp / target.maxHp < 0.6 && (canS1 || canS2)) {
+      if (canS2 && (!canS1 || (actor.cons2 ?? 99) <= actor.cons)) return { type: 'skill2' };
       return { type: 'skill' };
     }
-  } else if (me.cons >= actor.cons && (foeActive.hp <= actor.skill || me.cons >= MAX_CONS - 1)) {
-    return { type: 'skill' };
+  } else if ((canS1 && (foeActive.hp <= actor.skill || me.cons >= MAX_CONS - 1)) ||
+             (canS2 && (foeActive.hp <= actor.skill2 || me.cons >= MAX_CONS - 1))) {
+    const s1Kills = canS1 && foeActive.hp <= actor.skill;
+    const s2Kills = canS2 && foeActive.hp <= actor.skill2;
+    if (s1Kills && s2Kills) return { type: actor.skill2 >= actor.skill ? 'skill2' : 'skill' };
+    if (s2Kills) return { type: 'skill2' };
+    if (s1Kills) return { type: 'skill' };
+    if (canS1 && canS2) return { type: battle.turnCount % 2 === 0 ? 'skill2' : 'skill' };
+    return { type: canS1 ? 'skill' : 'skill2' };
   }
   if (foeActive.hp <= actor.basic) return { type: 'basic' };
-  if (actor.role !== 'Support' && me.cons >= actor.cons) return { type: 'skill' };
+  if (actor.role !== 'Support' && (canS1 || canS2)) {
+    if (canS1 && canS2) return { type: battle.turnCount % 2 === 0 ? 'skill2' : 'skill' };
+    return { type: canS1 ? 'skill' : 'skill2' };
+  }
   return { type: 'basic' };
 }
 

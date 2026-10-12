@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 
@@ -15,6 +15,17 @@ function formatSisa(ms) {
   return `${s} dtk lagi`;
 }
 
+const TIER_SCORE = { Common: 0, Rare: 1, Epic: 2, Legendary: 3, Mythic: 4 };
+
+function fairLabel(aTier, bTier) {
+  const a = TIER_SCORE[aTier] ?? 0;
+  const b = TIER_SCORE[bTier] ?? 0;
+  const d = Math.abs(a - b);
+  if (d === 0) return { text: 'Seimbang (tier sama)', ok: true };
+  if (d === 1) return { text: 'Cukup adil (selisih 1 tier)', ok: true };
+  return { text: `Tidak seimbang (${aTier} ↔ ${bTier})`, ok: false };
+}
+
 export default function TradePage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -23,20 +34,21 @@ export default function TradePage() {
   const [myCards, setMyCards] = useState([]);
   const [users, setUsers] = useState([]);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState('');
 
-  // Buat kode
   const [pickCard, setPickCard] = useState('');
+  const [pickAmount, setPickAmount] = useState(1);
+  const [pickQ, setPickQ] = useState('');
   const [created, setCreated] = useState(null);
   const [myOffers, setMyOffers] = useState([]);
 
-  // Masukkan kode (angka saja -> keypad numerik di HP)
   const [inCode, setInCode] = useState('');
   const [preview, setPreview] = useState(null);
   const [giveCard, setGiveCard] = useState('');
+  const [giveAmount, setGiveAmount] = useState(1);
   const [check, setCheck] = useState(null);
   const [result, setResult] = useState(null);
 
-  // List global trade ready (10/page + search usn/nama kartu/kode)
   const [tradeQ, setTradeQ] = useState('');
   const [tradeQInput, setTradeQInput] = useState('');
   const [tradePage, setTradePage] = useState(1);
@@ -57,7 +69,7 @@ export default function TradePage() {
         setMe(meData);
 
         const [cardsRes, usersRes, offersRes] = await Promise.all([
-          fetch('/api/cards'),
+          fetch('/api/cards?owned=1'),
           fetch('/api/trade/users'),
           fetch('/api/trade/create'),
         ]);
@@ -74,6 +86,21 @@ export default function TradePage() {
       }
     })();
   }, [router]);
+
+  const filteredPick = useMemo(() => {
+    const q = pickQ.trim().toLowerCase();
+    if (!q) return myCards;
+    return myCards.filter((c) => `${c.name} ${c.tier}`.toLowerCase().includes(q));
+  }, [myCards, pickQ]);
+
+  const pickCardObj = useMemo(
+    () => myCards.find((c) => c.name === pickCard) || null,
+    [myCards, pickCard],
+  );
+
+  useEffect(() => {
+    setPickAmount(1);
+  }, [pickCard]);
 
   async function fetchTradeReady(page = tradePage, q = tradeQ) {
     setTradeLoading(true);
@@ -108,10 +135,14 @@ export default function TradePage() {
     e.preventDefault();
     setError('');
     setCreated(null);
+    if (!pickCard) {
+      setError('Pilih 1 kartumu dulu.');
+      return;
+    }
     const res = await fetch('/api/trade/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ charName: pickCard }),
+      body: JSON.stringify({ charName: pickCard, amount: pickAmount }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
@@ -120,6 +151,16 @@ export default function TradePage() {
     }
     setCreated(data);
     refreshOffers();
+  }
+
+  async function copyText(t, key) {
+    try {
+      await navigator.clipboard.writeText(t);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 1500);
+    } catch {
+      setError('Gagal salin. Salin manual: ' + t);
+    }
   }
 
   async function onCancel(code) {
@@ -133,6 +174,7 @@ export default function TradePage() {
     setResult(null);
     setCheck(null);
     setGiveCard('');
+    setGiveAmount(1);
     setInCode(code);
     const res = await fetch(`/api/trade/offer?code=${encodeURIComponent(code)}`);
     const data = await res.json().catch(() => ({}));
@@ -157,7 +199,6 @@ export default function TradePage() {
     loadPreviewFor(inCode);
   }
 
-  // Cek live tiap ganti kartu: sudah punya? milik sendiri? penawar sudah punya?
   useEffect(() => {
     if (!preview || !giveCard) {
       setCheck(null);
@@ -166,7 +207,7 @@ export default function TradePage() {
     (async () => {
       try {
         const res = await fetch(
-          `/api/trade/offer?code=${encodeURIComponent(inCode)}&my=${encodeURIComponent(giveCard)}`,
+          `/api/trade/offer?code=${encodeURIComponent(inCode)}&my=${encodeURIComponent(giveCard)}&myQty=${giveAmount}`,
         );
         const data = await res.json().catch(() => ({}));
         if (data.success) {
@@ -178,7 +219,7 @@ export default function TradePage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [giveCard]);
+  }, [giveCard, giveAmount]);
 
   async function onAccept(e) {
     e.preventDefault();
@@ -186,14 +227,14 @@ export default function TradePage() {
     const res = await fetch('/api/trade/offer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: inCode, myCharName: giveCard }),
+      body: JSON.stringify({ code: inCode, myCharName: giveCard, myAmount: giveAmount }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
       setError(data.message || 'Gagal tukar kartu.');
       return;
     }
-    setResult(data);
+    setResult({ received: data.received, given: data.given });
     setPreview(null);
     refreshOffers();
   }
@@ -204,13 +245,19 @@ export default function TradePage() {
     setTradeQ(tradeQInput.trim());
   }
 
+  const giveObj = myCards.find((c) => c.name === giveCard);
+  const fair = preview?.offer && giveObj ? fairLabel(preview.offer.rarity, giveObj.tier) : null;
+
   if (loading) {
     return (
       <div className="layout">
         <Sidebar username={me?.username} />
         <div className="layout-main">
           <div className="page">
-            <div className="card">Memuat trade...</div>
+            <div className="card">
+              <div className="skeleton-line" style={{ width: '50%' }} />
+              <div className="skeleton-line" style={{ width: '85%' }} />
+            </div>
           </div>
         </div>
       </div>
@@ -229,13 +276,14 @@ export default function TradePage() {
           {error ? <div className="alert-error">{error}</div> : null}
 
           <div className="card" style={{ marginBottom: 16 }}>
-            <div className="section-title">Trade ready ({tradeTotal})</div>
+            <div className="section-title">Trade aktif ({tradeTotal})</div>
             <form onSubmit={onSearchTrade} style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <input
                 className="input"
                 placeholder="Cari usn / nama kartu / kode..."
                 value={tradeQInput}
                 onChange={(e) => setTradeQInput(e.target.value)}
+                aria-label="Cari trade"
               />
               <button className="btn" type="submit" style={{ width: 'auto', padding: '0 20px' }}>
                 Cari
@@ -249,7 +297,7 @@ export default function TradePage() {
               <div className="user-row" key={o.code}>
                 <span>
                   <strong>@{o.ownerUsername}</strong>
-                  <span style={{ color: 'var(--body)' }}> — {o.charName} [{o.rarity}]</span>
+                  <span style={{ color: 'var(--body)' }}> — {o.charName} [{o.rarity}]{o.amount > 1 ? ` x${o.amount}` : ''}</span>
                   <br />
                   <span style={{ fontWeight: 800, letterSpacing: 2 }}>{o.code}</span>
                   <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--muted)' }}>
@@ -261,7 +309,7 @@ export default function TradePage() {
                   style={{ width: 'auto', minHeight: 0, padding: '6px 12px', marginLeft: 'auto' }}
                   onClick={() => onPickTrade(o.code)}
                 >
-                  Trade
+                  Tukar
                 </button>
               </div>
             ))}
@@ -273,7 +321,7 @@ export default function TradePage() {
                   disabled={tradePage <= 1}
                   onClick={() => setTradePage((p) => Math.max(1, p - 1))}
                 >
-                  Prev
+                  Sebelumnya
                 </button>
                 <span style={{ fontSize: 12 }}>
                   {tradePage}/{tradeTotalPages}
@@ -284,7 +332,7 @@ export default function TradePage() {
                   disabled={tradePage >= tradeTotalPages}
                   onClick={() => setTradePage((p) => p + 1)}
                 >
-                  Next
+                  Berikutnya
                 </button>
               </div>
             ) : null}
@@ -318,25 +366,49 @@ export default function TradePage() {
               <div className="section-title">Buat kode trade ({myOffers.length}/10)</div>
               <form onSubmit={onCreate}>
                 <div className="field">
-                  <label className="label" htmlFor="pickCard">
-                    Kartu yang ditawarkan
-                  </label>
-                  <select
-                    id="pickCard"
-                    className="select"
-                    value={pickCard}
-                    onChange={(e) => setPickCard(e.target.value)}
-                    required
-                  >
-                    <option value="">-- pilih kartumu --</option>
-                    {myCards.map((c) => (
-                      <option key={c.name} value={c.name}>
-                        {c.name} [{c.tier}] ★{c.level}
-                      </option>
-                    ))}
-                  </select>
+                  <label className="label" htmlFor="pickQ">Cari kartumu</label>
+                  <input id="pickQ" className="input" placeholder="Ketik nama kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} />
                 </div>
-                <button className="btn" type="submit" disabled={myOffers.length >= 10}>
+                <div className="pick-grid" style={{ marginBottom: 12 }}>
+                  {filteredPick.slice(0, 30).map((c) => (
+                    <div
+                      key={c.name}
+                      className={pickCard === c.name ? 'card-item picked' : 'card-item'}
+                      onClick={() => setPickCard(c.name)}
+                      title={c.name}
+                      role="button"
+                      aria-pressed={pickCard === c.name}
+                    >
+                      {pickCard === c.name ? <span className="pick-check">✓</span> : null}
+                      {c.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="card-art" />
+                      )}
+                      <div className="card-meta">
+                        <div className="card-name">{c.name}</div>
+                        <div className="card-anime">{c.tier} ★{c.level}{c.quantity > 1 ? ` x${c.quantity}` : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {filteredPick.length === 0 ? <div style={{ fontSize: 13, marginBottom: 12 }}>Tidak ada kartu cocok.</div> : null}
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                  Dipilih: <b>{pickCard || '-'}</b>
+                  {pickCardObj && pickCardObj.quantity > 1 ? ` (punya ${pickCardObj.quantity})` : ''}
+                </div>
+                {pickCardObj && pickCardObj.quantity > 1 ? (
+                  <div className="field">
+                    <label className="label" htmlFor="pickAmount">Jumlah copy</label>
+                    <div className="stepper">
+                      <button type="button" className="btn btn-ghost" style={{ width: 44 }} disabled={pickAmount <= 1} onClick={() => setPickAmount((a) => Math.max(1, a - 1))} aria-label="Kurangi">-</button>
+                      <span className="stepper-val">{pickAmount}/{pickCardObj.quantity}</span>
+                      <button type="button" className="btn btn-ghost" style={{ width: 44 }} disabled={pickAmount >= pickCardObj.quantity} onClick={() => setPickAmount((a) => Math.min(pickCardObj.quantity, a + 1))} aria-label="Tambah">+</button>
+                    </div>
+                  </div>
+                ) : null}
+                <button className="btn" type="submit" disabled={myOffers.length >= 10 || !pickCard}>
                   Buat Kode Angka
                 </button>
               </form>
@@ -344,9 +416,12 @@ export default function TradePage() {
                 <div>
                   <div className="trade-code-big">{created.code}</div>
                   <div className="trade-hint">
-                    {created.charName} — berlaku 10 menit, sekali pakai. Bagikan kode ini ke lawan
+                    {created.charName}{created.amount > 1 ? ` x${created.amount}` : ''} — berlaku 10 menit, sekali pakai. Bagikan kode ini ke lawan
                     trademu.
                   </div>
+                  <button className="btn btn-ghost" type="button" onClick={() => copyText(created.code, 'created')}>
+                    {copied === 'created' ? 'Tersalin!' : 'Salin Kode'}
+                  </button>
                 </div>
               ) : null}
               {myOffers.length > 0 ? (
@@ -355,14 +430,24 @@ export default function TradePage() {
                   {myOffers.map((o) => (
                     <div className="user-row" key={o.code}>
                       <span style={{ fontWeight: 800, letterSpacing: 2 }}>{o.code}</span>
-                      <span style={{ marginLeft: 10, color: 'var(--body)' }}>{o.charName}</span>
-                      <button
-                        className="btn btn-ghost"
-                        style={{ width: 'auto', minHeight: 0, padding: '6px 12px', marginLeft: 'auto' }}
-                        onClick={() => onCancel(o.code)}
-                      >
-                        Batal
-                      </button>
+                      <span style={{ marginLeft: 10, color: 'var(--body)' }}>{o.charName}{o.amount > 1 ? ` x${o.amount}` : ''}</span>
+                      <span style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }}
+                          onClick={() => copyText(o.code, o.code)}
+                          type="button"
+                        >
+                          {copied === o.code ? 'OK' : 'Salin'}
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }}
+                          onClick={() => onCancel(o.code)}
+                        >
+                          Batal
+                        </button>
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -401,7 +486,7 @@ export default function TradePage() {
                   <div className="user-row">
                     <span>
                       <strong>{preview.card.charName || preview.offer.charName}</strong> [
-                      {preview.offer.rarity}] milik @{preview.offer.ownerUsername}
+                      {preview.offer.rarity}]{preview.offer.amount > 1 ? ` x${preview.offer.amount}` : ''} milik @{preview.offer.ownerUsername}
                     </span>
                   </div>
                   {preview.offer.isMine ? (
@@ -417,7 +502,7 @@ export default function TradePage() {
                         marginBottom: 16,
                       }}
                     >
-                      Kamu sudah punya {preview.offer.charName} — jadi Limit Break +XP otomatis.
+                      Kamu sudah punya {preview.offer.charName} — hasil trade akan menumpuk (tanpa XP otomatis).
                     </div>
                   ) : null}
                   <div className="field" style={{ marginTop: 12 }}>
@@ -428,34 +513,45 @@ export default function TradePage() {
                       id="giveCard"
                       className="select"
                       value={giveCard}
-                      onChange={(e) => setGiveCard(e.target.value)}
+                      onChange={(e) => { setGiveCard(e.target.value); setGiveAmount(1); }}
                       required
                     >
                       <option value="">-- pilih kartumu --</option>
                       {myCards.map((c) => (
                         <option key={c.name} value={c.name}>
-                          {c.name} [{c.tier}] ★{c.level}
+                          {c.name} [{c.tier}] ★{c.level}{c.quantity > 1 ? ` x${c.quantity}` : ''}
                         </option>
                       ))}
                     </select>
                   </div>
+                  {giveObj && giveObj.quantity > 1 ? (
+                    <div className="field">
+                      <label className="label" htmlFor="giveAmount">Jumlah copy yang diberikan</label>
+                      <div className="stepper">
+                        <button type="button" className="btn btn-ghost" style={{ width: 44 }} disabled={giveAmount <= 1} onClick={() => setGiveAmount((a) => Math.max(1, a - 1))} aria-label="Kurangi">-</button>
+                        <span className="stepper-val">{giveAmount}/{giveObj.quantity}</span>
+                        <button type="button" className="btn btn-ghost" style={{ width: 44 }} disabled={giveAmount >= giveObj.quantity} onClick={() => setGiveAmount((a) => Math.min(giveObj.quantity, a + 1))} aria-label="Tambah">+</button>
+                      </div>
+                      {giveAmount >= giveObj.quantity ? (
+                        <div style={{ fontSize: 12, color: '#a16207', marginTop: 6 }}>Perhatian: ini copy terakhirmu.</div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {fair && giveCard ? (
+                    <div
+                      className={fair.ok ? 'trade-fair ok' : 'trade-fair warn'}
+                      role="status"
+                    >
+                      {fair.ok ? '✓' : '⚠'} {fair.text}
+                    </div>
+                  ) : null}
                   {check && giveCard ? (
                     !check.owned ? (
                       <div className="alert-error">Kamu tidak punya kartu itu.</div>
+                    ) : !check.enough ? (
+                      <div className="alert-error">Kamu hanya punya {check.quantity} copy (minta {giveAmount}).</div>
                     ) : check.same ? (
                       <div className="alert-error">Kartunya sama, tidak perlu tukar.</div>
-                    ) : check.offererHas ? (
-                      <div
-                        style={{
-                          border: '1px solid var(--hairline-strong)',
-                          borderRadius: 'var(--r-md)',
-                          padding: '10px 14px',
-                          fontSize: 13,
-                          marginBottom: 16,
-                        }}
-                      >
-                        Penawar sudah punya {giveCard} — kartumu jadi Limit Break +XP untuknya.
-                      </div>
                     ) : null
                   ) : null}
                   <button
@@ -473,15 +569,9 @@ export default function TradePage() {
                   <div className="section-title">Trade berhasil</div>
                   <div className="user-row">
                     <span>
-                      Kamu menerima <strong>{result.received.charName}</strong>
-                      {result.dupeReceived
-                        ? ` (duplikat: Limit Break ★${result.dupeReceived.level} +${result.dupeReceived.xpBonus} XP)`
-                        : ''}{' '}
-                      dan memberikan <strong>{result.given.charName}</strong>
-                      {result.dupeGiven
-                        ? ` (duplikat untuk lawan: Limit Break ★${result.dupeGiven.level} +${result.dupeGiven.xpBonus} XP)`
-                        : ''}
-                      .
+                      Kamu menerima <strong>{result.received?.charName}{result.received?.amount > 1 ? ` x${result.received.amount}` : ''}</strong>{' '}
+                      dan memberikan <strong>{result.given?.charName}{result.given?.amount > 1 ? ` x${result.given.amount}` : ''}</strong>.
+                      Copy yang sama menumpuk otomatis.
                     </span>
                   </div>
                 </div>
