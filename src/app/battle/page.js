@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -9,10 +9,32 @@ function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
   const color = pct > 50 ? 'var(--success)' : pct > 20 ? '#eab308' : '#ef4444';
   return (
-    <div style={{ background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.5s' }} />
     </div>
   );
+}
+
+function CountUp({ value }) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const target = Number(value) || 0;
+    if (target <= 0) {
+      setN(0);
+      return;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = 900;
+    const step = (t) => {
+      const p = Math.min(1, (t - t0) / dur);
+      setN(Math.round(target * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span>+{n} XP</span>;
 }
 
 function ConsPips({ value }) {
@@ -35,14 +57,15 @@ function ConsPips({ value }) {
   );
 }
 
-function FighterCard({ f, active, art, fx, foe, onTap, tappable }) {
-  const cls = ['fighter', active ? 'active' : '', !f.alive ? 'ko' : '', fx || ''].filter(Boolean).join(' ');
+function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTone, refCb, preview }) {
+  const cls = ['fighter', active ? 'active' : '', !f.alive ? 'ko' : '', fx || '', selectTone || ''].filter(Boolean).join(' ');
   return (
     <div
+      ref={refCb}
       className={cls}
       onClick={tappable ? onTap : undefined}
       style={tappable ? { cursor: 'pointer' } : undefined}
-      title={tappable ? `Ganti ke ${f.name}` : f.name}
+      title={tappable ? f.name : f.name}
     >
       {art ? (
         // eslint-disable-next-line @next/next/no-img-element
@@ -65,11 +88,22 @@ function FighterCard({ f, active, art, fx, foe, onTap, tappable }) {
           {f.focus ? <span className="status-badge">FOKUS</span> : null}
         </div>
       </div>
-      {fx === 'float' && foe != null ? (
-        <span className={foe < 0 ? 'dmg-float heal' : 'dmg-float'}>
-          {foe < 0 ? `+${-foe}` : `-${foe}`}
-        </span>
+      {foe != null ? (
+        <>
+          <span className={'dmg-float' + (foe.num < 0 ? ' heal' : '') + (foe.crit ? ' crit' : '')}>
+            {foe.crit ? `CRIT -${foe.num}` : foe.num < 0 ? `+${-foe.num}` : `-${foe.num}`}
+          </span>
+          {foe.absorbed > 0 ? <span className="absorb-float">terserap {foe.absorbed}</span> : null}
+        </>
       ) : null}
+      {preview ? <span className="dmg-preview">{preview}</span> : null}
+      {f.alive && f.shield > 0 ? <span className="shield-ring" title={`Shield ${f.shield}`} /> : null}
+      {f.alive && f.burn ? (
+        <span className="fx-ember" aria-hidden="true"><i /><i /><i /></span>
+      ) : null}
+      {f.alive && f.stun ? <span className="fx-stun" aria-hidden="true">💫</span> : null}
+      {f.alive && f.regen ? <span className="fx-regen" aria-hidden="true">+{f.regen.amount || ''}</span> : null}
+      {!f.alive ? <span className="ko-stamp">KO</span> : null}
     </div>
   );
 }
@@ -122,6 +156,268 @@ export default function BattlePage() {
   const fxTimer = useRef(null);
   const seenLog = useRef(0);
 
+  // Targeting manual: { type: 'basic'|'skill'|'skill2', kind: 'foe'|'ally', fx: effect }
+  const [pending, setPending] = useState(null);
+  const [hint, setHint] = useState('');
+  const hintTimer = useRef(null);
+  const [splash, setSplash] = useState(null);
+  const splashTimer = useRef(null);
+
+  function showSplash(title, sub) {
+    setSplash({ title, sub });
+    clearTimeout(splashTimer.current);
+    splashTimer.current = setTimeout(() => setSplash(null), 1600);
+  }
+
+  function splashFor(state) {
+    if (!state || !state.battle) return;
+    const foeName = state.mode === 'ai' ? 'AI' : '@' + (String(state.yourSide) === 'player' ? state.p2Username : state.p1Username);
+    showSplash(`${me?.username || 'Kamu'} VS ${foeName}`, state.mode === 'ai' ? `Mode AI` : 'PvP');
+  }
+  // Ref elemen kartu per sisi engine: `${side}:${index}` -> el (untuk animasi terbang).
+  const fighterRefs = useRef({});
+  const arenaRef = useRef(null);
+
+  const EFFECT_COLORS = {
+    burn: '#f97316', crit: '#facc15', heavy: '#fb923c', double: '#fb923c',
+    shield: '#38bdf8', bulwark: '#38bdf8', regen: '#22c55e', heal: '#22c55e',
+    energize: '#22c55e', surge: '#a78bfa', weaken: '#a78bfa', focus: '#facc15',
+    slam: '#e2e8f0',
+  };
+
+  function fireProjectile(fromKey, toKey, color, dur = 420) {
+    return new Promise((resolve) => {
+      try {
+        const arena = arenaRef.current;
+        const a = fighterRefs.current[fromKey];
+        const b = fighterRefs.current[toKey];
+        if (!arena || !a || !b) return resolve();
+        const ra = arena.getBoundingClientRect();
+        const fa = a.getBoundingClientRect();
+        const fb = b.getBoundingClientRect();
+        const x1 = fa.left + fa.width / 2 - ra.left;
+        const y1 = fa.top + fa.height / 2 - ra.top;
+        const x2 = fb.left + fb.width / 2 - ra.left;
+        const y2 = fb.top + fb.height / 2 - ra.top;
+        const dot = document.createElement('span');
+        dot.className = 'projectile';
+        dot.style.background = String(color || '#facc15');
+        dot.style.boxShadow = `0 0 12px 3px ${String(color || '#facc15')}`;
+        dot.style.left = `${x1}px`;
+        dot.style.top = `${y1}px`;
+        arena.appendChild(dot);
+        const anim = dot.animate(
+          [
+            { transform: 'translate(-50%,-50%) scale(0.6)', opacity: 0.5 },
+            { transform: 'translate(-50%,-50%) scale(1.25)', opacity: 1, offset: 0.25 },
+            { transform: `translate(calc(-50% + ${x2 - x1}px), calc(-50% + ${y2 - y1}px)) scale(1)`, opacity: 1 },
+          ],
+          { duration: dur, easing: 'cubic-bezier(0.3,0.7,0.4,1)' }
+        );
+        anim.onfinish = () => { dot.remove(); resolve(); };
+        setTimeout(() => { dot.remove(); resolve(); }, dur + 300);
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  function shakeArena() {
+    const arena = arenaRef.current;
+    if (!arena) return;
+    arena.classList.remove('shake-screen');
+    void arena.offsetWidth;
+    arena.classList.add('shake-screen');
+    setTimeout(() => arena.classList.remove('shake-screen'), 550);
+  }
+
+  function flashHint(msg) {
+    setHint(msg);
+    clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setHint(''), 2600);
+  }
+
+  function armAction(type) {
+    const atk = activeFighter;
+    if (!atk) return;
+    if (type === 'basic') {
+      setPending((p) => (p?.type === 'basic' ? null : { type: 'basic', kind: 'foe', fx: 'basic' }));
+      return;
+    }
+    const slot = type === 'skill2' ? 2 : 1;
+    const fxName = slot === 2 ? atk.effect2 : atk.effect;
+    const allyKind = atk.role === 'Support' || fxName === 'shield' || fxName === 'bulwark';
+    setPending((p) => (p?.type === type ? null : { type, kind: allyKind ? 'ally' : 'foe', fx: fxName || 'skill' }));
+  }
+
+  // Kartu teman yang valid untuk pending ally (heal/energize butuh yang terluka).
+  function allyValid(f) {
+    if (!f?.alive) return false;
+    if (pending?.fx === 'heal' || pending?.fx === 'energize') return f.hp < f.maxHp;
+    return true;
+  }
+
+  function rageMult(battle) {
+    return 1 + 0.5 * Math.floor((battle?.turnCount || 0) / 20);
+  }
+
+  // Estimasi range damage skill ofensif (tanpa crit).
+  function skillDamageRange(fighter, slot, mult) {
+    const sk = slot === 2
+      ? { dmg: fighter.skill2, effect: fighter.effect2, val: fighter.effectVal2 }
+      : { dmg: fighter.skill, effect: fighter.effect, val: fighter.effectVal };
+    if (!sk.dmg) return null;
+    let m = 1;
+    const ef = sk.effect;
+    if (ef === 'heavy') m = (sk.val || 100) / 100;
+    else if (ef === 'slam') m = 0.9;
+    else if (ef === 'bulwark' || ef === 'surge' || ef === 'weaken' || ef === 'focus') m = 0.7;
+    else if (ef === 'double') m = ((sk.val || 60) / 100) * 2;
+    return {
+      lo: Math.max(1, Math.round(sk.dmg * m * 0.9 * mult)),
+      hi: Math.max(1, Math.round(sk.dmg * m * 1.1 * mult)),
+      crit: ef === 'crit',
+    };
+  }
+
+  function pendingPreviewForFoe() {
+    if (!pending || pending.kind !== 'foe' || !activeFighter || !myTeam) return null;
+    const mult = rageMult(st?.battle) * (activeFighter.weaken > 0 ? 0.7 : 1) * (myTeam.lastWasSkill ? 1.25 : 1);
+    if (pending.type === 'basic') {
+      const lo = Math.max(1, Math.round(activeFighter.basic * 0.9 * mult));
+      const hi = Math.max(1, Math.round(activeFighter.basic * 1.1 * mult));
+      return `≈${lo}–${hi}`;
+    }
+    const r = skillDamageRange(activeFighter, pending.type === 'skill2' ? 2 : 1, mult);
+    if (!r) return null;
+    return `≈${r.lo}–${r.hi}${r.crit ? ' ✦' : ''}`;
+  }
+
+  function pendingPreviewForAlly() {
+    if (!pending || pending.kind !== 'ally' || !activeFighter || !myTeam) return null;
+    const combo = myTeam.lastWasSkill ? 1.25 : 1;
+    const slot = pending.type === 'skill2' ? 2 : 1;
+    const sk = slot === 2
+      ? { dmg: activeFighter.skill2, effect: activeFighter.effect2 }
+      : { dmg: activeFighter.skill, effect: activeFighter.effect };
+    if (pending.fx === 'regen') return `+${Math.round((sk.dmg || 0) * 0.22 * combo)}/gil`;
+    if (pending.fx === 'heal' || pending.fx === 'energize') {
+      const m = pending.fx === 'energize' ? 0.45 : 0.7;
+      const lo = Math.max(1, Math.round((sk.dmg || 0) * m * 0.9 * combo));
+      const hi = Math.max(1, Math.round((sk.dmg || 0) * m * 1.1 * combo));
+      return `+${lo}–${hi}`;
+    }
+    if (pending.fx === 'shield' || pending.fx === 'bulwark') {
+      const val = slot === 2 ? activeFighter.effectVal2 : activeFighter.effectVal;
+      return `+⛨${Math.round((sk.dmg || 0) * ((val || 50) / 100))}`;
+    }
+    return null;
+  }
+
+  function flyBetween(actorKey, targetKey, dur = 460) {
+    return new Promise((resolve) => {
+      const a = fighterRefs.current[actorKey];
+      const b = fighterRefs.current[targetKey];
+      if (!a || !b) return resolve();
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      try {
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        const dx = rb.left + rb.width / 2 - (ra.left + ra.width / 2);
+        const dy = rb.top + rb.height / 2 - (ra.top + ra.height / 2);
+        a.style.zIndex = '5';
+        a.style.transition = `transform ${dur}ms cubic-bezier(0.3,0.7,0.4,1)`;
+        requestAnimationFrame(() => {
+          a.style.transform = `translate(${dx * 0.82}px, ${dy * 0.82}px) scale(1.18)`;
+        });
+        setTimeout(() => {
+          a.style.transition = 'transform 380ms cubic-bezier(0.6,0,0.7,0.4)';
+          a.style.transform = 'translate(0,0) scale(1)';
+          setTimeout(() => {
+            a.style.transition = '';
+            a.style.transform = '';
+            a.style.zIndex = '';
+            finish();
+          }, 400);
+        }, dur + 90);
+        setTimeout(finish, dur + 900);
+      } catch {
+        finish();
+      }
+    });
+  }
+
+  function hopCard(key) {
+    return new Promise((resolve) => {
+      const el = fighterRefs.current[key];
+      if (!el) return resolve();
+      try {
+        el.style.transition = 'transform 220ms ease-out';
+        el.style.transform = 'translateY(-16px) scale(1.06)';
+        setTimeout(() => {
+          el.style.transform = 'translate(0,0) scale(1)';
+          setTimeout(() => {
+            el.style.transition = '';
+            el.style.transform = '';
+            resolve();
+          }, 240);
+        }, 240);
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  function foeSideOf(side) {
+    return side === 'player' ? 'enemy' : 'player';
+  }
+
+  function idxOf(team, name) {
+    if (!team) return -1;
+    return team.fighters.findIndex((f) => f.name === name);
+  }
+
+  // Mainkan animasi untuk 1 event log (terbang untuk serang, hop untuk heal).
+  async function animateEvent(state, ev) {
+    if (!ev || !state?.battle) return;
+    const b = state.battle;
+    try {
+      if (ev.type === 'basic' || ev.type === 'skill') {
+        const ai = idxOf(b[ev.side], ev.name);
+        const ti = idxOf(b[foeSideOf(ev.side)], ev.target);
+        const isSkill = ev.type === 'skill';
+        const color = EFFECT_COLORS[ev.effect] || (isSkill ? '#facc15' : '#e2e8f0');
+        if (ai >= 0 && ti >= 0) {
+          if (isSkill) {
+            await Promise.all([
+              flyBetween(`${ev.side}:${ai}`, `${foeSideOf(ev.side)}:${ti}`),
+              fireProjectile(`${ev.side}:${ai}`, `${foeSideOf(ev.side)}:${ti}`, color),
+            ]);
+          } else {
+            await flyBetween(`${ev.side}:${ai}`, `${foeSideOf(ev.side)}:${ti}`);
+          }
+        }
+        if (ev.status === 'shield' && ev.allyTarget) {
+          const hi = idxOf(b[ev.side], ev.allyTarget);
+          if (hi >= 0) await hopCard(`${ev.side}:${hi}`);
+        }
+        if (ev.crit || (ev.dmg || 0) >= 40 || ev.slot === 2) shakeArena();
+      } else if (ev.type === 'heal' || ev.type === 'hot' || ev.type === 'regen') {
+        const ai = idxOf(b[ev.side], ev.name);
+        const ti = idxOf(b[ev.side], ev.target);
+        if (ai >= 0 && ti >= 0) {
+          await Promise.all([
+            fireProjectile(`${ev.side}:${ai}`, `${ev.side}:${ti}`, '#22c55e', 380),
+            hopCard(`${ev.side}:${ti}`),
+          ]);
+        } else if (ti >= 0) {
+          await hopCard(`${ev.side}:${ti}`);
+        }
+      }
+    } catch { /* animasi non-kritis */ }
+  }
+
   // Chat battle sementara
   const [chatMsgs, setChatMsgs] = useState([]);
   const [chatInput, setChatInput] = useState('');
@@ -164,7 +460,7 @@ export default function BattlePage() {
             setMyRooms(mineData.rooms);
             const first = mineData.rooms[0];
             seenLog.current = 0;
-            applyState(first);
+            applyState(first, { animate: false });
             try { localStorage.setItem(MY_ROOM_KEY, first.code); } catch { /* abaikan */ }
           } else {
             try {
@@ -184,17 +480,21 @@ export default function BattlePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function applyState(state) {
+  function applyState(state, opts = {}) {
+    const animate = opts.animate !== false;
     setSt(state);
     const log = state.battle?.log || [];
     if (log.length > seenLog.current) {
+      const fresh = log.slice(seenLog.current);
       const ev = log[log.length - 1];
       const num = ev.dmg ?? (ev.amount != null ? -ev.amount : null);
       const target =
         ev.target || (ev.type === 'ko' || ev.type === 'stun' ? ev.name : null);
       const kind =
         ev.type === 'basic' || ev.type === 'skill'
-          ? 'attack'
+          ? ev.status === 'shield'
+            ? 'shield'
+            : 'attack'
           : ev.type === 'heal' || ev.type === 'hot' || ev.type === 'regen'
             ? 'heal'
             : ev.type === 'ko'
@@ -202,11 +502,24 @@ export default function BattlePage() {
               : null;
       if (target && kind) {
         const key = `${log.length}-${ev.t}`;
-        setFx({ actor: ev.name, target, kind, num, key });
+        const selfTarget = ev.type === 'heal' || ev.type === 'hot' || ev.type === 'regen' || ev.type === 'ko' || ev.type === 'stun';
+        setFx({ actor: ev.name, side: ev.side, target, targetSide: selfTarget ? ev.side : foeSideOf(ev.side), kind, num, key, allyTarget: ev.allyTarget || null, crit: ev.crit || false, absorbed: ev.absorbed || 0 });
         clearTimeout(fxTimer.current);
-        fxTimer.current = setTimeout(() => setFx(null), 1100);
+        fxTimer.current = setTimeout(() => setFx(null), 1600);
       }
       seenLog.current = log.length;
+      // Animasi terbang untuk SEMUA aksi serangan/heal baru (milikmu, lawan, AI).
+      if (animate) {
+        const events = fresh.filter((e) =>
+          e && (e.type === 'basic' || e.type === 'skill' || e.type === 'heal' || e.type === 'hot' || e.type === 'regen'));
+        if (events.length > 0) {
+          setTimeout(() => {
+            (async () => {
+              for (const e of events.slice(-3)) await animateEvent(state, e);
+            })();
+          }, 90);
+        }
+      }
     }
   }
 
@@ -369,6 +682,8 @@ export default function BattlePage() {
   async function onPickRoom(code) {
     if (picked.length === 3) {
       setError('');
+      setPending(null);
+      setHint('');
       setJoinCode(code);
       const data = await api('/api/battle/room/join', { code, team: orderedTeam() });
       if (!data.success) {
@@ -379,6 +694,7 @@ export default function BattlePage() {
       }
       seenLog.current = 0;
       applyState(data.state);
+      splashFor(data.state);
       try { localStorage.setItem(MY_ROOM_KEY, data.state.code); } catch { /* abaikan */ }
       setRoomList((prev) => prev.filter((r) => r.code !== code));
       return;
@@ -418,6 +734,8 @@ export default function BattlePage() {
 
   async function startAi() {
     setError('');
+    setPending(null);
+    setHint('');
     const data = await api('/api/battle/room', { mode: 'ai', team: orderedTeam(), difficulty });
     if (!data.success) {
       setError(data.message || 'Gagal mulai battle.');
@@ -425,10 +743,13 @@ export default function BattlePage() {
     }
     seenLog.current = 0;
     applyState(data.state);
+    splashFor(data.state);
   }
 
   async function createPvp() {
     setError('');
+    setPending(null);
+    setHint('');
     const data = await api('/api/battle/room', { mode: 'pvp', team: orderedTeam() });
     if (!data.success) {
       setError(data.message || 'Gagal buat room.');
@@ -443,6 +764,8 @@ export default function BattlePage() {
   async function joinPvp(e) {
     e.preventDefault();
     setError('');
+    setPending(null);
+    setHint('');
     if (picked.length !== 3) {
       setError('Pilih 3 kartumu dulu sebelum gabung.');
       return;
@@ -455,6 +778,7 @@ export default function BattlePage() {
     }
     seenLog.current = 0;
     applyState(data.state);
+    splashFor(data.state);
     try { localStorage.setItem(MY_ROOM_KEY, data.state.code); } catch { /* abaikan */ }
     setRoomList((prev) => prev.filter((r) => r.code !== data.state.code));
   }
@@ -465,6 +789,9 @@ export default function BattlePage() {
 
   async function cancelRoom() {
     if (!st) return;
+    setPending(null);
+    setHint('');
+    setSplash(null);
     try {
       await fetch(`/api/battle/room?code=${encodeURIComponent(st.code)}`, { method: 'DELETE' });
     } catch {
@@ -495,6 +822,10 @@ export default function BattlePage() {
     setSt(null);
     setPicked([]);
     setFx(null);
+    setPending(null);
+    setHint('');
+    setSplash(null);
+    fighterRefs.current = {};
     setChatMsgs([]);
     chatAfter.current = 0;
     fetchMine();
@@ -505,6 +836,8 @@ export default function BattlePage() {
   async function doAct(action) {
     if (!st || acting) return;
     setActing(true);
+    setPending(null);
+    setHint('');
     setError('');
     const data = await api('/api/battle/room/act', { code: st.code, action });
     setActing(false);
@@ -555,18 +888,19 @@ export default function BattlePage() {
   const canSkill2 = activeFighter && myTeam && activeFighter.alive && hasSkill2 && myTeam.cons >= (activeFighter.cons2 ?? 99);
   const fLeft = forfeitLeft();
 
-  function fxFor(name) {
+  function fxFor(name, side) {
     if (!fx || !name) return '';
-    if (fx.actor === name && (fx.kind === 'attack')) return 'attacking';
-    if (fx.target === name && fx.kind === 'attack') return 'hit';
+    if (fx.allyTarget === name && side === fx.side && fx.kind === 'shield') return 'shielded';
+    if (side !== fx.targetSide) return '';
+    if (fx.target === name && (fx.kind === 'attack' || fx.kind === 'shield')) return 'hit';
     if (fx.target === name && fx.kind === 'heal') return 'healed';
     if (fx.target === name && fx.kind === 'ko') return '';
     return '';
   }
 
-  function floatFor(name) {
-    if (!fx || fx.target !== name || fx.num == null) return null;
-    return fx.num;
+  function floatInfoFor(name, side) {
+    if (!fx || fx.target !== name || side !== fx.targetSide || fx.num == null) return null;
+    return { num: fx.num, crit: fx.crit, absorbed: fx.absorbed };
   }
 
   const filteredCards = cards.filter((c) => {
@@ -575,6 +909,23 @@ export default function BattlePage() {
     if (pickQ.trim() && !`${c.name} ${c.tier}`.toLowerCase().includes(pickQ.trim().toLowerCase())) return false;
     return true;
   });
+
+  const iWon = Boolean(st && (st.status === 'finished' || st.battle?.over) && String(st.winner) === String(me?.id));
+  const confetti = useMemo(() => {
+    if (!iWon) return null;
+    const colors = ['#ef4444', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
+    return Array.from({ length: 28 }).map((_, i) => (
+      <i
+        key={i}
+        style={{
+          left: `${(i * 97 + 13) % 100}%`,
+          background: colors[i % colors.length],
+          animationDelay: `${((i * 137) % 800) / 1000}s`,
+          animationDuration: `${1.6 + ((i * 53) % 1200) / 1000}s`,
+        }}
+      />
+    ));
+  }, [iWon, st?.code]);
 
   if (loading) {
     return (
@@ -962,6 +1313,7 @@ export default function BattlePage() {
                 ) : null}
               </div>
 
+              <div ref={arenaRef} className="arena">
               <div className="card" style={{ marginBottom: 16 }}>
                 <div className="arena-side-title">
                   {st.mode === 'ai' ? 'Lawan (AI)' : `@${mySide === 'player' ? st.p2Username : st.p1Username}`}
@@ -970,16 +1322,32 @@ export default function BattlePage() {
                   ) : null}
                 </div>
                 <div className="fighters">
-                  {foeTeam?.fighters.map((f, i) => (
-                    <FighterCard
-                      key={f.name}
-                      f={f}
-                      active={foeTeam.active === i}
-                      art={arts[f.name.toLowerCase()]}
-                      fx={fxFor(f.name)}
-                      foe={floatFor(f.name)}
-                    />
-                  ))}
+                  {foeTeam?.fighters.map((f, i) => {
+                    const isActiveFoe = foeTeam.active === i;
+                    const armedFoe = Boolean(myTurn && !acting && pending?.kind === 'foe' && isActiveFoe && f.alive);
+                    const hintable = Boolean(myTurn && !acting && isActiveFoe && f.alive && !armedFoe);
+                    return (
+                      <FighterCard
+                        key={f.name}
+                        f={f}
+                        active={isActiveFoe}
+                        art={arts[f.name.toLowerCase()]}
+                        fx={fxFor(f.name, foeSide)}
+                        foe={floatInfoFor(f.name, foeSide)}
+                        tappable={armedFoe || hintable}
+                        selectTone={armedFoe ? 'targetable-foe' : ''}
+                        preview={armedFoe ? pendingPreviewForFoe() : null}
+                        refCb={(el) => { if (el) fighterRefs.current[`${foeSide}:${i}`] = el; }}
+                        onTap={() => {
+                          if (armedFoe) {
+                            doAct({ type: pending.type, target: i });
+                          } else if (hintable) {
+                            flashHint(pending ? 'Skill ini hanya untuk timmu. Ketuk kartu timmu.' : 'Pilih ATK / Skill dulu, lalu ketuk kartu aktif lawan.');
+                          }
+                        }}
+                      />
+                    );
+                  })}
                 </div>
                 <ConsPips value={foeTeam?.cons || 0} />
               </div>
@@ -991,52 +1359,84 @@ export default function BattlePage() {
                 </div>
                 <div className="fighters">
                   {myTeam?.fighters.map((f, i) => {
-                    const switchable = Boolean(myTurn && !acting && f.alive && i !== myTeam.active);
+                    const armingAlly = Boolean(myTurn && !acting && pending?.kind === 'ally');
+                    const validAlly = armingAlly && allyValid(f);
+                    const switchable = Boolean(myTurn && !acting && !pending && f.alive && i !== myTeam.active);
+                    const isSource = Boolean(pending && i === myTeam.active && f.alive);
                     return (
                       <FighterCard
                         key={f.name}
                         f={f}
                         active={myTeam.active === i}
                         art={arts[f.name.toLowerCase()]}
-                        fx={fxFor(f.name)}
-                        foe={floatFor(f.name)}
-                        tappable={switchable}
-                        onTap={() => doAct({ type: 'switch', to: i })}
+                        fx={fxFor(f.name, mySide)}
+                        foe={floatInfoFor(f.name, mySide)}
+                        tappable={validAlly || switchable}
+                        selectTone={validAlly ? 'targetable-ally' : isSource ? 'pending-source' : ''}
+                        preview={validAlly ? pendingPreviewForAlly() : null}
+                        refCb={(el) => { if (el) fighterRefs.current[`${mySide}:${i}`] = el; }}
+                        onTap={() => {
+                          if (validAlly) {
+                            doAct({ type: pending.type, ally: i, target: foeTeam?.active });
+                          } else if (armingAlly) {
+                            flashHint(pending?.fx === 'heal' || pending?.fx === 'energize' ? 'Pilih teman yang HP-nya belum penuh.' : 'Pilih teman yang masih hidup.');
+                          } else if (switchable) {
+                            doAct({ type: 'switch', to: i });
+                          }
+                        }}
                       />
                     );
                   })}
                 </div>
                 <ConsPips value={myTeam?.cons || 0} />
-
+                {hint ? (
+                  <div className="action-hint">{hint}</div>
+                ) : null}
                 {myTurn && !acting ? (
                   <div className="action-bar">
-                    <button className="btn" style={{ width: 'auto' }} onClick={() => doAct({ type: 'basic' })}>
+                    <button
+                      className={pending?.type === 'basic' ? 'btn armed' : 'btn'}
+                      style={{ width: 'auto' }}
+                      onClick={() => armAction('basic')}
+                    >
                       ATK ({activeFighter?.basic})
                     </button>
                     <button
-                      className="btn"
+                      className={pending?.type === 'skill' ? 'btn armed' : 'btn'}
                       style={{ width: 'auto' }}
                       disabled={!canSkill}
-                      onClick={() => doAct({ type: 'skill' })}
+                      onClick={() => armAction('skill')}
                       title={activeFighter ? `${activeFighter.skillName} - ${activeFighter.cons} cons` : ''}
                     >
                       Skill ({activeFighter?.cons} cons)
                     </button>
                     {hasSkill2 ? (
                       <button
-                        className="btn"
+                        className={pending?.type === 'skill2' ? 'btn armed' : 'btn'}
                         style={{ width: 'auto' }}
                         disabled={!canSkill2}
-                        onClick={() => doAct({ type: 'skill2' })}
+                        onClick={() => armAction('skill2')}
                         title={activeFighter ? `${activeFighter.skill2Name} - ${activeFighter.cons2} cons (★5)` : ''}
                       >
                         Skill2 ({activeFighter?.cons2} cons)
                       </button>
                     ) : null}
+                    {pending ? (
+                      <button className="btn btn-ghost" style={{ width: 'auto' }} onClick={() => { setPending(null); setHint(''); }}>
+                        Batal
+                      </button>
+                    ) : null}
                     <div style={{ width: '100%', fontSize: 11, color: 'var(--body)' }}>
-                      Ketuk kartu cadanganmu untuk ganti (1 giliran).
+                      {pending?.kind === 'foe'
+                        ? '🎯 Ketuk kartu AKTIF lawan untuk menyerang.'
+                        : pending?.kind === 'ally'
+                          ? '💚 Ketuk kartu timmu untuk heal / shield.'
+                          : '1) Pilih ATK/Skill, 2) ketuk kartu aktif lawan. Skill heal/shield → ketuk teman. Ketuk kartu cadangan untuk ganti.'}
                     </div>
                   </div>
+                ) : null}
+                {myTurn && !acting && myTeam?.lastWasSkill ? (
+                  <div className="combo-badge">🔥 COMBO — skill berikutnya +25%</div>
                 ) : null}
                 {st.turn && !myTurn && st.status === 'ongoing' && !st.battle.over ? (
                   <div style={{ marginTop: 8, fontSize: 12, color: 'var(--body)' }}>
@@ -1044,17 +1444,19 @@ export default function BattlePage() {
                   </div>
                 ) : null}
               </div>
+              </div>
 
               {st.status === 'finished' || st.battle.over ? (
-                <div className="card" style={{ marginBottom: 16 }}>
+                <div className="card result-card" style={{ marginBottom: 16 }}>
+                  {iWon ? <div className="confetti" aria-hidden="true">{confetti}</div> : null}
                   <div className="section-title">
-                    {String(st.winner) === String(me?.id) ? 'Menang!' : st.winner === 'AI' && st.mode === 'ai' ? 'Kalah' : 'Kalah'}
+                    {iWon ? '🏆 Menang!' : st.winner === 'AI' && st.mode === 'ai' ? 'Kalah' : 'Kalah'}
                     {st.result?.reason ? <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>({st.result.reason})</span> : null}
                   </div>
-                  <div style={{ fontSize: 13 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>
                     {st.result?.xp?.[me?.id] ? (
                       <span>
-                        +{st.result.xp[me.id].gain} XP
+                        <CountUp value={st.result.xp[me.id].gain} />
                         {st.result.xp[me.id].capped ? ' (jatah harian habis)' : ''}
                       </span>
                     ) : (
@@ -1113,6 +1515,13 @@ export default function BattlePage() {
               onCancel={() => setAskSurrender(false)}
               onConfirm={surrenderBattle}
             />
+          ) : null}
+          {splash ? (
+            <div className="vs-overlay" aria-hidden="true">
+              <div className="vs-title">{splash.title}</div>
+              {splash.sub ? <div className="vs-sub">{splash.sub}</div> : null}
+              <div className="vs-fight">FIGHT!</div>
+            </div>
           ) : null}
         </div>
       </div>

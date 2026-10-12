@@ -12,7 +12,9 @@ import {
   sideOf,
 } from '@/lib/rooms';
 
-// POST /api/battle/room/act { code, action: {type} } — 1 aksi giliranmu.
+// POST /api/battle/room/act { code, action: {type, target?, ally?} } — 1 aksi giliranmu.
+// type: basic|skill|skill2|switch. target = index kartu AKTIF lawan (ofensif),
+// ally = index kartu tim sendiri (heal/shield manual).
 export async function POST(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });

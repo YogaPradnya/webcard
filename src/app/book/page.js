@@ -26,10 +26,28 @@ const DISPLAY_BORDER_FALLBACK = {
   classic: '#9ca3af',
 };
 
+const DISPLAY_RAINBOW_GRADIENT = 'linear-gradient(135deg,#ef4444,#eab308,#22c55e,#3b82f6,#a855f7)';
+
 function displayBorderColor(c) {
   if (!c) return '#9ca3af';
   if (c.borderType === 'custom' && c.borderColor) return c.borderColor;
   return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9ca3af';
+}
+
+function displayCardStyle(c) {
+  const isRainbow = c && c.borderType === 'rainbow';
+  if (isRainbow) {
+    return {
+      border: '3px solid transparent',
+      background: `linear-gradient(var(--surface), var(--surface)) padding-box, ${DISPLAY_RAINBOW_GRADIENT} border-box`,
+      boxShadow: '0 2px 14px #a855f755',
+    };
+  }
+  const color = displayBorderColor(c);
+  return {
+    borderColor: color,
+    boxShadow: `0 2px 14px ${color}55`,
+  };
 }
 
 function shortName(name) {
@@ -310,10 +328,7 @@ export default function BookPage() {
                     <div
                       key={c.id || c.name}
                       className={displayFlipped === c.name ? 'card-item owned flipped' : 'card-item owned'}
-                      style={{
-                        borderColor: displayBorderColor(c),
-                        boxShadow: `0 2px 14px ${displayBorderColor(c)}55`,
-                      }}
+                      style={displayCardStyle(c)}
                       title={`${c.name} (ketuk untuk flip)`}
                       onClick={() => setDisplayFlipped((f) => (f === c.name ? null : c.name))}
                     >

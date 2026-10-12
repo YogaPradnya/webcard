@@ -575,6 +575,448 @@ body {
   animation: healglow 0.9s;
 }
 
+.fighter.shielded {
+  animation: shieldglow 0.9s;
+}
+
+/* Targeting manual: tap-to-target */
+.fighter.targetable-foe {
+  border-color: #ef4444;
+  animation: targetPulseRed 1s infinite;
+  cursor: pointer;
+}
+
+.fighter.targetable-ally {
+  border-color: var(--success);
+  animation: targetPulseGreen 1s infinite;
+  cursor: pointer;
+}
+
+.fighter.pending-source {
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px var(--link), 0 0 14px var(--link);
+}
+
+.action-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--hairline-soft);
+  border: 1px dashed var(--hairline-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.btn.armed {
+  border: 2px solid var(--link);
+  box-shadow: 0 0 0 2px var(--link);
+}
+
+@keyframes targetPulseRed {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px #ef4444;
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.45);
+  }
+}
+
+@keyframes targetPulseGreen {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px var(--success);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.4);
+  }
+}
+
+@keyframes shieldglow {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+
+  50% {
+    box-shadow: 0 0 18px var(--link);
+  }
+}
+
+/* ===== Battle juice: targeting, proyektil, status, KO, splash ===== */
+.arena {
+  position: relative;
+}
+
+.arena.shake-screen {
+  animation: arenaShake 0.5s;
+}
+
+@keyframes arenaShake {
+  20%,
+  60% {
+    transform: translate(-6px, 2px);
+  }
+
+  40%,
+  80% {
+    transform: translate(6px, -2px);
+  }
+}
+
+.projectile {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.dmg-float.crit {
+  color: #facc15;
+  font-size: 26px;
+  animation: critPop 1.1s forwards;
+}
+
+@keyframes critPop {
+  0% {
+    transform: translateX(-50%) scale(0.4);
+    opacity: 0;
+  }
+
+  25% {
+    transform: translateX(-50%) scale(1.35);
+    opacity: 1;
+  }
+
+  60% {
+    transform: translateX(-50%) translateY(-14px) scale(1.1);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(-50%) translateY(-30px) scale(1);
+    opacity: 0;
+  }
+}
+
+.absorb-float {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 9999px;
+  padding: 1px 8px;
+  animation: floatUp 1s forwards;
+  pointer-events: none;
+  z-index: 3;
+  white-space: nowrap;
+}
+
+.dmg-preview {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 9999px;
+  padding: 2px 8px;
+  pointer-events: none;
+  z-index: 4;
+  white-space: nowrap;
+}
+
+.shield-ring {
+  position: absolute;
+  inset: 3px;
+  border: 3px solid rgba(56, 189, 248, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7), inset 0 0 12px rgba(56, 189, 248, 0.35);
+  pointer-events: none;
+  animation: shieldPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes shieldPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.fx-ember {
+  position: absolute;
+  top: 2px;
+  right: 6px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.fx-ember i {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: #f97316;
+  box-shadow: 0 0 6px #f97316;
+  animation: emberRise 0.9s ease-in infinite;
+}
+
+.fx-ember i:nth-child(2) {
+  right: 8px;
+  animation-delay: 0.3s;
+  background: #ef4444;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+.fx-ember i:nth-child(3) {
+  right: 4px;
+  animation-delay: 0.6s;
+  background: #facc15;
+  box-shadow: 0 0 6px #facc15;
+}
+
+@keyframes emberRise {
+  0% {
+    transform: translateY(6px) scale(0.5);
+    opacity: 0;
+  }
+
+  40% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(-16px) scale(1);
+    opacity: 0;
+  }
+}
+
+.fx-stun {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 16px;
+  pointer-events: none;
+  z-index: 3;
+  animation: stunSpin 1.2s linear infinite;
+}
+
+@keyframes stunSpin {
+  0%,
+  100% {
+    transform: translateX(-4px);
+  }
+
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+.fx-regen {
+  position: absolute;
+  bottom: 34px;
+  right: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--success);
+  text-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
+  pointer-events: none;
+  z-index: 3;
+  animation: regenFloat 1.4s ease-in-out infinite;
+}
+
+@keyframes regenFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+
+  50% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.ko-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #ef4444;
+  border: 4px solid #ef4444;
+  border-radius: 8px;
+  padding: 2px 12px;
+  transform: translate(-50%, -50%) rotate(-14deg);
+  background: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+  z-index: 4;
+  animation: koDrop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+@keyframes koDrop {
+  0% {
+    transform: translate(-50%, -90%) rotate(-14deg) scale(2);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) rotate(-14deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.hp-low {
+  animation: hpPulse 1s infinite;
+}
+
+@keyframes hpPulse {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+
+  50% {
+    box-shadow: 0 0 8px #ef4444;
+  }
+}
+
+.combo-badge {
+  margin-top: 8px;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  border-radius: 9999px;
+  padding: 4px 12px;
+  animation: comboFlicker 1s infinite;
+}
+
+@keyframes comboFlicker {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+.vs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  animation: vsFade 1.6s forwards;
+  pointer-events: none;
+}
+
+.vs-title {
+  font-size: clamp(22px, 5vw, 44px);
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 1px;
+  text-align: center;
+  padding: 0 16px;
+  animation: vsZoom 0.5s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+
+.vs-sub {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted-soft);
+}
+
+.vs-fight {
+  margin-top: 10px;
+  font-size: clamp(30px, 7vw, 60px);
+  font-weight: 900;
+  color: #facc15;
+  text-shadow: 0 0 24px rgba(250, 204, 21, 0.8);
+  animation: vsZoom 0.4s 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes vsZoom {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes vsFade {
+  0%,
+  70% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+.result-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.confetti i {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  animation: confettiFall 2.4s ease-in infinite;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateY(320px) rotate(540deg);
+    opacity: 0;
+  }
+}
+
 .fighter-img {
   width: 100%;
   aspect-ratio: 1 / 1;
