@@ -24,6 +24,7 @@ export default function ProfilePage() {
   const [busy, setBusy] = useState('');
   const [displayCards, setDisplayCards] = useState([]);
   const [displayPick, setDisplayPick] = useState('');
+  const [profilSource, setProfilSource] = useState('auto');
 
   async function load() {
     setLoading(true);
@@ -36,11 +37,12 @@ export default function ProfilePage() {
         return;
       }
       setMe(meData);
-      const [pRes, cRes, lbRes, dRes] = await Promise.all([
+      const [pRes, cRes, lbRes, dRes, srcRes] = await Promise.all([
         fetch('/api/profile'),
         fetch('/api/cards'),
         fetch('/api/battle/leaderboard?tab=pvp'),
         fetch('/api/display'),
+        fetch('/api/profile/showcase-source'),
       ]);
       const pData = await pRes.json().catch(() => ({}));
       if (!pRes.ok || !pData.success) {
@@ -62,6 +64,8 @@ export default function ProfilePage() {
         const active = (dData.cards || []).find((c) => c.showcase);
         if (active) setDisplayPick(active.name);
       }
+      const srcData = await srcRes.json().catch(() => ({}));
+      if (srcData.success && srcData.source) setProfilSource(srcData.source);
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -118,6 +122,26 @@ export default function ProfilePage() {
         return;
       }
       await load();
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function saveProfilSource(source) {
+    setBusy('profil-source');
+    setError('');
+    try {
+      const res = await fetch('/api/profile/showcase-source', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Gagal simpan pilihan.');
+        return;
+      }
+      setProfilSource(data.source);
     } finally {
       setBusy('');
     }
@@ -231,7 +255,7 @@ export default function ProfilePage() {
                       <img src={profile.showcase.imageUrl} alt={profile.showcase.name} loading="lazy" decoding="async" />
                     ) : null}
                     <div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan{(profilSource === 'gacha' || (profilSource === 'auto' && !profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
                       <div style={{ fontWeight: 800 }}>{profile.showcase.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--body)' }}>{profile.showcase.tier} ★{profile.showcase.level} • PWR {profile.showcase.power}</div>
                     </div>
@@ -246,7 +270,7 @@ export default function ProfilePage() {
                       <img src={profile.displayShowcase.imageUrl} alt={profile.displayShowcase.name} loading="lazy" decoding="async" />
                     ) : null}
                     <div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan spesial 🎁</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan spesial 🎁{(profilSource === 'display' || (profilSource === 'auto' && profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
                       <div style={{ fontWeight: 800 }}>{profile.displayShowcase.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--body)' }}>{profile.displayShowcase.grade}</div>
                     </div>
@@ -304,6 +328,30 @@ export default function ProfilePage() {
                     </button>
                   </form>
                 )}
+              </div>
+
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="section-title">Tampil di .profil chat</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                  Pilih satu pajangan yang selalu tampil di .profil chat. Otomatis = kartu pajangan bila ada.
+                </div>
+                <div className="chip-row" role="radiogroup" aria-label="Pajangan profil">
+                  {[
+                    ['auto', 'Otomatis'],
+                    ['gacha', 'Kartu gacha'],
+                    ['display', 'Kartu pajangan 🎁'],
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      className={profilSource === value ? 'chip active' : 'chip'}
+                      onClick={() => saveProfilSource(value)}
+                      disabled={busy === 'profil-source'}
+                      aria-pressed={profilSource === value}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
