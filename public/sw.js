@@ -1,5 +1,7 @@
 // Service worker minimal: cache-first untuk aset statis, network-first untuk halaman/API.
-const CACHE = 'animein-cards-v1';
+// Versi cache HARUS naik tiap ada perubahan strategi, kalau tidak browser
+// menyajikan chunk JS lama selamanya (pernah bikin halaman Shop/Book basi).
+const CACHE = 'animein-cards-v2';
 const STATIC_PATTERNS = ['/titles/', '/battle-waiting.png', '/favicon.ico', '/icon-', '/apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
