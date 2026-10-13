@@ -69,6 +69,9 @@ export default function Sidebar({ username }) {
         {username ? <div className="sidebar-user">@{username}</div> : null}
         <nav className="sidebar-nav">{desktopLinks}</nav>
         <div className="sidebar-bottom">
+          <Link href="/terms" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline', marginBottom: 8 }}>
+            Syarat & Ketentuan
+          </Link>
           <ThemeToggle />
           <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
             Keluar

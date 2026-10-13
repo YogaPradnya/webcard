@@ -97,6 +97,13 @@ export default function LoginPage() {
           </div>
         )}
       </div>
+      <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--muted)' }}>
+        Dengan masuk, Anda menyetujui{' '}
+        <a href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
+          Syarat & Ketentuan
+        </a>{' '}
+        Animein.
+      </div>
     </div>
   );
 }

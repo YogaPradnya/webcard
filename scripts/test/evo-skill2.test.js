@@ -57,7 +57,7 @@ describe('skill kedua (unlock ★5)', () => {
 describe('engine skill2', () => {
   function dmgStat(name, overrides = {}) {
     return {
-      name, role: 'Damage', hp: 200, basic: 10,
+      name, role: 'Damage', tier: 'Legendary', level: 1, hp: 200, basic: 10,
       skillName: 'S1', skill: 40, cons: 2, effect: 'none', effectVal: 0,
       skill2Name: 'S2', skill2: 60, cons2: 3, effect2: 'none', effectVal2: 0,
       ...overrides,
@@ -75,6 +75,14 @@ describe('engine skill2', () => {
     assert.equal(ev.type, 'skill');
     assert.equal(ev.slot, 2);
     assert.equal(ev.skill, 'S2');
+  });
+  it('skill2 terkunci untuk Common ★1 (bukan L/M, belum ★5)', () => {
+    const b = createBattle([dmgStat('A', { tier: 'Common', level: 1 })], [dmgStat('X')]);
+    b.player.cons = 10;
+    assert.equal(act(b, 'player', { type: 'skill2' }, () => 0.5), false);
+    const b2 = createBattle([dmgStat('A', { tier: 'Common', level: 5 })], [dmgStat('X')]);
+    b2.player.cons = 10;
+    assert.equal(act(b2, 'player', { type: 'skill2' }, () => 0.5), true);
   });
   it('skill2 terkunci tanpa skill2Name / cons kurang', () => {
     const b = createBattle([dmgStat('A', { skill2Name: null })], [dmgStat('X')]);

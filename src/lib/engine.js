@@ -287,7 +287,8 @@ export function act(battle, side, action, rng = Math.random) {
   me.cons = Math.min(MAX_CONS, me.cons + 1 + me.assistBonus);
   battle.turnCount += 1;
   battle.turn = side;
-  const rage = 1 + 0.5 * Math.floor(battle.turnCount / 20);
+  // Rage anti-stall: +10% tiap 10 giliran, cap +30% (dulu +50%/20 turn, terlalu curam).
+  const rage = Math.min(1.3, 1 + 0.1 * Math.floor(battle.turnCount / 10));
 
   if (!tickStatuses(battle, side)) return true;
   if (battle.over) return true;

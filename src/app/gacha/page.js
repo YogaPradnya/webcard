@@ -12,7 +12,17 @@ const TIER_COLORS = {
   Common: '#9ca3af',
 };
 
-const REVEAL_MS = 900;
+const REVEAL_MS_BY_RARITY = {
+  Common: 400,
+  Rare: 600,
+  Epic: 900,
+  Legendary: 1500,
+  Mythic: 2200,
+};
+
+function revealMsFor(pull) {
+  return REVEAL_MS_BY_RARITY[pull?.rarity] || 900;
+}
 
 function RevealCard({ pull, face }) {
   const color = TIER_COLORS[pull.rarity] || '#9ca3af';
@@ -92,14 +102,15 @@ export default function GachaPage() {
   }, []);
 
   function schedule(index) {
-    // Kartu index: tampilkan back spin, lalu front setelah REVEAL_MS.
+    // Kartu index: back spin dulu, front mengikuti timing rarity (M makin lama makin deg-degan).
+    const ms = revealMsFor(pullsRef.current[index]);
     setTurn(index);
     setFace('back');
-    timers.current.push(setTimeout(() => setFace('front'), REVEAL_MS));
+    timers.current.push(setTimeout(() => setFace('front'), ms));
     timers.current.push(setTimeout(() => {
       if (index + 1 < pullsRef.current.length) schedule(index + 1);
       else setFinished(true);
-    }, REVEAL_MS + 450));
+    }, ms + 450));
   }
 
   const pullsRef = useRef([]);
@@ -127,13 +138,14 @@ export default function GachaPage() {
       setInfo((prev) => prev ? { ...prev, xp: data.xpAfter, totalPulls: data.total_pulls, pullsToday: data.pulls_today } : prev);
       // Mulai reveal dari kartu pertama (next tick agar state pulls ter-commit).
       timers.current.push(setTimeout(() => {
+        const firstMs = revealMsFor((data.pulls || [])[0]);
         setTurn(0);
         setFace('back');
-        timers.current.push(setTimeout(() => setFace('front'), REVEAL_MS));
+        timers.current.push(setTimeout(() => setFace('front'), firstMs));
         timers.current.push(setTimeout(() => {
           if ((data.pulls || []).length > 1) scheduleRef.current(1);
           else setFinished(true);
-        }, REVEAL_MS + 450));
+        }, firstMs + 450));
       }, 50));
     } catch {
       setError('Tidak bisa menghubungi server.');

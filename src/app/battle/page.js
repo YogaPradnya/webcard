@@ -115,6 +115,53 @@ function fmtClock(ms) {
   return `${m}:${String(r).padStart(2, '0')}`;
 }
 
+const AUTO_TIER_SCORE = { Mythic: 50, Legendary: 40, Epic: 30, Rare: 20, Common: 10 };
+
+function scoreCard(c) {
+  const s = c.stats || {};
+  return (Number(s.hp) || 0) + (Number(s.basic) || 0) * 2 + (Number(s.skill) || 0) * 2 + (AUTO_TIER_SCORE[c.tier] || 0);
+}
+
+function pickAutoTeam(all) {
+  const pool = (all || []).filter((c) => c.stats);
+  if (pool.length <= 3) return pool.map((c) => c.name);
+  const byRole = (role) => pool.filter((c) => c.stats?.role === role).sort((a, b) => scoreCard(b) - scoreCard(a));
+  const team = [];
+  const tank = byRole('Tank')[0];
+  if (tank) team.push(tank.name);
+  const sup = byRole('Support').find((c) => !team.includes(c.name));
+  if (sup) team.push(sup.name);
+  const rest = [...pool].sort((a, b) => scoreCard(b) - scoreCard(a));
+  for (const c of rest) {
+    if (team.length >= 3) break;
+    if (!team.includes(c.name)) team.push(c.name);
+  }
+  return team.slice(0, 3);
+}
+
+function describeLog(ev) {
+  if (!ev) return '';
+  const who = ev.name ? `${ev.name}` : ev.side === 'player' ? 'Tim biru' : 'Tim merah';
+  switch (ev.type) {
+    case 'start': return `Battle mulai! (${ev.first === 'player' ? 'kamu' : 'lawan'} jalan duluan)`;
+    case 'cons': return `+${ev.cons} cons untuk tim ${ev.side === 'player' ? 'biru' : 'merah'}`;
+    case 'basic': return `${who} menyerang ${ev.target} (-${ev.dmg || 0})${ev.absorbed ? `, ${ev.absorbed} terserap shield` : ''}`;
+    case 'skill': return `${who} memakai ${ev.skill || 'skill'} ke ${ev.target} (-${ev.dmg || 0})${ev.crit ? ' CRIT!' : ''}${ev.status && ev.status !== 'none' ? ` [${ev.status}]` : ''}${ev.absorbed ? `, ${ev.absorbed} terserap` : ''}`;
+    case 'heal': return `${who} memulihkan ${ev.target} (+${ev.amount || 0})`;
+    case 'regen': return `${who} memberi regen ke ${ev.target} (+${ev.amount || 0}/giliran)`;
+    case 'hot': return `${ev.target} regen (+${ev.amount || 0})`;
+    case 'dot': return `${ev.target} terbakar (-${ev.amount || 0})`;
+    case 'ko': return `💀 ${ev.name} KO!`;
+    case 'switch': return `🔄 ${ev.forced ? 'Otomatis maju' : 'Ganti'}: ${ev.name}`;
+    case 'stun': return `💫 ${ev.name} terkena stun, giliran lewat`;
+    case 'timeout': return `⏱ Giliran ${ev.side} habis, auto-ATK`;
+    case 'forfeit': return `🏳️ ${who} menyerah (AFK 2 menit)`;
+    case 'surrender': return `🏳️ ${who} menyerah`;
+    case 'end': return ev.timeout ? `⏱ Waktu habis! Pemenang: ${ev.winner === 'you' ? 'kamu' : 'lawan'}` : `🏆 Pemenang: ${ev.winner === 'you' ? 'kamu' : 'lawan'}`;
+    default: return `${ev.type}${ev.name ? `: ${ev.name}` : ''}`;
+  }
+}
+
 export default function BattlePage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -258,7 +305,7 @@ export default function BattlePage() {
   }
 
   function rageMult(battle) {
-    return 1 + 0.5 * Math.floor((battle?.turnCount || 0) / 20);
+    return Math.min(1.3, 1 + 0.1 * Math.floor((battle?.turnCount || 0) / 10));
   }
 
   // Estimasi range damage skill ofensif (tanpa crit).
@@ -872,7 +919,7 @@ export default function BattlePage() {
     const waiting = st.status === 'waiting';
     const myTurn = st.turn === me?.id;
     if (!waiting && myTurn) return;
-    const t = setInterval(() => { if (!document.hidden) refresh(); }, 2500);
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, 1500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st?.code, st?.status, st?.turn, me?.id]);
@@ -1084,6 +1131,22 @@ export default function BattlePage() {
                   ) : null}
                 </div>
                 <div className="section-title">Pilih 3 kartumu</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    style={{ width: 'auto', minHeight: 0, padding: '8px 14px' }}
+                    disabled={cards.length === 0}
+                    onClick={() => {
+                      const team = pickAutoTeam(cards);
+                      setPicked(team);
+                      setVanguard(team[0] || '');
+                    }}
+                    title="Otomatis: 1 Tank + 1 Support + kartu terkuat"
+                  >
+                    ⚡ Auto Tim
+                  </button>
+                </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Cari kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} aria-label="Cari kartu battle" />
                   <select className="select" style={{ width: 130 }} value={pickRole} onChange={(e) => setPickRole(e.target.value)} aria-label="Filter role">
@@ -1406,7 +1469,7 @@ export default function BattlePage() {
                       style={{ width: 'auto' }}
                       disabled={!canSkill}
                       onClick={() => armAction('skill')}
-                      title={activeFighter ? `${activeFighter.skillName} - ${activeFighter.cons} cons` : ''}
+                      title={activeFighter ? (canSkill ? `${activeFighter.skillName} — ${activeFighter.cons} cons` : `Butuh ${activeFighter.cons} cons (kamu ${myTeam?.cons || 0})`) : ''}
                     >
                       Skill ({activeFighter?.cons} cons)
                     </button>
@@ -1416,7 +1479,7 @@ export default function BattlePage() {
                         style={{ width: 'auto' }}
                         disabled={!canSkill2}
                         onClick={() => armAction('skill2')}
-                        title={activeFighter ? `${activeFighter.skill2Name} - ${activeFighter.cons2} cons (★5)` : ''}
+                        title={activeFighter ? (canSkill2 ? `${activeFighter.skill2Name} — ${activeFighter.cons2} cons (★5)` : `Butuh ${activeFighter.cons2} cons (kamu ${myTeam?.cons || 0})`) : ''}
                       >
                         Skill2 ({activeFighter?.cons2} cons)
                       </button>
@@ -1453,14 +1516,24 @@ export default function BattlePage() {
                     {iWon ? '🏆 Menang!' : st.winner === 'AI' && st.mode === 'ai' ? 'Kalah' : 'Kalah'}
                     {st.result?.reason ? <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>({st.result.reason})</span> : null}
                   </div>
+                  {(() => {
+                    const winSide = st.battle?.winner === 'you' ? mySide : foeSide;
+                    const winTeam = st.battle?.[winSide];
+                    const mvp = winTeam?.fighters ? [...winTeam.fighters].sort((a, b) => (b.alive - a.alive) || (b.hp - a.hp))[0] : null;
+                    return mvp ? (
+                      <div style={{ fontSize: 12, color: 'var(--body)', marginBottom: 8 }}>
+                        ⭐ MVP: <b>{mvp.name}</b> ({mvp.hp}/{mvp.maxHp} HP{mvp.alive ? '' : ', KO'})
+                      </div>
+                    ) : null;
+                  })()}
                   <div style={{ fontSize: 15, fontWeight: 800 }}>
                     {st.result?.xp?.[me?.id] ? (
                       <span>
                         <CountUp value={st.result.xp[me.id].gain} />
-                        {st.result.xp[me.id].capped ? ' (jatah harian habis)' : ''}
+                        {st.result.xp[me.id].capped ? ' (jatah harian habis)' : st.mode === 'pvp' ? ' (PvP: menang +XP, kalah +XP kecil)' : ''}
                       </span>
                     ) : (
-                      <span>Battle selesai.</span>
+                      <span>{st.mode === 'ai' ? 'Mode latihan vs AI: tanpa XP.' : 'Battle selesai.'}</span>
                     )}
                   </div>
                   <button
@@ -1472,6 +1545,18 @@ export default function BattlePage() {
                   </button>
                 </div>
               ) : null}
+
+              <div className="card" style={{ marginBottom: 16 }}>
+                <div className="section-title">Jalannya battle ({st.battle?.turnCount || 0} giliran)</div>
+                <div style={{ maxHeight: 160, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                  {(st.battle?.log || []).slice(-8).reverse().map((ev, i) => (
+                    <div key={`${ev.t}-${i}`} style={{ color: ev.type === 'ko' || ev.type === 'end' ? 'var(--ink)' : 'var(--body)', fontWeight: ev.type === 'ko' || ev.type === 'end' ? 800 : 400 }}>
+                      <span style={{ color: 'var(--muted)', marginRight: 6 }}>#{ev.t}</span>{describeLog(ev)}
+                    </div>
+                  ))}
+                  {(st.battle?.log || []).length === 0 ? <div style={{ color: 'var(--muted)' }}>Belum ada aksi.</div> : null}
+                </div>
+              </div>
 
               <div className="card">
                 <div className="section-title">Chat battle (sementara, hanya room ini)</div>
