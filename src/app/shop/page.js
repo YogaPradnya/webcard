@@ -21,53 +21,6 @@ function loadSnapJs(src, clientKey) {
   });
 }
 
-function SlotEditor({ slot, saving, onSave }) {
-  const [name, setName] = useState(slot.name || '');
-  const [imageUrl, setImageUrl] = useState(slot.imageUrl || '');
-  const [borderType, setBorderType] = useState(slot.borderType || 'classic');
-  const [borderColor, setBorderColor] = useState(slot.borderColor || '#a855f7');
-  const locked = slot.editsLeft <= 0;
-  return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave(slot.id, { name, imageUrl, borderType, borderColor });
-      }}
-      style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}
-    >
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        {slot.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={slot.imageUrl} alt={slot.name} width={54} height={72} style={{ objectFit: 'cover', borderRadius: 8, background: 'var(--hairline-soft)' }} loading="lazy" />
-        ) : (
-          <div style={{ width: 54, height: 72, borderRadius: 8, background: 'var(--hairline-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>?</div>
-        )}
-        <div style={{ fontSize: 12 }}>
-          <div style={{ fontWeight: 800 }}>{slot.name}</div>
-          <div style={{ color: locked ? '#ef4444' : 'var(--muted)' }}>
-            {locked ? 'Jatah ubah habis (3/3)' : `Sisa ubah: ${slot.editsLeft}/3`}
-          </div>
-        </div>
-      </div>
-      <input className="input" placeholder="Nama kartu (maks 40)" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} disabled={locked} aria-label="Nama kartu" />
-      <input className="input" placeholder="URL gambar https://... (opsional)" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} disabled={locked} aria-label="URL gambar" />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <select className="select" value={borderType} onChange={(e) => setBorderType(e.target.value)} disabled={locked} aria-label="Border" style={{ flex: 1 }}>
-          {['gold', 'rainbow', 'neon', 'sakura', 'shadow', 'classic', 'custom'].map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-        {borderType === 'custom' ? (
-          <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(borderColor) ? borderColor : '#a855f7'} onChange={(e) => setBorderColor(e.target.value)} disabled={locked} aria-label="Warna custom" style={{ width: 48, height: 44 }} />
-        ) : null}
-      </div>
-      <button className="btn btn-ghost" type="submit" disabled={locked || saving} style={{ minHeight: 0, padding: '8px 12px' }}>
-        {saving ? 'Menyimpan...' : 'Simpan (pakai 1 jatah ubah)'}
-      </button>
-    </form>
-  );
-}
-
 export default function ShopPage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -78,7 +31,6 @@ export default function ShopPage() {
   const [error, setError] = useState('');
   const [paying, setPaying] = useState('');
   const [slotQty, setSlotQty] = useState(1);
-  const [savingSlot, setSavingSlot] = useState(0);
   const snapReady = useRef(false);
 
   async function load() {
@@ -141,28 +93,6 @@ export default function ShopPage() {
       setError('Tidak bisa menghubungi server.');
     } finally {
       setPaying('');
-    }
-  }
-
-  async function saveSlot(slotId, form) {
-    setSavingSlot(slotId);
-    setError('');
-    try {
-      const res = await fetch('/api/shop/slot/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slotId, ...form }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
-        setError(data.message || 'Gagal simpan kartu.');
-        return;
-      }
-      await load();
-    } catch {
-      setError('Tidak bisa menghubungi server.');
-    } finally {
-      setSavingSlot(0);
     }
   }
 
@@ -251,11 +181,12 @@ export default function ShopPage() {
             {me && slots.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum punya slot. Beli dulu di atas.</div>
             ) : null}
-            {slots.map((s) => (
-              <div key={s.id} className="user-row" style={{ alignItems: 'flex-start', flexDirection: 'column' }}>
-                <SlotEditor slot={s} saving={savingSlot === s.id} onSave={saveSlot} />
+            {me && slots.length > 0 ? (
+              <div style={{ fontSize: 13 }}>
+                Kamu punya {slots.length} slot. Atur kartunya di{' '}
+                <Link href="/book" style={{ color: 'var(--link)', fontWeight: 800 }}>tab Pajangan Book</Link>.
               </div>
-            ))}
+            ) : null}
           </div>
 
           {me && orders.length > 0 ? (

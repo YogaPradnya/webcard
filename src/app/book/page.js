@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
@@ -99,6 +100,10 @@ export default function BookPage() {
   const [tab, setTab] = useState('book');
   const [displayCards, setDisplayCards] = useState([]);
   const [displayFlipped, setDisplayFlipped] = useState(null);
+  const [customSlots, setCustomSlots] = useState([]);
+  const [editingSlot, setEditingSlot] = useState(null);
+  const [slotForm, setSlotForm] = useState({ name: '', imageUrl: '', borderType: 'classic', borderColor: '#a855f7' });
+  const [savingSlot, setSavingSlot] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -133,6 +138,14 @@ export default function BookPage() {
         if (dispRes.ok && dispData.success) setDisplayCards(dispData.cards || []);
       } catch {
         // non-kritis: book gacha tetap tampil
+      }
+      // Slot custom (beli di Shop): dikelola di tab Pajangan.
+      try {
+        const slotRes = await fetch('/api/shop/slots');
+        const slotData = await slotRes.json().catch(() => ({}));
+        if (slotRes.ok && slotData.success) setCustomSlots(slotData.slots || []);
+      } catch {
+        // non-kritis
       }
     } catch {
       setError('Tidak bisa menghubungi server. Coba lagi.');
@@ -231,6 +244,44 @@ export default function BookPage() {
     }
   }
 
+  function openSlotEditor(slot) {
+    setEditingSlot(slot.id);
+    setSlotForm({
+      name: slot.name === 'Kartu Custom' ? '' : (slot.name || ''),
+      imageUrl: slot.imageUrl || '',
+      borderType: slot.borderType || 'classic',
+      borderColor: slot.borderColor || '#a855f7',
+    });
+    setError('');
+  }
+
+  async function saveSlot(e) {
+    e.preventDefault();
+    if (!editingSlot || savingSlot) return;
+    setSavingSlot(true);
+    setError('');
+    try {
+      const res = await fetch('/api/shop/slot/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slotId: editingSlot, ...slotForm }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Gagal simpan kartu.');
+        return;
+      }
+      setEditingSlot(null);
+      const slotRes = await fetch('/api/shop/slots');
+      const slotData = await slotRes.json().catch(() => ({}));
+      if (slotData.success) setCustomSlots(slotData.slots || []);
+    } catch {
+      setError('Tidak bisa menghubungi server.');
+    } finally {
+      setSavingSlot(false);
+    }
+  }
+
   async function toggleDisplayShowcase(c) {
     if (showcaseBusy) return;
     setShowcaseBusy(`display:${c.name}`);
@@ -304,12 +355,88 @@ export default function BookPage() {
               onClick={() => setTab('display')}
               aria-pressed={tab === 'display'}
             >
-              Pajangan 🎁 ({displayCards.length})
+              Pajangan 🎁 ({displayCards.length + customSlots.length})
             </button>
           </div>
 
           {tab === 'display' ? (
             <div>
+              <div className="card" style={{ marginTop: 12 }}>
+                <div className="section-title">Slot Custom ({customSlots.length}/50)</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+                  1 slot = 1 kartu pajangan custom. Tiap Simpan memakai 1 jatah ubah (maks 3x per slot).{' '}
+                  <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Beli slot di Shop</Link>
+                </div>
+                {customSlots.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    Belum punya slot. Beli dulu di <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Shop</Link> (Rp10rb/slot).
+                  </div>
+                ) : (
+                  <div className="book-grid">
+                    {customSlots.map((s) => {
+                      const empty = !s.imageUrl && (s.name === 'Kartu Custom' || !s.name);
+                      const locked = s.editsLeft <= 0;
+                      return (
+                        <div
+                          key={s.id}
+                          className="card-item owned"
+                          style={empty ? { borderStyle: 'dashed', cursor: 'pointer' } : displayCardStyle({ borderType: s.borderType, borderColor: s.borderColor })}
+                          title={empty ? 'Slot kosong — ketuk untuk isi' : `${s.name} — ketuk untuk ubah`}
+                          onClick={() => { if (!locked) openSlotEditor(s); }}
+                        >
+                          {empty ? (
+                            <div className="card-art gacha-noart" style={{ fontSize: 48, fontWeight: 800 }}>+</div>
+                          ) : s.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img className="card-art" src={s.imageUrl} alt={s.name} loading="lazy" decoding="async" />
+                          ) : (
+                            <div className="card-art" />
+                          )}
+                          <div className="card-meta">
+                            <div className="card-name">{empty ? 'Slot kosong' : shortName(s.name)}</div>
+                            <div className="card-anime">{empty ? 'ketuk untuk isi' : `sisa ubah ${s.editsLeft}/3`}</div>
+                            {!empty && !locked ? (
+                              <button
+                                type="button"
+                                className="btn btn-ghost"
+                                style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                onClick={(ev) => { ev.stopPropagation(); openSlotEditor(s); }}
+                              >
+                                Ubah
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {editingSlot ? (
+                  <form onSubmit={saveSlot} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, padding: 12, border: '1px dashed var(--hairline-strong)', borderRadius: 8 }}>
+                    <div className="section-title" style={{ margin: 0 }}>Isi / Ubah kartu (pakai 1 jatah ubah)</div>
+                    <input className="input" placeholder="Nama kartu (maks 40)" value={slotForm.name} maxLength={40} onChange={(e) => setSlotForm((f) => ({ ...f, name: e.target.value }))} aria-label="Nama kartu" />
+                    <input className="input" placeholder="URL gambar https://... (opsional)" value={slotForm.imageUrl} onChange={(e) => setSlotForm((f) => ({ ...f, imageUrl: e.target.value }))} aria-label="URL gambar" />
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <select className="select" value={slotForm.borderType} onChange={(e) => setSlotForm((f) => ({ ...f, borderType: e.target.value }))} aria-label="Border" style={{ flex: 1 }}>
+                        {['gold', 'rainbow', 'neon', 'sakura', 'shadow', 'classic', 'custom'].map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                      {slotForm.borderType === 'custom' ? (
+                        <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(slotForm.borderColor) ? slotForm.borderColor : '#a855f7'} onChange={(e) => setSlotForm((f) => ({ ...f, borderColor: e.target.value }))} aria-label="Warna custom" style={{ width: 48, height: 44 }} />
+                      ) : null}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button className="btn" type="submit" disabled={savingSlot} style={{ flex: 1 }}>
+                        {savingSlot ? 'Menyimpan...' : 'Simpan'}
+                      </button>
+                      <button className="btn btn-ghost" type="button" onClick={() => setEditingSlot(null)} style={{ width: 'auto' }}>
+                        Batal
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+              </div>
               <div className="card" style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>
                   {displayCards.length} kartu pajangan (display-only, gift admin)
