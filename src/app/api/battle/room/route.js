@@ -46,12 +46,19 @@ async function validateTeam(db, userId, team) {
     return 'Pilih 3 kartu berbeda.';
   }
   const ownedRes = await db.execute({
-    sql: 'SELECT char_name FROM user_cards WHERE user_id = ?',
+    sql: 'SELECT char_name, rarity, level FROM user_cards WHERE user_id = ?',
     args: [String(userId)],
   });
-  const ownedSet = new Set(ownedRes.rows.map((r) => String(r.char_name || '').toLowerCase()));
+  const ownedMap = {};
+  for (const r of ownedRes.rows) {
+    ownedMap[String(r.char_name || '').toLowerCase()] = {
+      rarity: String(r.rarity || 'Common'),
+      level: Number(r.level) || 1,
+    };
+  }
   for (const n of names) {
-    if (!ownedSet.has(n.toLowerCase())) return `Kamu tidak punya ${n}.`;
+    const owned = ownedMap[n.toLowerCase()];
+    if (!owned) return `Kamu tidak punya ${n}.`;
     // Kartu pajangan (display-only) tidak bisa dipakai battle.
     try {
       const disp = await db.execute({
@@ -62,6 +69,25 @@ async function validateTeam(db, userId, team) {
     } catch { /* tabel belum ada -> abaikan */ }
   }
   return null;
+}
+
+async function teamLevels(db, userId, team) {
+  try {
+    const res = await db.execute({
+      sql: 'SELECT char_name, rarity, level FROM user_cards WHERE user_id = ?',
+      args: [String(userId)],
+    });
+    const map = {};
+    for (const r of res.rows) {
+      map[String(r.char_name || '').toLowerCase()] = {
+        tier: String(r.rarity || 'Common'),
+        level: Number(r.level) || 1,
+      };
+    }
+    return team.map((n) => map[String(n || '').toLowerCase()] || { tier: 'Common', level: 1 });
+  } catch {
+    return team.map(() => ({ tier: 'Common', level: 1 }));
+  }
 }
 
 // POST /api/battle/room { mode: 'ai' | 'pvp', team: [3 nama] } — buat room + kode angka.

@@ -113,6 +113,7 @@ export async function getCardStatsMap() {
 function mapBattleStatRow(r) {
   return {
     name: String(r.char_name || ''),
+    tier: String(r.tier || 'Common'),
     role: String(r.role || 'Damage'),
     hp: Number(r.hp) || 60,
     basic: Number(r.basic_dmg) || 10,

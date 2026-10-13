@@ -11,10 +11,20 @@
 export const MAX_CONS = 10;
 export const MAX_TURNS = 30;
 
+// Skill2 unlock: Legendary/Mythic langsung buka; tier lain wajib kartu ★5.
+export function isSkill2Unlocked(f) {
+  if (!f) return false;
+  const t = String(f.tier || 'Common');
+  if (t === 'Legendary' || t === 'Mythic') return true;
+  return (Number(f.level) || 1) >= 5;
+}
+
 export function makeFighter(stat) {
   return {
     name: stat.name,
     role: stat.role,
+    tier: stat.tier || 'Common',
+    level: Number(stat.level) || 1,
     maxHp: stat.hp,
     hp: stat.hp,
     basic: stat.basic,
@@ -320,6 +330,7 @@ export function act(battle, side, action, rng = Math.random) {
 
   if (action?.type === 'skill' || action?.type === 'skill2') {
     const slot = action.type === 'skill2' ? 2 : 1;
+    if (slot === 2 && !isSkill2Unlocked(actor)) return false; // terkunci (bukan ★5 / tier rendah)
     const sk = slot === 2
       ? { name: actor.skill2Name, dmg: actor.skill2, cons: actor.cons2, effect: actor.effect2, val: actor.effectVal2 }
       : { name: actor.skillName, dmg: actor.skill, cons: actor.cons, effect: actor.effect, val: actor.effectVal };
@@ -349,7 +360,7 @@ export function aiChoose(battle, side = 'enemy') {
   const foeActive = foe.fighters[foe.active];
   const target = foe.active;
   const canS1 = me.cons >= actor.cons;
-  const hasS2 = Boolean(actor.skill2Name) && (actor.skill2 || 0) > 0;
+  const hasS2 = Boolean(actor.skill2Name) && (actor.skill2 || 0) > 0 && isSkill2Unlocked(actor);
   const canS2 = hasS2 && me.cons >= (actor.cons2 ?? 99);
   if (actor.role === 'Support') {
     const healTo = healTarget(me);

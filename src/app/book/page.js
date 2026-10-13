@@ -342,7 +342,7 @@ export default function BookPage() {
                           )}
                           <div className="card-meta">
                             <div className="card-name">{shortName(c.name)}</div>
-                            <div className="card-anime">🎁 {c.grade}</div>
+                            <div className="card-anime">{c.grade}</div>
                             <div className="card-stats">
                               {c.showcase ? <span className="stat-tag showcase">Pajangan</span> : null}
                             </div>
