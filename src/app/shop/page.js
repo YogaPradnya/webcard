@@ -31,7 +31,27 @@ export default function ShopPage() {
   const [error, setError] = useState('');
   const [paying, setPaying] = useState('');
   const [slotQty, setSlotQty] = useState(1);
+  const [checking, setChecking] = useState('');
   const snapReady = useRef(false);
+
+  async function checkOrder(orderId) {
+    if (!orderId) return;
+    setChecking(orderId);
+    try {
+      const res = await fetch('/api/shop/order/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!data.success && data.message) setError(data.message);
+    } catch {
+      // abaikan, user bisa tekan tombol Cek manual
+    } finally {
+      setChecking('');
+      await load();
+    }
+  }
 
   async function load() {
     setError('');
@@ -85,9 +105,9 @@ export default function ShopPage() {
         snapReady.current = true;
       }
       window.snap.pay(data.snapToken, {
-        onSuccess: () => load(),
-        onPending: () => load(),
-        onClose: () => load(),
+        onSuccess: () => checkOrder(data.orderId),
+        onPending: () => checkOrder(data.orderId),
+        onClose: () => checkOrder(data.orderId),
       });
     } catch {
       setError('Tidak bisa menghubungi server.');
@@ -196,8 +216,21 @@ export default function ShopPage() {
                 <div className="user-row" key={o.orderId}>
                   <span style={{ fontWeight: 700 }}>{o.kind === 'xp' ? `Top-Up ${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `Slot x${o.qty}`}</span>
                   <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>{idr(o.amountIdr)}</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#eab308' : '#ef4444' }}>
-                    {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? 'Menunggu bayar' : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#eab308' : '#ef4444' }}>
+                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? 'Menunggu bayar' : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
+                    </span>
+                    {o.status === 'pending' ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
+                        disabled={checking === o.orderId}
+                        onClick={() => checkOrder(o.orderId)}
+                      >
+                        {checking === o.orderId ? '...' : 'Cek Status'}
+                      </button>
+                    ) : null}
                   </span>
                 </div>
               ))}

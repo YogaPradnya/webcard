@@ -76,6 +76,52 @@ export function verifyWebhookSignature({ orderId, statusCode, grossAmount, signa
   return expected === String(signature || '').toLowerCase();
 }
 
+export function midtransApiBaseUrl() {
+  return isProduction() ? 'https://api.midtrans.com' : 'https://api.sandbox.midtrans.com';
+}
+
+// Ambil status transaksi langsung dari Midtrans (dipakai tombol "Cek Status"
+// dan sinkronisasi otomatis — penting untuk localhost yang tak terjangkau webhook).
+export async function fetchTransactionStatus(orderId) {
+  const serverKey = process.env.MIDTRANS_SERVER_KEY || '';
+  if (!serverKey) throw new Error('MIDTRANS_SERVER_KEY belum diisi');
+  const res = await fetch(`${midtransApiBaseUrl()}/v2/${encodeURIComponent(String(orderId))}/status`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Basic ${Buffer.from(`${serverKey}:`).toString('base64')}`,
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.status_message || `Midtrans ${res.status}`);
+  return data;
+}
+
+// Sinkronkan 1 order pending ke status Midtrans + penuhi bila lunas.
+// Return { status: 'paid'|'pending'|'failed'|'expired'|'unknown', reason? }.
+export async function syncOrderFromMidtrans(orderId) {
+  const order = await getOrder(orderId);
+  if (!order) return { status: 'unknown' };
+  if (order.status !== 'pending') return { status: order.status };
+  const st = await fetchTransactionStatus(orderId);
+  const tx = String(st.transaction_status || '');
+  if (tx === 'capture' || tx === 'settlement') {
+    if (tx === 'capture' && String(st.fraud_status) === 'challenge') return { status: 'pending' };
+    const r = await fulfillPaidOrder(order);
+    if (!r.fulfilled && r.reason !== 'bukan pending') return { status: order.status, reason: r.reason };
+    return { status: 'paid' };
+  }
+  if (tx === 'pending') return { status: 'pending' };
+  if (['deny', 'cancel', 'failure'].includes(tx)) {
+    await setOrderStatus(orderId, 'failed');
+    return { status: 'failed' };
+  }
+  if (tx === 'expire') {
+    await setOrderStatus(orderId, 'expired');
+    return { status: 'expired' };
+  }
+  return { status: order.status };
+}
+
 export function genMerchantOrderId() {
   const rand = Math.floor(100000 + Math.random() * 900000);
   return `ANIMEIN-${Date.now()}-${rand}`;
