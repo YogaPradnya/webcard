@@ -17,13 +17,26 @@ function formatSisa(ms) {
 
 const TIER_SCORE = { Common: 0, Rare: 1, Epic: 2, Legendary: 3, Mythic: 4 };
 
-function fairLabel(aTier, bTier) {
+function fairLabel(aTier, aAmount, bTier, bAmount) {
   const a = TIER_SCORE[aTier] ?? 0;
   const b = TIER_SCORE[bTier] ?? 0;
   const d = Math.abs(a - b);
   if (d === 0) return { text: 'Seimbang (tier sama)', ok: true };
-  if (d === 1) return { text: 'Cukup adil (selisih 1 tier)', ok: true };
-  return { text: `Tidak seimbang (${aTier} ↔ ${bTier})`, ok: false };
+  if (d === 1) {
+    return aAmount === 1 && bAmount === 1
+      ? { text: 'Cukup adil (selisih 1 tier, 1 lawan 1)', ok: true }
+      : { text: `Selisih 1 tier (${aTier} ↔ ${bTier}) hanya bisa 1 lawan 1`, ok: false };
+  }
+  if (d === 2) {
+    const hi = a > b ? aTier : bTier;
+    const lo = a > b ? bTier : aTier;
+    const hiAmt = a > b ? aAmount : bAmount;
+    const loAmt = a > b ? bAmount : aAmount;
+    return hiAmt === 1 && loAmt === 3
+      ? { text: `Adil (3 ${lo} untuk 1 ${hi})`, ok: true }
+      : { text: `Butuh 3 ${lo} untuk 1 ${hi}`, ok: false };
+  }
+  return { text: `Tidak bisa trade ${aTier} dengan ${bTier} (maksimal selisih 2 tier)`, ok: false };
 }
 
 export default function TradePage() {
@@ -246,7 +259,9 @@ export default function TradePage() {
   }
 
   const giveObj = myCards.find((c) => c.name === giveCard);
-  const fair = preview?.offer && giveObj ? fairLabel(preview.offer.rarity, giveObj.tier) : null;
+  const fair = preview?.offer && giveObj
+    ? fairLabel(preview.offer.rarity, preview.offer.amount, giveObj.tier, giveAmount)
+    : null;
 
   if (loading) {
     return (
@@ -336,6 +351,16 @@ export default function TradePage() {
                 </button>
               </div>
             ) : null}
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="section-title">Aturan nilai trade</div>
+            <div style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.7 }}>
+              • Tier sama: bebas (jumlah copy bebas)<br />
+              • Selisih 1 tier (mis. Legend ↔ Epic): wajib 1 lawan 1<br />
+              • Selisih 2 tier (mis. Legend ↔ Rare): wajib 3 (tier bawah) lawan 1 (tier atas)<br />
+              • Selisih 3 tier atau lebih: tidak bisa trade
+            </div>
           </div>
 
           <div className="card" style={{ marginBottom: 16 }}>
@@ -552,6 +577,8 @@ export default function TradePage() {
                       <div className="alert-error">Kamu hanya punya {check.quantity} copy (minta {giveAmount}).</div>
                     ) : check.same ? (
                       <div className="alert-error">Kartunya sama, tidak perlu tukar.</div>
+                    ) : !check.ruleOk ? (
+                      <div className="alert-error">{check.ruleMessage}</div>
                     ) : null
                   ) : null}
                   <button

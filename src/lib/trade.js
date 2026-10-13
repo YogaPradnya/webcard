@@ -7,6 +7,37 @@ export const TRADE_CODE_LENGTH = 6;
 export const TRADE_TTL_MS = 10 * 60 * 1000;
 export const MAX_ACTIVE_TRADES_PER_USER = 10;
 
+// Urutan tier untuk aturan trade.
+export const TRADE_TIER_ORDER = { Common: 0, Rare: 1, Epic: 2, Legendary: 3, Mythic: 4 };
+
+/**
+ * Aturan nilai trade (berlaku untuk semua tier):
+ * - Tier sama: bebas (seperti sebelumnya).
+ * - Selisih 1 tier: wajib 1 lawan 1.
+ * - Selisih 2 tier: wajib 3 (tier bawah) lawan 1 (tier atas).
+ * - Selisih 3+ tier: dilarang.
+ * Return { ok:true } atau { ok:false, message }.
+ */
+export function checkTradeTierRule(aRarity, aAmount, bRarity, bAmount) {
+  const a = TRADE_TIER_ORDER[String(aRarity)] ?? 0;
+  const b = TRADE_TIER_ORDER[String(bRarity)] ?? 0;
+  const gap = Math.abs(a - b);
+  if (gap === 0) return { ok: true };
+  if (gap === 1) {
+    if (aAmount === 1 && bAmount === 1) return { ok: true };
+    return { ok: false, message: `Selisih 1 tier (${aRarity} ↔ ${bRarity}) hanya bisa 1 lawan 1.` };
+  }
+  if (gap === 2) {
+    const hi = a > b ? String(aRarity) : String(bRarity);
+    const lo = a > b ? String(bRarity) : String(aRarity);
+    const hiAmt = a > b ? aAmount : bAmount;
+    const loAmt = a > b ? bAmount : aAmount;
+    if (hiAmt === 1 && loAmt === 3) return { ok: true };
+    return { ok: false, message: `Butuh 3 ${lo} untuk 1 ${hi}.` };
+  }
+  return { ok: false, message: `Tidak bisa trade ${aRarity} dengan ${bRarity} (maksimal selisih 2 tier).` };
+}
+
 // Kode trade hanya angka (keypad numerik di HP).
 export function generateTradeCode() {
   let code = '';
@@ -105,6 +136,8 @@ export async function executeTrade(db, offer, accepterId, accepterUsername, acce
   if (giverCard.charName.toLowerCase() === takerCard.charName.toLowerCase()) {
     return { ok: false, message: 'Kartunya sama, tidak perlu tukar.' };
   }
+  const tierRule = checkTradeTierRule(giverCard.rarity, giveAmount, takerCard.rarity, takeAmount);
+  if (!tierRule.ok) return { ok: false, message: tierRule.message };
   if (giverCard.quantity < giveAmount) {
     return { ok: false, message: `Penawar hanya punya ${giverCard.quantity} copy.` };
   }

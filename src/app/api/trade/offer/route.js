@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { isDisplayOwned } from '@/lib/display';
-import { ensureTradeTable, executeTrade, getCardOwner, getOffer, normalizeTradeCode } from '@/lib/trade';
+import { ensureTradeTable, executeTrade, getCardOwner, getOffer, normalizeTradeCode, checkTradeTierRule } from '@/lib/trade';
 import { checkRateCount } from '@/lib/rateLimit';
 
 // GET /api/trade/offer?code=123456[&my=Nama&myQty=N] — intip penawaran sebelum tukar.
@@ -35,12 +35,17 @@ export async function GET(req) {
     if (myCharName) {
       const mine = await getCardOwner(db, session.id, myCharName);
       const same = mine && mine.charName.toLowerCase() === offer.charName.toLowerCase();
+      const rule = mine && !same
+        ? checkTradeTierRule(offer.rarity, offer.amount, mine.rarity, myQty)
+        : { ok: true };
       mineOk = {
         owned: Boolean(mine),
         quantity: mine ? mine.quantity : 0,
         enough: mine ? mine.quantity >= myQty : false,
         same: Boolean(same),
-        ok: Boolean(mine) && mine.quantity >= myQty && !same && !isMine,
+        ruleOk: Boolean(rule.ok),
+        ruleMessage: rule.ok ? null : rule.message,
+        ok: Boolean(mine) && mine.quantity >= myQty && !same && !isMine && Boolean(rule.ok),
       };
     }
     return NextResponse.json({
