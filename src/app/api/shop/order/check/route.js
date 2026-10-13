@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getOrder, syncOrderFromMidtrans } from '@/lib/shop';
+import { checkRateCount } from '@/lib/rateLimit';
 
 // POST /api/shop/order/check { orderId } — tanya status ke Midtrans langsung.
 // Dipakai tombol "Cek Status" + auto-cek (penting untuk localhost yang
@@ -16,6 +17,10 @@ export async function POST(req) {
   }
   const orderId = String(body.orderId || '').trim();
   if (!orderId) return NextResponse.json({ success: false, message: 'orderId wajib diisi.' }, { status: 400 });
+  const attempt = await checkRateCount(`shopcheck:${session.id}`, 30, 60 * 1000);
+  if (!attempt.ok) {
+    return NextResponse.json({ success: false, message: 'Terlalu sering cek status. Tunggu sebentar.' }, { status: 429 });
+  }
   try {
     const order = await getOrder(orderId);
     if (!order || String(order.userId) !== String(session.id)) {

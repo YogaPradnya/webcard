@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
+import { checkRateCount } from '@/lib/rateLimit';
 import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
   createSnapTransaction, countUserSlots, ensureShopTables,
@@ -18,6 +19,10 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
   }
   const kind = String(body.kind || '');
+  const attempt = await checkRateCount(`shoporder:${session.id}`, 10, 60 * 1000);
+  if (!attempt.ok) {
+    return NextResponse.json({ success: false, message: 'Terlalu sering bikin order. Tunggu sebentar.' }, { status: 429 });
+  }
   try {
     await ensureShopTables();
     let amountIdr = 0;

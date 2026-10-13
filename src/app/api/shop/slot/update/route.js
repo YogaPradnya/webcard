@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { updateSlotCard } from '@/lib/shop';
+import { checkRateCount } from '@/lib/rateLimit';
 
 // POST /api/shop/slot/update { slotId, name, imageUrl, borderType, borderColor }
 // Tiap Simpan sukses memakai 1 jatah ubah (maks 3 per slot).
@@ -12,6 +13,10 @@ export async function POST(req) {
     body = await req.json();
   } catch {
     return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
+  }
+  const attempt = await checkRateCount(`shopsave:${session.id}`, 20, 60 * 1000);
+  if (!attempt.ok) {
+    return NextResponse.json({ success: false, message: 'Terlalu sering menyimpan. Tunggu sebentar.' }, { status: 429 });
   }
   try {
     const r = await updateSlotCard(session.id, body.slotId, {

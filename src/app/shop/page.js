@@ -32,11 +32,25 @@ export default function ShopPage() {
   const [paying, setPaying] = useState('');
   const [slotQty, setSlotQty] = useState(1);
   const [checking, setChecking] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [myXp, setMyXp] = useState(null);
+  const [nowTick, setNowTick] = useState(Date.now());
   const snapReady = useRef(false);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  function fmtSisa(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
 
   async function checkOrder(orderId) {
     if (!orderId) return;
     setChecking(orderId);
+    setSuccessMsg('');
     try {
       const res = await fetch('/api/shop/order/check', {
         method: 'POST',
@@ -44,7 +58,15 @@ export default function ShopPage() {
         body: JSON.stringify({ orderId }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!data.success && data.message) setError(data.message);
+      if (!data.success && data.message) {
+        setError(data.message);
+      } else if (data.status === 'paid') {
+        const o = orders.find((x) => x.orderId === orderId);
+        const what = o
+          ? (o.kind === 'xp' ? `+${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `+${o.qty} slot pajangan`)
+          : 'pembayaran';
+        setSuccessMsg(`Pembayaran lunas! ${what} sudah masuk. 🎉`);
+      }
     } catch {
       // abaikan, user bisa tekan tombol Cek manual
     } finally {
@@ -63,11 +85,13 @@ export default function ShopPage() {
       const meData = await meRes.json().catch(() => ({}));
       if (meRes.ok && meData.success) {
         setMe(meData);
-        const [sRes, oRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/shop/orders')]);
+        const [sRes, oRes, pRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/shop/orders'), fetch('/api/profile')]);
         const sData = await sRes.json().catch(() => ({}));
         if (sData.success) setSlots(sData.slots || []);
         const oData = await oRes.json().catch(() => ({}));
         if (oData.success) setOrders(oData.orders || []);
+        const pData = await pRes.json().catch(() => ({}));
+        if (pData.success && Number.isFinite(Number(pData.profile?.xp))) setMyXp(Number(pData.profile.xp));
       }
     } catch {
       setError('Tidak bisa menghubungi server.');
@@ -80,6 +104,28 @@ export default function ShopPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function payAgain(order) {
+    if (paying || !me || !order?.snapToken) return;
+    setPaying(order.orderId);
+    setError('');
+    setSuccessMsg('');
+    try {
+      if (!snapReady.current) {
+        await loadSnapJs(catalog.payment.snapJsUrl, catalog.payment.clientKey);
+        snapReady.current = true;
+      }
+      window.snap.pay(order.snapToken, {
+        onSuccess: () => checkOrder(order.orderId),
+        onPending: () => checkOrder(order.orderId),
+        onClose: () => checkOrder(order.orderId),
+      });
+    } catch {
+      setError('Tidak bisa membuka pembayaran.');
+    } finally {
+      setPaying('');
+    }
+  }
 
   async function pay(body, label) {
     if (paying || !me) return;
@@ -142,6 +188,9 @@ export default function ShopPage() {
         <div className="page">
           <div className="brand"><h1>Shop</h1></div>
           {error ? <div className="alert-error">{error}</div> : null}
+          {successMsg ? (
+            <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{successMsg}</div>
+          ) : null}
           {!me ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13 }}>
@@ -152,7 +201,7 @@ export default function ShopPage() {
           ) : null}
 
           <div className="card" style={{ marginBottom: 16 }}>
-            <div className="section-title">Top-Up XP</div>
+            <div className="section-title">Top-Up XP{myXp != null ? ` (kamu: ${myXp.toLocaleString('id-ID')} XP)` : ''}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
               XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS (Midtrans).
             </div>
@@ -212,28 +261,45 @@ export default function ShopPage() {
           {me && orders.length > 0 ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="section-title">Order terakhir</div>
-              {orders.map((o) => (
+              {orders.map((o) => {
+                const ttl = catalog?.payment?.orderTtlMs || 15 * 60 * 1000;
+                const left = o.status === 'pending' ? (o.createdAt + ttl - nowTick) : 0;
+                return (
                 <div className="user-row" key={o.orderId}>
                   <span style={{ fontWeight: 700 }}>{o.kind === 'xp' ? `Top-Up ${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `Slot x${o.qty}`}</span>
                   <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>{idr(o.amountIdr)}</span>
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#eab308' : '#ef4444' }}>
-                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? 'Menunggu bayar' : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
+                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
                     </span>
                     {o.status === 'pending' ? (
-                      <button
-                        type="button"
-                        className="btn btn-ghost"
-                        style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
-                        disabled={checking === o.orderId}
-                        onClick={() => checkOrder(o.orderId)}
-                      >
-                        {checking === o.orderId ? '...' : 'Cek Status'}
-                      </button>
+                      <>
+                        {o.snapToken ? (
+                          <button
+                            type="button"
+                            className="btn"
+                            style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
+                            disabled={paying === o.orderId}
+                            onClick={() => payAgain(o)}
+                          >
+                            {paying === o.orderId ? '...' : 'Bayar'}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
+                          disabled={checking === o.orderId}
+                          onClick={() => checkOrder(o.orderId)}
+                        >
+                          {checking === o.orderId ? '...' : 'Cek Status'}
+                        </button>
+                      </>
                     ) : null}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
 

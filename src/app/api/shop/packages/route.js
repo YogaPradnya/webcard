@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import {
   XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT,
-  SLOT_BORDER_TYPES, snapJsUrl, isMidtransConfigured,
+  SLOT_BORDER_TYPES, ORDER_PENDING_TTL_MS, snapJsUrl, isMidtransConfigured,
 } from '@/lib/shop';
 
 // GET /api/shop/packages — katalog publik (buat reviewer Midtrans juga).
@@ -24,6 +24,7 @@ export async function GET() {
       snapJsUrl: snapJsUrl(),
       clientKey: process.env.MIDTRANS_CLIENT_KEY || '',
       methods: ['QRIS'],
+      orderTtlMs: ORDER_PENDING_TTL_MS,
     },
   });
 }

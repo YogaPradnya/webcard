@@ -13,8 +13,9 @@ export const XP_PACKS = [
 
 export const SLOT_PRICE_IDR = 10000;
 export const MAX_SLOTS_PER_USER = 50;
-// Order pending yang tidak dibayar dalam 5 menit otomatis kadaluarsa.
-export const ORDER_PENDING_TTL_MS = 5 * 60 * 1000;
+// Order pending yang tidak dibayar dalam 15 menit otomatis kadaluarsa.
+// (QRIS asli: buka HP + scan + konfirmasi sering >5 menit.)
+export const ORDER_PENDING_TTL_MS = 15 * 60 * 1000;
 // Tiap slot = 1 kartu pajangan custom dengan 3x jatah ubah (tiap Simpan makan 1).
 export const MAX_EDITS_PER_SLOT = 3;
 
@@ -99,18 +100,20 @@ export async function fetchTransactionStatus(orderId) {
   return data;
 }
 
-// Sinkronkan 1 order pending ke status Midtrans + penuhi bila lunas.
+// Sinkronkan 1 order ke status Midtrans + penuhi bila lunas.
+// Pemaaf: order 'expired' yang ternyata settlement di Midtrans tetap dipenuhi
+// (anti double-kirim: status langsung jadi 'paid', sync berikutnya diabaikan).
 // Return { status: 'paid'|'pending'|'failed'|'expired'|'unknown', reason? }.
 export async function syncOrderFromMidtrans(orderId) {
   const order = await getOrder(orderId);
   if (!order) return { status: 'unknown' };
-  if (order.status !== 'pending') return { status: order.status };
+  if (order.status !== 'pending' && order.status !== 'expired') return { status: order.status };
   const st = await fetchTransactionStatus(orderId);
   const tx = String(st.transaction_status || '');
   if (tx === 'capture' || tx === 'settlement') {
     if (tx === 'capture' && String(st.fraud_status) === 'challenge') return { status: 'pending' };
     const r = await fulfillPaidOrder(order);
-    if (!r.fulfilled && r.reason !== 'bukan pending') return { status: order.status, reason: r.reason };
+    if (!r.fulfilled && r.reason !== 'bukan pending/expired') return { status: order.status, reason: r.reason };
     return { status: 'paid' };
   }
   if (tx === 'pending') return { status: 'pending' };
@@ -221,7 +224,7 @@ export async function expireStalePendingOrders(userId) {
 
 export async function listUserOrders(userId, limit = 10) {
   const res = await getDb().execute({
-    sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, snap_token, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
     args: [String(userId), Math.min(20, Math.max(1, Number(limit) || 10))],
   });
   return (res.rows || []).map((r) => ({
@@ -232,6 +235,7 @@ export async function listUserOrders(userId, limit = 10) {
     amountIdr: Number(r.amount_idr) || 0,
     xpAmount: Number(r.xp_amount) || 0,
     status: String(r.status),
+    snapToken: r.snap_token || null,
     createdAt: Number(r.created_at) || 0,
   }));
 }
@@ -257,13 +261,17 @@ export async function countUserSlots(userId) {
   return Number(res.rows[0]?.c || 0);
 }
 
-// Penuhi order yang sudah dibayar (idempoten: hanya dari status pending).
+// Penuhi order yang sudah dibayar (idempoten).
+// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Midtrans
+// bilang lunas padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
 // Return { fulfilled: true } atau { fulfilled: false, reason }.
 export async function fulfillPaidOrder(order) {
   const db = getDb();
   await ensureShopTables();
   const fresh = await getOrder(order.orderId);
-  if (!fresh || fresh.status !== 'pending') return { fulfilled: false, reason: 'bukan pending' };
+  if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'expired')) {
+    return { fulfilled: false, reason: 'bukan pending/expired' };
+  }
   if (fresh.kind === 'xp') {
     await addXpToUser(fresh.userId, fresh.username, fresh.xpAmount);
   } else if (fresh.kind === 'slot') {
