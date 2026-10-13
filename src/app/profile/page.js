@@ -54,6 +54,7 @@ export default function ProfilePage() {
   const [displayCards, setDisplayCards] = useState([]);
   const [displayPick, setDisplayPick] = useState('');
   const [profilSource, setProfilSource] = useState('auto');
+  const [customSlots, setCustomSlots] = useState([]);
 
   async function load() {
     setLoading(true);
@@ -66,12 +67,13 @@ export default function ProfilePage() {
         return;
       }
       setMe(meData);
-      const [pRes, cRes, lbRes, dRes, srcRes] = await Promise.all([
+      const [pRes, cRes, lbRes, dRes, srcRes, slotRes] = await Promise.all([
         fetch('/api/profile'),
         fetch('/api/cards'),
         fetch('/api/battle/leaderboard?tab=pvp'),
         fetch('/api/display'),
         fetch('/api/profile/showcase-source'),
+        fetch('/api/shop/slots'),
       ]);
       const pData = await pRes.json().catch(() => ({}));
       if (!pRes.ok || !pData.success) {
@@ -95,6 +97,8 @@ export default function ProfilePage() {
       }
       const srcData = await srcRes.json().catch(() => ({}));
       if (srcData.success && srcData.source) setProfilSource(srcData.source);
+      const slotData = await slotRes.json().catch(() => ({}));
+      if (slotData.success) setCustomSlots(slotData.slots || []);
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -316,6 +320,7 @@ export default function ProfilePage() {
                   <Link href="/leaderboard" className="menu-tile"><span className="menu-ico">★</span>Rank</Link>
                   <Link href="/battle" className="menu-tile"><span className="menu-ico">VS</span>Battle</Link>
                   <Link href="/book" className="menu-tile"><span className="menu-ico">▦</span>Book</Link>
+                  <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link>
                 </div>
                 <button className="btn btn-ghost" onClick={onLogout} style={{ marginTop: 12 }}>
                   Keluar
@@ -356,6 +361,32 @@ export default function ProfilePage() {
                       {busy === 'display-showcase' ? '...' : 'Simpan'}
                     </button>
                   </form>
+                )}
+              </div>
+
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="section-title">Kartu Pajangan Custom ({customSlots.length}/50)</div>
+                {customSlots.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+                    Belum punya slot. <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Beli di Shop</Link> (Rp10rb/slot).
+                  </div>
+                ) : (
+                  <div className="pick-grid">
+                    {customSlots.map((s) => (
+                      <div key={s.id} className="card-item">
+                        {s.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="card-art" src={s.imageUrl} alt={s.name} loading="lazy" decoding="async" />
+                        ) : (
+                          <div className="card-art" />
+                        )}
+                        <div className="card-meta">
+                          <div className="card-name">{s.name}</div>
+                          <div className="card-anime">sisa ubah {s.editsLeft}/3</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
