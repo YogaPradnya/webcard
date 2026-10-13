@@ -471,6 +471,8 @@ export default function BattlePage() {
   const [chatSending, setChatSending] = useState(false);
   const chatAfter = useRef(0);
   const chatBoxRef = useRef(null);
+  const resultRef = useRef(null);
+  const [autoExitIn, setAutoExitIn] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -872,6 +874,7 @@ export default function BattlePage() {
     setPending(null);
     setHint('');
     setSplash(null);
+    setAutoExitIn(0);
     fighterRefs.current = {};
     setChatMsgs([]);
     chatAfter.current = 0;
@@ -923,6 +926,23 @@ export default function BattlePage() {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st?.code, st?.status, st?.turn, me?.id]);
+
+  // Battle selesai: scroll ke hasil + otomatis kembali ke menu pilih tim.
+  const battleDone = Boolean(st && (st.status === 'finished' || st.battle?.over));
+  useEffect(() => {
+    if (!battleDone) {
+      setAutoExitIn(0);
+      return;
+    }
+    if (resultRef.current) {
+      try { resultRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* abaikan */ }
+    }
+    setAutoExitIn(8);
+    const tick = setInterval(() => { setAutoExitIn((n) => Math.max(0, n - 1)); }, 1000);
+    const to = setTimeout(() => { exitBattle(); }, 8000);
+    return () => { clearInterval(tick); clearTimeout(to); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.code, st?.status, st?.battle?.over]);
 
   const mySide = st?.yourSide || 'player';
   const foeSide = mySide === 'player' ? 'enemy' : 'player';
@@ -1510,7 +1530,7 @@ export default function BattlePage() {
               </div>
 
               {st.status === 'finished' || st.battle.over ? (
-                <div className="card result-card" style={{ marginBottom: 16 }}>
+                <div className="card result-card" ref={resultRef} style={{ marginBottom: 16 }}>
                   {iWon ? <div className="confetti" aria-hidden="true">{confetti}</div> : null}
                   <div className="section-title">
                     {iWon ? '🏆 Menang!' : st.winner === 'AI' && st.mode === 'ai' ? 'Kalah' : 'Kalah'}
@@ -1543,6 +1563,11 @@ export default function BattlePage() {
                   >
                     Main Lagi
                   </button>
+                  {autoExitIn > 0 ? (
+                    <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+                      Otomatis kembali dalam {autoExitIn} dtk…
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
