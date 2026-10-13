@@ -134,7 +134,7 @@ export default function ShopPage() {
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="section-title">Top-Up XP</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-              XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS, virtual account, e-wallet, atau gerai retail (Midtrans).
+              XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS (Midtrans).
             </div>
             <div className="title-grid">
               {(catalog?.xpPacks || []).map((p) => (

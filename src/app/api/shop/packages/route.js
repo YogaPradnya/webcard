@@ -23,7 +23,7 @@ export async function GET() {
       configured: isMidtransConfigured(),
       snapJsUrl: snapJsUrl(),
       clientKey: process.env.MIDTRANS_CLIENT_KEY || '',
-      methods: ['QRIS', 'Virtual Account bank', 'E-wallet', 'Gerai retail'],
+      methods: ['QRIS'],
     },
   });
 }

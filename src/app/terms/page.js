@@ -29,7 +29,7 @@ const SECTIONS = [
   },
   {
     title: '7. Harga dan Pembayaran',
-    body: 'Seluruh harga tercantum dalam Rupiah (IDR) di halaman Shop dan sudah termasuk biaya layanan pembayaran. Pembayaran diproses aman melalui Midtrans dengan metode: QRIS, virtual account bank, e-wallet, dan gerai retail. Pesanan yang tidak dibayar hingga batas waktu yang ditentukan akan otomatis dibatalkan oleh sistem dan tidak ada dana yang ditarik.',
+    body: 'Seluruh harga tercantum dalam Rupiah (IDR) di halaman Shop dan sudah termasuk biaya layanan pembayaran. Pembayaran diproses aman melalui Midtrans dan hanya tersedia via QRIS. Pesanan yang tidak dibayar hingga batas waktu yang ditentukan akan otomatis dibatalkan oleh sistem dan tidak ada dana yang ditarik.',
   },
   {
     title: '8. Pengiriman dan Penyelesaian Pesanan',
