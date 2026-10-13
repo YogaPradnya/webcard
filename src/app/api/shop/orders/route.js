@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
-import { listUserOrders, ensureShopTables } from '@/lib/shop';
+import { listUserOrders, ensureShopTables, expireStalePendingOrders } from '@/lib/shop';
 
 // GET /api/shop/orders — 10 order terakhir milik user.
 export async function GET(req) {
@@ -8,6 +8,7 @@ export async function GET(req) {
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   try {
     await ensureShopTables();
+    await expireStalePendingOrders(session.id);
     const orders = await listUserOrders(session.id, 10);
     return NextResponse.json({ success: true, orders });
   } catch (e) {

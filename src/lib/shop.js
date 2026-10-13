@@ -13,6 +13,8 @@ export const XP_PACKS = [
 
 export const SLOT_PRICE_IDR = 10000;
 export const MAX_SLOTS_PER_USER = 50;
+// Order pending yang tidak dibayar dalam 5 menit otomatis kadaluarsa.
+export const ORDER_PENDING_TTL_MS = 5 * 60 * 1000;
 // Tiap slot = 1 kartu pajangan custom dengan 3x jatah ubah (tiap Simpan makan 1).
 export const MAX_EDITS_PER_SLOT = 3;
 
@@ -205,6 +207,16 @@ export async function setOrderStatus(orderId, status) {
     sql: 'UPDATE shop_orders SET status = ?, updated_at = ? WHERE order_id = ?',
     args: [status, Date.now(), String(orderId)],
   });
+}
+
+// Tandai pending yang lebih tua dari TTL sebagai expired. Return jumlah yang diubah.
+export async function expireStalePendingOrders(userId) {
+  const res = await getDb().execute({
+    sql: `UPDATE shop_orders SET status = 'expired', updated_at = ?
+          WHERE user_id = ? AND status = 'pending' AND created_at < ?`,
+    args: [Date.now(), String(userId), Date.now() - ORDER_PENDING_TTL_MS],
+  });
+  return Number(res.rowsAffected || 0);
 }
 
 export async function listUserOrders(userId, limit = 10) {
