@@ -42,7 +42,7 @@ export async function POST(req) {
       if (tx === 'capture' && fraud === 'challenge') {
         return NextResponse.json({ success: true, ignored: true });
       }
-      const r = await fulfillPaidOrder(order);
+      const r = await fulfillPaidOrder(order, { paymentType: body.payment_type });
       if (!r.fulfilled) console.warn('[SHOP WEBHOOK] Gagal penuhi:', orderId, r.reason);
       return NextResponse.json({ success: true });
     }

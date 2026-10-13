@@ -9,6 +9,20 @@ function idr(n) {
   return `Rp${Number(n || 0).toLocaleString('id-ID')}`;
 }
 
+function paymentLabel(t) {
+  const map = { qris: 'QRIS', gopay: 'GoPay', shopeepay: 'ShopeePay', bank_transfer: 'Virtual Account', echannel: 'Mandiri Bill', credit_card: 'Kartu Kredit', cstore: 'Gerai Retail' };
+  return map[String(t || '')] || (t ? String(t).toUpperCase() : '-');
+}
+
+function fmtDate(ts) {
+  if (!ts) return '-';
+  try {
+    return new Date(Number(ts)).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '-';
+  }
+}
+
 function loadSnapJs(src, clientKey) {
   return new Promise((resolve, reject) => {
     if (typeof window !== 'undefined' && window.snap) return resolve();
@@ -32,6 +46,7 @@ export default function ShopPage() {
   const [paying, setPaying] = useState('');
   const [slotQty, setSlotQty] = useState(1);
   const [checking, setChecking] = useState('');
+  const [expandedOrder, setExpandedOrder] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
   const [myXp, setMyXp] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
@@ -264,14 +279,22 @@ export default function ShopPage() {
               {orders.map((o) => {
                 const ttl = catalog?.payment?.orderTtlMs || 15 * 60 * 1000;
                 const left = o.status === 'pending' ? (o.createdAt + ttl - nowTick) : 0;
+                const open = expandedOrder === o.orderId;
                 return (
-                <div className="user-row" key={o.orderId}>
+                <div key={o.orderId}>
+                <div
+                  className="user-row"
+                  onClick={() => setExpandedOrder(open ? null : o.orderId)}
+                  style={{ cursor: 'pointer' }}
+                  title="Ketuk untuk detail"
+                >
                   <span style={{ fontWeight: 700 }}>{o.kind === 'xp' ? `Top-Up ${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `Slot x${o.qty}`}</span>
                   <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>{idr(o.amountIdr)}</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#eab308' : '#ef4444' }}>
                       {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
                     </span>
+                    <span style={{ fontSize: 11, color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
                     {o.status === 'pending' ? (
                       <>
                         {o.snapToken ? (
@@ -280,7 +303,7 @@ export default function ShopPage() {
                             className="btn"
                             style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
                             disabled={paying === o.orderId}
-                            onClick={() => payAgain(o)}
+                            onClick={(e) => { e.stopPropagation(); payAgain(o); }}
                           >
                             {paying === o.orderId ? '...' : 'Bayar'}
                           </button>
@@ -290,13 +313,24 @@ export default function ShopPage() {
                           className="btn btn-ghost"
                           style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
                           disabled={checking === o.orderId}
-                          onClick={() => checkOrder(o.orderId)}
+                          onClick={(e) => { e.stopPropagation(); checkOrder(o.orderId); }}
                         >
                           {checking === o.orderId ? '...' : 'Cek Status'}
                         </button>
                       </>
                     ) : null}
                   </span>
+                </div>
+                {open ? (
+                  <div style={{ fontSize: 12, color: 'var(--body)', background: 'var(--hairline-soft)', borderRadius: 8, padding: '10px 12px', margin: '0 0 8px', lineHeight: 1.8 }}>
+                    <div><b>Order ID:</b> {o.orderId}</div>
+                    <div><b>Dibuat:</b> {fmtDate(o.createdAt)}</div>
+                    {o.paidAt ? <div><b>Lunas:</b> {fmtDate(o.paidAt)}</div> : null}
+                    <div><b>Metode:</b> {paymentLabel(o.paymentType)}</div>
+                    <div><b>Nominal:</b> {idr(o.amountIdr)}</div>
+                    <div><b>Isi:</b> {o.kind === 'xp' ? `+${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `+${o.qty} slot pajangan`}</div>
+                  </div>
+                ) : null}
                 </div>
                 );
               })}

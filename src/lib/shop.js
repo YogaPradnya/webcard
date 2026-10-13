@@ -112,7 +112,7 @@ export async function syncOrderFromMidtrans(orderId) {
   const tx = String(st.transaction_status || '');
   if (tx === 'capture' || tx === 'settlement') {
     if (tx === 'capture' && String(st.fraud_status) === 'challenge') return { status: 'pending' };
-    const r = await fulfillPaidOrder(order);
+    const r = await fulfillPaidOrder(order, { paymentType: st.payment_type });
     if (!r.fulfilled && r.reason !== 'bukan pending/expired') return { status: order.status, reason: r.reason };
     return { status: 'paid' };
   }
@@ -153,11 +153,16 @@ export async function ensureShopTables() {
       xp_amount INTEGER DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'pending',
       snap_token TEXT DEFAULT NULL,
+      paid_at INTEGER DEFAULT 0,
+      payment_type TEXT DEFAULT '',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
   `);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_orders_user ON shop_orders (user_id, created_at DESC)');
+  // Detail pembayaran (best-effort untuk DB lama).
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN paid_at INTEGER DEFAULT 0'); } catch { /* sudah ada */ }
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN payment_type TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
   await db.execute(`
     CREATE TABLE IF NOT EXISTS user_display_slots (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,7 +229,7 @@ export async function expireStalePendingOrders(userId) {
 
 export async function listUserOrders(userId, limit = 10) {
   const res = await getDb().execute({
-    sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, snap_token, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, snap_token, paid_at, payment_type, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
     args: [String(userId), Math.min(20, Math.max(1, Number(limit) || 10))],
   });
   return (res.rows || []).map((r) => ({
@@ -236,6 +241,8 @@ export async function listUserOrders(userId, limit = 10) {
     xpAmount: Number(r.xp_amount) || 0,
     status: String(r.status),
     snapToken: r.snap_token || null,
+    paidAt: Number(r.paid_at) || 0,
+    paymentType: String(r.payment_type || ''),
     createdAt: Number(r.created_at) || 0,
   }));
 }
@@ -264,8 +271,9 @@ export async function countUserSlots(userId) {
 // Penuhi order yang sudah dibayar (idempoten).
 // Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Midtrans
 // bilang lunas padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
+// payment: { paymentType } dari Midtrans (disimpan untuk detail transaksi).
 // Return { fulfilled: true } atau { fulfilled: false, reason }.
-export async function fulfillPaidOrder(order) {
+export async function fulfillPaidOrder(order, payment = {}) {
   const db = getDb();
   await ensureShopTables();
   const fresh = await getOrder(order.orderId);
@@ -291,6 +299,12 @@ export async function fulfillPaidOrder(order) {
     return { fulfilled: false, reason: 'jenis tak dikenal' };
   }
   await setOrderStatus(fresh.orderId, 'paid');
+  try {
+    await db.execute({
+      sql: 'UPDATE shop_orders SET paid_at = ?, payment_type = ? WHERE order_id = ?',
+      args: [Date.now(), String(payment.paymentType || ''), fresh.orderId],
+    });
+  } catch { /* kolom lama: abaikan, status paid tetap sah */ }
   return { fulfilled: true };
 }
 
