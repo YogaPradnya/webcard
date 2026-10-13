@@ -55,9 +55,9 @@ export async function createSnapTransaction({ orderId, grossAmount, itemName, us
     },
     body: JSON.stringify({
       transaction_details: { order_id: orderId, gross_amount: grossAmount },
-      // Hanya QR: pakai channel GoPay yang "Always show QRIS"-nya ON di dashboard.
-      // ('qris' murni tidak aktif di akun ini → popup kosong.)
-      enabled_payments: ['gopay'],
+      // Daftar channel diatur di dashboard Midtrans (Snap Checkout > Payment methods):
+      // nyalakan HANYA GoPay/GoPay Later (Always show QRIS) + Other QRIS,
+      // matikan VA, kartu, retail, dsb. Tanpa enabled_payments agar ikut dashboard.
       item_details: [{ id: orderId, price: grossAmount, quantity: 1, name: String(itemName).slice(0, 50) }],
       customer_details: { first_name: String(username || 'Animein').slice(0, 50) },
     }),
