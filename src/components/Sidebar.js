@@ -11,10 +11,16 @@ export default function Sidebar({ username }) {
   const pathname = usePathname();
   const router = useRouter();
   const [activeBattle, setActiveBattle] = useState(0);
+  const [shopOn, setShopOn] = useState(false);
 
   useEffect(() => {
     let alive = true;
     (async () => {
+      try {
+        const res = await fetch('/api/shop/packages');
+        const data = await res.json().catch(() => ({}));
+        if (alive && data.success) setShopOn(Boolean(data.enabled));
+      } catch { /* abaikan: shop tetap sembunyi */ }
       try {
         const res = await fetch('/api/battle/mine');
         const data = await res.json().catch(() => ({}));
@@ -48,7 +54,7 @@ export default function Sidebar({ username }) {
     <>
       {item('/book', 'Book Kartu')}
       {item('/battle', activeBattle > 0 ? `Battle (${activeBattle})` : 'Battle', activeBattle)}
-      {item('/shop', 'Shop')}
+      {shopOn ? item('/shop', 'Shop') : null}
       {item('/chat', 'Chat Global')}
       {item('/profile', 'Profil')}
     </>
@@ -58,7 +64,7 @@ export default function Sidebar({ username }) {
     <>
       {item('/book', 'Book')}
       {item('/battle', activeBattle > 0 ? `Battle (${activeBattle})` : 'Battle', activeBattle)}
-      {item('/shop', 'Shop')}
+      {shopOn ? item('/shop', 'Shop') : null}
       {item('/chat', 'Chat')}
       {item('/profile', 'Profil')}
     </>

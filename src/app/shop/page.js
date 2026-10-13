@@ -195,6 +195,26 @@ export default function ShopPage() {
 
   const maxSlots = catalog?.slot?.maxPerUser || 50;
   const slotRoom = Math.max(0, maxSlots - slots.length);
+  const shopOn = Boolean(catalog?.enabled);
+
+  if (!loading && catalog && !shopOn) {
+    return (
+      <div className="layout">
+        <Sidebar username={me?.username} />
+        <div className="layout-main">
+          <div className="page">
+            <div className="brand"><h1>Shop</h1></div>
+            <div className="card">
+              <div className="section-title">Segera hadir 🛠️</div>
+              <div style={{ fontSize: 13, color: 'var(--body)' }}>
+                Toko Top-Up XP dan Slot Kartu Pajangan sedang disiapkan dan akan segera dibuka.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="layout">

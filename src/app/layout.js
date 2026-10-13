@@ -1,5 +1,4 @@
 import './globals.css';
-import SwRegister from '@/components/SwRegister';
 
 export const metadata = {
   title: 'Book Kartu Animein',
@@ -39,7 +38,6 @@ export default function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <SwRegister />
         {children}
       </body>
     </html>

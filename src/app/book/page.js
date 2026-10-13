@@ -101,6 +101,7 @@ export default function BookPage() {
   const [displayCards, setDisplayCards] = useState([]);
   const [displayFlipped, setDisplayFlipped] = useState(null);
   const [customSlots, setCustomSlots] = useState([]);
+  const [shopOn, setShopOn] = useState(false);
   const [editingSlot, setEditingSlot] = useState(null);
   const [slotForm, setSlotForm] = useState({ name: '', imageUrl: '', borderType: 'classic', borderColor: '#a855f7' });
   const [savingSlot, setSavingSlot] = useState(false);
@@ -141,9 +142,11 @@ export default function BookPage() {
       }
       // Slot custom (beli di Shop): dikelola di tab Pajangan.
       try {
-        const slotRes = await fetch('/api/shop/slots');
+        const [slotRes, shopRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/shop/packages')]);
         const slotData = await slotRes.json().catch(() => ({}));
         if (slotRes.ok && slotData.success) setCustomSlots(slotData.slots || []);
+        const shopData = await shopRes.json().catch(() => ({}));
+        if (shopData.success) setShopOn(Boolean(shopData.enabled));
       } catch {
         // non-kritis
       }
@@ -361,6 +364,7 @@ export default function BookPage() {
 
           {tab === 'display' ? (
             <div>
+              {shopOn ? (
               <div className="card" style={{ marginTop: 12 }}>
                 <div className="section-title">Slot Custom ({customSlots.length}/50)</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
@@ -437,6 +441,7 @@ export default function BookPage() {
                   </form>
                 ) : null}
               </div>
+              ) : null}
               <div className="card" style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>
                   {displayCards.length} kartu pajangan (display-only, gift admin)

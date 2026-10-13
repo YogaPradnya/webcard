@@ -4,6 +4,13 @@ import { getDb } from './db.js';
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
 // Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Midtrans.
 
+// Feature flag Shop: tampil hanya bila NEXT_PUBLIC_SHOP_ENABLED=true.
+// Matikan (default) sampai key production Midtrans siap, agar fitur
+// pembayaran tidak terlihat publik. Nyalakan lokal untuk tes.
+export function isShopEnabled() {
+  return String(process.env.NEXT_PUBLIC_SHOP_ENABLED || '').toLowerCase() === 'true';
+}
+
 export const XP_PACKS = [
   { id: 'xp-5k', priceIdr: 5000, xp: 6000 },
   { id: 'xp-10k', priceIdr: 10000, xp: 11500 },

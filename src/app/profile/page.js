@@ -55,6 +55,7 @@ export default function ProfilePage() {
   const [displayPick, setDisplayPick] = useState('');
   const [profilSource, setProfilSource] = useState('auto');
   const [customSlots, setCustomSlots] = useState([]);
+  const [shopOn, setShopOn] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -67,13 +68,14 @@ export default function ProfilePage() {
         return;
       }
       setMe(meData);
-      const [pRes, cRes, lbRes, dRes, srcRes, slotRes] = await Promise.all([
+      const [pRes, cRes, lbRes, dRes, srcRes, slotRes, shopRes] = await Promise.all([
         fetch('/api/profile'),
         fetch('/api/cards'),
         fetch('/api/battle/leaderboard?tab=pvp'),
         fetch('/api/display'),
         fetch('/api/profile/showcase-source'),
         fetch('/api/shop/slots'),
+        fetch('/api/shop/packages'),
       ]);
       const pData = await pRes.json().catch(() => ({}));
       if (!pRes.ok || !pData.success) {
@@ -99,6 +101,8 @@ export default function ProfilePage() {
       if (srcData.success && srcData.source) setProfilSource(srcData.source);
       const slotData = await slotRes.json().catch(() => ({}));
       if (slotData.success) setCustomSlots(slotData.slots || []);
+      const shopData = await shopRes.json().catch(() => ({}));
+      if (shopData.success) setShopOn(Boolean(shopData.enabled));
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -320,7 +324,7 @@ export default function ProfilePage() {
                   <Link href="/leaderboard" className="menu-tile"><span className="menu-ico">★</span>Rank</Link>
                   <Link href="/battle" className="menu-tile"><span className="menu-ico">VS</span>Battle</Link>
                   <Link href="/book" className="menu-tile"><span className="menu-ico">▦</span>Book</Link>
-                  <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link>
+                  {shopOn ? <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link> : null}
                 </div>
                 <button className="btn btn-ghost" onClick={onLogout} style={{ marginTop: 12 }}>
                   Keluar
@@ -364,6 +368,7 @@ export default function ProfilePage() {
                 )}
               </div>
 
+              {shopOn ? (
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="section-title">Kartu Pajangan Custom ({customSlots.length}/50)</div>
                 {customSlots.length === 0 ? (
@@ -389,6 +394,7 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+              ) : null}
 
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="section-title">Tampil di .profil chat</div>

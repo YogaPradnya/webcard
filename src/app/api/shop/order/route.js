@@ -4,7 +4,7 @@ import { getDb } from '@/lib/db';
 import { checkRateCount } from '@/lib/rateLimit';
 import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
-  createSnapTransaction, countUserSlots, ensureShopTables,
+  createSnapTransaction, countUserSlots, ensureShopTables, isShopEnabled,
 } from '@/lib/shop';
 
 // POST /api/shop/order { kind: 'xp', packId } | { kind: 'slot', qty }
@@ -12,6 +12,9 @@ import {
 export async function POST(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+  if (!isShopEnabled()) {
+    return NextResponse.json({ success: false, message: 'Shop belum dibuka.' }, { status: 403 });
+  }
   let body = {};
   try {
     body = await req.json();

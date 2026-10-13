@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import {
   XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT,
-  SLOT_BORDER_TYPES, ORDER_PENDING_TTL_MS, snapJsUrl, isMidtransConfigured,
+  SLOT_BORDER_TYPES, ORDER_PENDING_TTL_MS, isShopEnabled, snapJsUrl, isMidtransConfigured,
 } from '@/lib/shop';
 
 // GET /api/shop/packages — katalog publik (buat reviewer Midtrans juga).
 export async function GET() {
   return NextResponse.json({
     success: true,
+    enabled: isShopEnabled(),
     xpPacks: XP_PACKS.map((p) => ({
       ...p,
       bonusPct: Math.round(((p.xp - p.priceIdr) / p.priceIdr) * 100),
