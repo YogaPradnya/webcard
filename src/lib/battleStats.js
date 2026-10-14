@@ -6,7 +6,9 @@ export const ROLES = ['Damage', 'Tank', 'Support', 'Assist'];
 const TIER_HP = { Common: 70, Rare: 100, Epic: 140, Legendary: 180, Mythic: 220 };
 const TIER_BASIC = { Common: 10, Rare: 14, Epic: 18, Legendary: 24, Mythic: 30 };
 const TIER_SKILL = { Common: 25, Rare: 35, Epic: 50, Legendary: 70, Mythic: 95 };
-const TIER_CONS = { Common: 3, Rare: 3, Epic: 4, Legendary: 5, Mythic: 6 };
+// Cons flat: skill1 = 6, skill2 (finisher) = 8 untuk semua tier & role.
+const SKILL1_CONS = 6;
+const SKILL2_CONS = 8;
 
 const ROLE_BASIC_MULT = { Damage: 1.3, Tank: 0.9, Support: 0.7, Assist: 0.7 };
 const ROLE_SKILL_MULT = { Damage: 1.3, Tank: 1.0, Support: 1.2, Assist: 0.6 };
@@ -77,17 +79,14 @@ export function genCardStats(entry) {
     10,
     Math.round((TIER_SKILL[tier] ?? 25) * (ROLE_SKILL_MULT[role] ?? 1) + (h % 7)),
   );
-  let cons = TIER_CONS[tier] ?? 3;
-  if (role === 'Support') cons = Math.max(2, cons - 1);
-  if (role === 'Assist') cons = Math.min(cons, 3);
+  const cons = SKILL1_CONS;
   const effectPool = SKILL_EFFECTS[role] || SKILL_EFFECTS.Damage;
   const picked = effectPool[h % effectPool.length];
   const second = genSecondSkill(entry, role, picked.effect);
   return { name, tier, role, hp, basic, skillName, skill, cons, effect: picked.effect, effectVal: picked.val, ...second };
 }
 
-// Skill kedua (terbuka saat kartu ★5): deterministik, efek dijamin beda dari skill pertama.
-// Kekuatan ~90% skill pertama agar skill-1 tetap utama.
+// Skill kedua = finisher (lebih OP dari skill1): damage ~130% + efek beda.
 export function genSecondSkill(entry, role, firstEffect) {
   const name = entry.name;
   const tier = entry.tier;
@@ -98,11 +97,9 @@ export function genSecondSkill(entry, role, firstEffect) {
   const skill2Name = `${skillPool[(h + 1) % skillPool.length]} ${firstWord} II`;
   const skill2 = Math.max(
     10,
-    Math.round((TIER_SKILL[tier] ?? 25) * (ROLE_SKILL_MULT[resolvedRole] ?? 1) * 0.9 + (h % 7)),
+    Math.round((TIER_SKILL[tier] ?? 25) * (ROLE_SKILL_MULT[resolvedRole] ?? 1) * 1.3 + (h % 7)),
   );
-  let cons2 = TIER_CONS[tier] ?? 3;
-  if (resolvedRole === 'Support') cons2 = Math.max(2, cons2 - 1);
-  if (resolvedRole === 'Assist') cons2 = Math.min(cons2, 3);
+  const cons2 = SKILL2_CONS;
   const effectPool = SKILL_EFFECTS[resolvedRole] || SKILL_EFFECTS.Damage;
   let picked = effectPool[(h + 1) % effectPool.length];
   if (effectPool.length > 1 && picked.effect === firstEffect) {

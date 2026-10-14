@@ -8,8 +8,8 @@
 // - shield/bulwark (Tank): damage ke aktif lawan + shield ke kartu tim pilihan.
 // Tanpa target (AI/timeout/room lama) = perilaku lama: aktif lawan / heal otomatis / shield diri.
 
-export const MAX_CONS = 10;
-export const MAX_TURNS = 30;
+export const MAX_CONS = 20;
+export const MAX_TURNS = 40;
 
 // Skill2 unlock: Legendary/Mythic langsung buka; tier lain wajib kartu ★5.
 export function isSkill2Unlocked(f) {
@@ -87,9 +87,9 @@ export function createBattle(playerStats, enemyStats, first = 'player') {
     winner: null,
     log: [{ t: 0, type: 'start', first }],
   };
-  // Kompensasi giliran kedua: mulai dengan 2 cons.
-  battle[first === 'player' ? 'enemy' : 'player'].cons = 2;
-  battle.log.push({ t: 0, type: 'cons', side: first === 'player' ? 'enemy' : 'player', cons: 2 });
+  // Kompensasi giliran kedua: mulai dengan 4 cons (20% dari maks).
+  battle[first === 'player' ? 'enemy' : 'player'].cons = 4;
+  battle.log.push({ t: 0, type: 'cons', side: first === 'player' ? 'enemy' : 'player', cons: 4 });
   return battle;
 }
 
@@ -206,7 +206,7 @@ function runSkill(battle, side, actor, foeTarget, atkMult, combo, sk, slot, rng,
       const mult = fx === 'energize' ? 0.45 : 0.7;
       const amount = Math.min(target.maxHp - target.hp, Math.round(base * mult * comboMult));
       target.hp += amount;
-      if (fx === 'energize') me.cons = Math.min(MAX_CONS, me.cons + 2);
+      if (fx === 'energize') me.cons = Math.min(MAX_CONS, me.cons + 4);
       battle.log.push({
         t: battle.turnCount, type: 'heal', side, name: actor.name,
         skill: sk.name, slot, target: target.name, amount, cons: me.cons,
@@ -261,7 +261,7 @@ function runSkill(battle, side, actor, foeTarget, atkMult, combo, sk, slot, rng,
       foeTarget.stun = true;
       ev.status = 'stun';
     } else if (fx === 'surge') {
-      me.cons = Math.min(MAX_CONS, me.cons + 2);
+      me.cons = Math.min(MAX_CONS, me.cons + 4);
       ev.status = 'surge';
     } else if (fx === 'weaken') {
       foeTarget.weaken = 2;

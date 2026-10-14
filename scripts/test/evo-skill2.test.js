@@ -69,7 +69,7 @@ describe('engine skill2', () => {
     const hpBefore = b.enemy.fighters[0].hp;
     const ok = act(b, 'player', { type: 'skill2' }, () => 0.5);
     assert.equal(ok, true);
-    assert.equal(b.player.cons, 7);
+    assert.equal(b.player.cons, 8); // 10 + 1 income - 3
     assert.ok(b.enemy.fighters[0].hp < hpBefore);
     const ev = b.log[b.log.length - 1];
     assert.equal(ev.type, 'skill');

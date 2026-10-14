@@ -40,21 +40,14 @@ function CountUp({ value }) {
 }
 
 function ConsPips({ value }) {
+  const max = 20;
+  const pct = Math.max(0, Math.min(100, Math.round((value / max) * 100)));
   return (
-    <div style={{ display: 'flex', gap: 4, marginTop: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, fontWeight: 800, marginRight: 4 }}>Cons {value}/10</span>
-      {Array.from({ length: 10 }).map((_, i) => (
-        <span
-          key={i}
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: 9999,
-            background: i < value ? 'var(--link)' : 'var(--hairline)',
-            border: '1px solid var(--hairline-strong)',
-          }}
-        />
-      ))}
+    <div style={{ display: 'flex', gap: 8, marginTop: 6, alignItems: 'center' }}>
+      <span style={{ fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap' }}>Cons {value}/{max}</span>
+      <div className="progress-bar" style={{ flex: 1 }}>
+        <div className="progress-fill" style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }
