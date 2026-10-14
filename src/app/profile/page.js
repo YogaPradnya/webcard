@@ -54,6 +54,7 @@ export default function ProfilePage() {
   const [weeklyMissions, setWeeklyMissions] = useState([]);
   const [missionClaiming, setMissionClaiming] = useState('');
   const [missionToast, setMissionToast] = useState('');
+  const [showTitles, setShowTitles] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -134,7 +135,26 @@ export default function ProfilePage() {
         return;
       }
       setMissionToast(`+${data.xp} XP masuk! 🎉`);
-      await load();
+      // Update optimistik: tandai diklaim tanpa reload penuh (tidak kelap-kelip).
+      const mark = (list) => (list || []).map((m) => (
+        m.id === missionId ? { ...m, claimed: true, canClaim: false, done: true, count: m.target } : m
+      ));
+      if (period === 'daily') setDailyMissions((prev) => mark(prev));
+      else setWeeklyMissions((prev) => mark(prev));
+      if (data.newXp != null) {
+        setProfile((p) => (p ? { ...p, xp: data.newXp } : p));
+      }
+      // Sinkron ringan di background: misi + XP profil saja (tanpa /api/cards yang berat).
+      try {
+        const [mRes, pRes] = await Promise.all([fetch('/api/missions'), fetch('/api/profile')]);
+        const mData = await mRes.json().catch(() => ({}));
+        if (mRes.ok && mData.success) {
+          setDailyMissions(mData.daily || []);
+          setWeeklyMissions(mData.weekly || []);
+        }
+        const pData = await pRes.json().catch(() => ({}));
+        if (pRes.ok && pData.success && pData.profile) setProfile(pData.profile);
+      } catch { /* abaikan: state optimistik sudah benar */ }
     } finally {
       setMissionClaiming('');
     }
@@ -218,7 +238,7 @@ export default function ProfilePage() {
         setError(data.message || 'Gagal pasang gelar.');
         return;
       }
-      await load();
+      setProfile((p) => (p ? { ...p, title } : p));
     } finally {
       setBusy('');
     }
@@ -232,7 +252,7 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '' }),
       });
-      await load();
+      setProfile((p) => (p ? { ...p, title: '' } : p));
     } finally {
       setBusy('');
     }
@@ -439,59 +459,100 @@ export default function ProfilePage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
-                <div className="section-title">Gelar ({profile.titles.earned.length} didapat)</div>
-                {profile.titles.earned.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada gelar. Kumpulkan kartu Mythic atau lengkapi 1 tier.</div>
-                ) : (
-                  <div className="title-grid">
-                    {profile.titles.earned.map((t) => (
-                      <div key={t.id} className={profile.title === t.title ? 'title-tile active' : 'title-tile earned'}>
-                        <div className="title-top">
-                          {t.icon ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge" loading="lazy" decoding="async" />
-                          ) : null}
-                          <div className="title-name">{t.title}</div>
-                        </div>
-                        <div className="title-desc">{t.kind === 'mythic' ? `Punya ${t.cardName}` : `Lengkap ${t.tier}`}</div>
-                        {profile.title === t.title ? (
-                          <div className="title-active">Terpasang ✓</div>
-                        ) : (
-                          <button type="button" className="btn btn-ghost" style={{ minHeight: 0, padding: '4px 10px', fontSize: 12 }} disabled={busy === `title:${t.title}`} onClick={() => equipTitle(t.title)}>
-                            Pasang
-                          </button>
-                        )}
-                      </div>
-                    ))}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div className="section-title" style={{ margin: 0 }}>
+                    Gelar ({profile.titles.earned.length} didapat)
                   </div>
-                )}
-                {profile.titles.locked.length > 0 ? (
-                  <>
-                    <div className="section-title" style={{ marginTop: 16 }}>Belum didapat</div>
-                    <div className="title-grid">
-                      {profile.titles.locked.map((t) => (
-                        <div key={t.id} className="title-tile locked">
-                          <div className="title-top">
-                            {t.icon ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge locked-img" loading="lazy" decoding="async" />
-                            ) : null}
-                            <div className="title-name">{t.title}</div>
-                          </div>
-                          <div className="title-desc">
-                            {t.kind === 'mythic' ? `Butuh kartu ${t.cardName}` : `${t.progress}/${t.total} ${t.tier}`}
-                          </div>
-                          {t.kind === 'tier' ? (
-                            <div className="progress-bar" style={{ marginTop: 6 }}>
-                              <div className="progress-fill" style={{ width: `${t.total ? Math.round((t.progress / t.total) * 100) : 0}%` }} />
-                            </div>
-                          ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ width: 'auto', minHeight: 0, padding: '8px 16px', marginLeft: 'auto' }}
+                    onClick={() => setShowTitles(true)}
+                  >
+                    🎖 Lihat Gelar
+                  </button>
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+                  {profile.title ? `Terpasang: [${profile.title}]` : 'Belum ada gelar terpasang.'}
+                </div>
               </div>
+
+              {showTitles ? (
+                <div className="modal-backdrop" onClick={() => setShowTitles(false)} role="presentation">
+                  <div
+                    className="modal-card"
+                    role="dialog"
+                    aria-label="Gelar dan progres"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ maxWidth: 560, maxHeight: '82vh', overflowY: 'auto' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                      <div className="section-title" style={{ margin: 0 }}>
+                        Gelar ({profile.titles.earned.length} didapat)
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        style={{ width: 'auto', minHeight: 0, padding: '6px 12px', marginLeft: 'auto' }}
+                        onClick={() => setShowTitles(false)}
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                    {profile.titles.earned.length === 0 ? (
+                      <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada gelar. Kumpulkan kartu Mythic atau lengkapi 1 tier.</div>
+                    ) : (
+                      <div className="title-grid">
+                        {profile.titles.earned.map((t) => (
+                          <div key={t.id} className={profile.title === t.title ? 'title-tile active' : 'title-tile earned'}>
+                            <div className="title-top">
+                              {t.icon ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge" loading="lazy" decoding="async" />
+                              ) : null}
+                              <div className="title-name">{t.title}</div>
+                            </div>
+                            <div className="title-desc">{t.kind === 'mythic' ? `Punya ${t.cardName}` : `Lengkap ${t.tier}`}</div>
+                            {profile.title === t.title ? (
+                              <div className="title-active">Terpasang ✓</div>
+                            ) : (
+                              <button type="button" className="btn btn-ghost" style={{ minHeight: 0, padding: '4px 10px', fontSize: 12 }} disabled={busy === `title:${t.title}`} onClick={() => equipTitle(t.title)}>
+                                Pasang
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {profile.titles.locked.length > 0 ? (
+                      <>
+                        <div className="section-title" style={{ marginTop: 16 }}>Belum didapat</div>
+                        <div className="title-grid">
+                          {profile.titles.locked.map((t) => (
+                            <div key={t.id} className="title-tile locked">
+                              <div className="title-top">
+                                {t.icon ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge locked-img" loading="lazy" decoding="async" />
+                                ) : null}
+                                <div className="title-name">{t.title}</div>
+                              </div>
+                              <div className="title-desc">
+                                {t.kind === 'mythic' ? `Butuh kartu ${t.cardName}` : `${t.progress}/${t.total} ${t.tier}`}
+                              </div>
+                              {t.kind === 'tier' ? (
+                                <div className="progress-bar" style={{ marginTop: 6 }}>
+                                  <div className="progress-fill" style={{ width: `${t.total ? Math.round((t.progress / t.total) * 100) : 0}%` }} />
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
 
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="section-title">Koleksi per tier</div>

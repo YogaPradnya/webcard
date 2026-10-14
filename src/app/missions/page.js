@@ -59,7 +59,21 @@ export default function MissionsPage() {
         return;
       }
       setToast(`+${d.xp} XP masuk! 🎉`);
-      await load();
+      // Update optimistik tanpa reload penuh.
+      const mark = (list) => (list || []).map((m) => (
+        m.id === missionId ? { ...m, claimed: true, canClaim: false, done: true, count: m.target } : m
+      ));
+      setData((prev) => {
+        if (!prev) return prev;
+        if (period === 'weekly') return { ...prev, weekly: mark(prev.weekly) };
+        return { ...prev, daily: mark(prev.daily) };
+      });
+      // Sinkron ringan di background.
+      try {
+        const mRes = await fetch('/api/missions');
+        const mData = await mRes.json().catch(() => ({}));
+        if (mRes.ok && mData.success) setData(mData);
+      } catch { /* abaikan */ }
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
