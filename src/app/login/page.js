@@ -2,23 +2,36 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+const TNC_KEY = 'animein-tnc-ok';
 
 export default function LoginPage() {
   const router = useRouter();
   const [code, setCode] = useState('');
   const [expiresAt, setExpiresAt] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [checking, setChecking] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const [tnc, setTnc] = useState(false);
   const pollTimer = useRef(null);
 
   async function makeCode() {
+    if (!tnc) {
+      setError('Centang persetujuan Syarat & Ketentuan dulu.');
+      return;
+    }
     setError('');
     setCode('');
     setCopied(false);
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/code', { method: 'POST' });
+      const res = await fetch('/api/auth/code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tnc: true }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
         setError(data.message || 'Gagal buat kode.');
@@ -44,6 +57,40 @@ export default function LoginPage() {
       // fallback: select manual
       setError('Gagal salin otomatis. Salin manual: ' + text);
     }
+  }
+
+  useEffect(() => {
+    // Muat status centang TnC + pulihkan kode yang belum diklaim
+    // (cookie login_token tetap ada walau browser di-refresh).
+    try {
+      if (localStorage.getItem(TNC_KEY) === '1') setTnc(true);
+    } catch { /* abaikan */ }
+    (async () => {
+      try {
+        const res = await fetch('/api/auth/code/status');
+        const data = await res.json().catch(() => ({}));
+        if (data.status === 'claimed') {
+          router.push('/book');
+          return;
+        }
+        if (data.status === 'pending' && data.code) {
+          setCode(data.code);
+          setExpiresAt(data.expiresAt || 0);
+        }
+      } catch { /* abaikan: tampilkan tombol buat kode */ }
+      finally {
+        setChecking(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function onToggleTnc(v) {
+    setTnc(v);
+    try {
+      if (v) localStorage.setItem(TNC_KEY, '1');
+      else localStorage.removeItem(TNC_KEY);
+    } catch { /* abaikan */ }
   }
 
   useEffect(() => {
@@ -78,10 +125,29 @@ export default function LoginPage() {
           chat Animein dari akunmu. Tanpa password.
         </p>
         {error ? <div className="alert-error">{error}</div> : null}
-        {!code ? (
-          <button className="btn" onClick={makeCode} disabled={loading}>
-            {loading ? 'Membuat...' : 'Dapatkan Kode'}
-          </button>
+        {checking ? (
+          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memeriksa sesi...</div>
+        ) : !code ? (
+          <>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: 'var(--body)', marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={tnc}
+                onChange={(e) => onToggleTnc(e.target.checked)}
+                style={{ width: 18, height: 18, marginTop: 1, accentColor: 'var(--link)' }}
+              />
+              <span>
+                Saya menyetujui{' '}
+                <Link href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
+                  Syarat & Ketentuan
+                </Link>{' '}
+                Animein.
+              </span>
+            </label>
+            <button className="btn" onClick={makeCode} disabled={loading || !tnc}>
+              {loading ? 'Membuat...' : 'Dapatkan Kode'}
+            </button>
+          </>
         ) : (
           <div>
             <div className="trade-code-big">{code}</div>

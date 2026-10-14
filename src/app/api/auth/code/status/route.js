@@ -22,12 +22,21 @@ export async function GET(req) {
     const db = getDb();
     await db.execute('DELETE FROM web_login_codes WHERE expires_at <= ?', [Date.now()]);
     const res = await db.execute({
-      sql: 'SELECT code, user_id, username FROM web_login_codes WHERE token_hash = ?',
+      sql: 'SELECT code, user_id, username, expires_at FROM web_login_codes WHERE token_hash = ?',
       args: [hashToken(token)],
     });
     if (res.rows.length === 0) return NextResponse.json({ success: true, status: 'expired' });
     const row = res.rows[0];
-    if (!row.user_id) return NextResponse.json({ success: true, status: 'pending' });
+    // Kode masih menunggu klaim: kembalikan juga code + expiresAt agar
+    // halaman login bisa pulih sendiri setelah browser di-refresh.
+    if (!row.user_id) {
+      return NextResponse.json({
+        success: true,
+        status: 'pending',
+        code: String(row.code || ''),
+        expiresAt: Number(row.expires_at) || 0,
+      });
+    }
 
     const userId = String(row.user_id);
     const username = String(row.username || '');

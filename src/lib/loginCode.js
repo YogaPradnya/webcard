@@ -37,4 +37,6 @@ export async function ensureLoginCodeTable() {
       created_at INTEGER NOT NULL
     )
   `);
+  // Catatan persetujuan TnC (best-effort untuk DB lama).
+  try { await getDb().execute('ALTER TABLE web_login_codes ADD COLUMN tnc_at INTEGER DEFAULT 0'); } catch { /* sudah ada */ }
 }
