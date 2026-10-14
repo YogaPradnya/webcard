@@ -33,6 +33,7 @@ export default function ThemeToggle() {
       onClick={() => setTheme(next)}
       aria-label={`Ganti ke mode ${next === 'dark' ? 'gelap' : 'terang'}`}
       title={`Ganti ke mode ${next === 'dark' ? 'gelap' : 'terang'}`}
+      suppressHydrationWarning
     >
       {theme === 'dark' ? '☀️ White mode' : '🌙 Dark mode'}
     </button>

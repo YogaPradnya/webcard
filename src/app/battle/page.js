@@ -1490,7 +1490,7 @@ export default function BattlePage() {
                     </span>
                   ) : null}
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={() => setSpeed((s) => (s === '2' ? '1' : '2'))} title="Kecepatan animasi battle">
+                    <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={() => setSpeed((s) => (s === '2' ? '1' : '2'))} title="Kecepatan animasi battle" suppressHydrationWarning>
                       ⏩ {speed}x
                     </button>
                     {st.mode === 'ai' && !st.battle.over ? (

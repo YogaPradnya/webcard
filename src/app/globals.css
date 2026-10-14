@@ -360,7 +360,7 @@ body {
 .card-item {
   position: relative;
   border-radius: var(--r-lg);
-  overflow: hidden;
+  overflow: visible;
   background: var(--surface);
   border: 2px solid var(--hairline-strong);
   transition: transform 0.18s ease-out, box-shadow 0.25s;
@@ -374,6 +374,7 @@ body {
 
 .card-item.owned:hover {
   transform: translateY(-4px) scale(1.02);
+  z-index: 3;
 }
 
 /* Utilitas rarity: pakai sebagai class tambahan (rar-Common dst.) */
@@ -408,6 +409,7 @@ body {
   inset: 0;
   transform: rotateY(180deg);
   background: var(--surface);
+  border-radius: var(--r-lg);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -1812,7 +1814,7 @@ body {
 .gacha-card {
   position: relative;
   border-radius: var(--r-lg);
-  overflow: hidden;
+  overflow: visible;
   background: var(--surface);
   border: 3px solid var(--muted-soft);
   min-height: 220px;
@@ -1845,6 +1847,8 @@ body {
   font-weight: 800;
   color: #ffffff;
   text-shadow: 2px 2px 0 #0a0a0a;
+  border-radius: var(--r-lg);
+  overflow: hidden;
 }
 
 .gacha-back.dim {
@@ -1898,7 +1902,8 @@ body {
   position: relative;
   aspect-ratio: 280 / 400;
   background: var(--hairline-soft);
-  overflow: hidden;
+  overflow: visible;
+  border-radius: 10px;
 }
 
 .framed-art > img {
@@ -1906,11 +1911,13 @@ body {
   height: 100%;
   object-fit: cover;
   display: block;
+  border-radius: 10px;
 }
 
 .framed-art > .framed-blank {
   width: 100%;
   height: 100%;
+  border-radius: 10px;
 }
 
 .frame-overlay {
@@ -1919,6 +1926,8 @@ body {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  transform: scale(1.07);
+  transform-origin: center;
 }
 
 /* ===== Stepper jumlah (+/-) ===== */

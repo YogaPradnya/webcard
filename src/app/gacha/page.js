@@ -247,6 +247,7 @@ export default function GachaPage() {
                   className={instant ? 'chip active' : 'chip'}
                   onClick={toggleInstant}
                   title="Buka semua kartu sekaligus tanpa animasi 1-1"
+                  suppressHydrationWarning
                 >
                   ⚡ {instant ? 'Langsung: ON' : 'Reveal 1-1'}
                 </button>
