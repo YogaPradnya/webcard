@@ -366,6 +366,9 @@ export default function ProfilePage() {
               <div className="mission-duo">
               <div className="card">
                 <div className="section-title">Misi Harian (reset 00:00 WIB)</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                  Vs AI tidak dihitung — hanya mode PvP (vs teman).
+                </div>
                 {missionToast ? (
                   <div className="trade-fair ok" role="status" style={{ marginBottom: 8 }}>{missionToast}</div>
                 ) : null}

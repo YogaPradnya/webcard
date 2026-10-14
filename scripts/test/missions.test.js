@@ -16,9 +16,9 @@ describe('misi', () => {
   it('misi user sesuai spek', () => {
     const d = Object.fromEntries(DAILY_MISSIONS.map((m) => [m.id, m]));
     assert.equal(d.gacha_1.target, 1);
-    assert.equal(d.battle_1.target, 1);
     assert.equal(d.pvp_1.target, 1);
     assert.equal(d.pvp_5.target, 5);
+    assert.ok(!DAILY_MISSIONS.some((m) => m.event === 'battle'), 'harian tanpa AI');
     const w = Object.fromEntries(WEEKLY_MISSIONS.map((m) => [m.id, m]));
     assert.equal(w.gacha_15.target, 15);
     assert.equal(w.battle_15.target, 15);

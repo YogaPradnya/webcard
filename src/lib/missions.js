@@ -5,7 +5,6 @@ import { getDb } from './db.js';
 
 export const DAILY_MISSIONS = [
   { id: 'gacha_1', label: 'Gacha 1x', target: 1, xp: 100, event: 'gacha' },
-  { id: 'battle_1', label: 'Main battle 1x (AI/PvP)', target: 1, xp: 50, event: 'battle' },
   { id: 'pvp_1', label: 'Battle vs teman 1x', target: 1, xp: 150, event: 'pvp' },
   { id: 'pvp_5', label: 'Battle vs teman 5x', target: 5, xp: 400, event: 'pvp' },
   { id: 'pvp_win_1', label: 'Menang vs teman 1x', target: 1, xp: 200, event: 'pvp_win' },
