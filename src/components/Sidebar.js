@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { ThemeToggle } from './ThemeToggle';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 // Menu utama 4 saja: Book, Battle, Chat Global, Profil (Trade & Leaderboard via Profil).
@@ -80,7 +79,6 @@ export default function Sidebar({ username }) {
           <Link href="/terms" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline', marginBottom: 8 }}>
             Syarat & Ketentuan
           </Link>
-          <ThemeToggle />
           <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
             Keluar
           </button>
@@ -90,7 +88,6 @@ export default function Sidebar({ username }) {
       <header className="topbar">
         <span className="topbar-title">Animein</span>
         <span className="topbar-spacer" />
-        <ThemeToggle />
       </header>
 
       <nav className="bottomnav">{mobileLinks}</nav>
