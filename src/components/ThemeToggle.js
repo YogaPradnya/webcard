@@ -5,15 +5,15 @@ import { useEffect, useState } from 'react';
 const KEY = 'animein-theme';
 
 function getInitial() {
-  if (typeof window === 'undefined') return 'dark';
+  if (typeof window === 'undefined') return 'light';
   try {
     const saved = window.localStorage.getItem(KEY);
     if (saved === 'light' || saved === 'dark') return saved;
   } catch { /* abaikan: storage tidak tersedia */ }
   const cur = document.documentElement.getAttribute('data-theme');
   if (cur === 'light' || cur === 'dark') return cur;
-  if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
-  return 'dark';
+  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
+  return 'light';
 }
 
 export default function ThemeToggle() {

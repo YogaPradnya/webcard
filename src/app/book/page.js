@@ -13,11 +13,11 @@ const TIERS = ['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
 const PAGE_SIZE = 24;
 
 const TIER_COLORS = {
-  Mythic: '#ef4444',
+  Mythic: '#e5484d',
   Legendary: '#eab308',
   Epic: '#a855f7',
-  Rare: '#3b82f6',
-  Common: '#9ca3af',
+  Rare: '#2c67e9',
+  Common: '#9aa3b2',
 };
 
 const DISPLAY_BORDER_FALLBACK = {
@@ -26,13 +26,13 @@ const DISPLAY_BORDER_FALLBACK = {
   neon: '#22d3ee',
   sakura: '#f9a8d4',
   shadow: '#111827',
-  classic: '#9ca3af',
+  classic: '#9aa3b2',
 };
 
 function displayBorderColor(c) {
-  if (!c) return '#9ca3af';
+  if (!c) return '#9aa3b2';
   if (c.borderType === 'custom' && c.borderColor) return c.borderColor;
-  return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9ca3af';
+  return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9aa3b2';
 }
 
 function displayCardStyle(c) {

@@ -230,10 +230,10 @@ export default function BattlePage() {
   const arenaRef = useRef(null);
 
   const EFFECT_COLORS = {
-    burn: '#f97316', crit: '#facc15', heavy: '#fb923c', double: '#fb923c',
-    shield: '#38bdf8', bulwark: '#38bdf8', regen: '#22c55e', heal: '#22c55e',
-    energize: '#22c55e', surge: '#a78bfa', weaken: '#a78bfa', focus: '#facc15',
-    slam: '#e2e8f0',
+    burn: '#ea580c', crit: '#65a30d', heavy: '#ea580c', double: '#ea580c',
+    shield: '#2c67e9', bulwark: '#2c67e9', regen: '#15803d', heal: '#15803d',
+    energize: '#15803d', surge: '#65a30d', weaken: '#7c5cd6', focus: '#b8860b',
+    slam: '#0a0a0a',
   };
 
   function fireProjectile(fromKey, toKey, color, dur = 420) {
@@ -252,8 +252,8 @@ export default function BattlePage() {
         const y2 = fb.top + fb.height / 2 - ra.top;
         const dot = document.createElement('span');
         dot.className = 'projectile';
-        dot.style.background = String(color || '#facc15');
-        dot.style.boxShadow = `0 0 12px 3px ${String(color || '#facc15')}`;
+        dot.style.background = String(color || '#a3e636');
+        dot.style.boxShadow = '2px 2px 0 #0a0a0a';
         dot.style.left = `${x1}px`;
         dot.style.top = `${y1}px`;
         arena.appendChild(dot);
@@ -438,7 +438,7 @@ export default function BattlePage() {
         const ai = idxOf(b[ev.side], ev.name);
         const ti = idxOf(b[foeSideOf(ev.side)], ev.target);
         const isSkill = ev.type === 'skill';
-        const color = EFFECT_COLORS[ev.effect] || (isSkill ? '#facc15' : '#e2e8f0');
+        const color = EFFECT_COLORS[ev.effect] || (isSkill ? '#a3e636' : '#0a0a0a');
         if (ai >= 0 && ti >= 0) {
           if (isSkill) {
             await Promise.all([
@@ -459,7 +459,7 @@ export default function BattlePage() {
         const ti = idxOf(b[ev.side], ev.target);
         if (ai >= 0 && ti >= 0) {
           await Promise.all([
-            fireProjectile(`${ev.side}:${ai}`, `${ev.side}:${ti}`, '#22c55e', 380),
+            fireProjectile(`${ev.side}:${ai}`, `${ev.side}:${ti}`, '#15803d', 380),
             hopCard(`${ev.side}:${ti}`),
           ]);
         } else if (ti >= 0) {
@@ -905,7 +905,7 @@ export default function BattlePage() {
   const iWon = Boolean(st && (st.status === 'finished' || st.battle?.over) && String(st.winner) === String(me?.id));
   const confetti = useMemo(() => {
     if (!iWon) return null;
-    const colors = ['#ef4444', '#eab308', '#22c55e', '#3b82f6', '#a855f7'];
+    const colors = ['#a3e636', '#e5484d', '#2c67e9', '#eab308', '#a855f7'];
     return Array.from({ length: 28 }).map((_, i) => (
       <i
         key={i}

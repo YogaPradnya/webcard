@@ -12,11 +12,11 @@ export const RARITY_LIST = ['Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
 
 // Warna frame per rarity (serasi emoji bot: Mythic merah, Legendary kuning, Epic ungu, Rare biru, Common abu).
 export const RARITY_COLORS = {
-  Mythic: '#ef4444',
+  Mythic: '#e5484d',
   Legendary: '#eab308',
   Epic: '#a855f7',
-  Rare: '#3b82f6',
-  Common: '#9ca3af',
+  Rare: '#2c67e9',
+  Common: '#9aa3b2',
 };
 
 function sanitizePoolInput(pool) {

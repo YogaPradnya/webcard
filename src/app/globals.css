@@ -1,67 +1,129 @@
-/* ===== Animein Anime Theme: dark + white, palet #08D9D6 #252A34 #FF2E63 #EAEAEA ===== */
+/* ===== Brainfish playful neo-brutalist (terang default, + dark mode) ===== */
 :root,
-[data-theme='dark'] {
-  --canvas: #1a1f2b;
-  --canvas-soft: #202637;
-  --surface: #252a34;
-  --surface-soft: #2d3444;
-  --ink: #eaeaea;
-  --body: #b9bfcc;
-  --muted: #8a93a8;
-  --muted-soft: #4a5268;
-  --hairline: #2e3649;
-  --hairline-soft: #232a3c;
-  --hairline-strong: #3f4872;
-  --primary: #08d9d6;
-  --primary-active: #00c6c3;
-  --on-primary: #062a2a;
-  --accent-grad: #08d9d6;
-  --link: #08d9d6;
-  --success: #34d399;
-  --error: #ff2e63;
+[data-theme='light'] {
+  --ink: #0a0a0a;
+  --white: #ffffff;
+  --cream: #fffff6;
+  --lime: #a3e636;
+  --lime-deep: #65a30d;
+  --sky-top: #8ce4f0;
+  --sky-bottom: #b9f0f5;
+  --mint: #abebd1;
+  --mint-deep: #69d6b6;
+  --blue-bright: #2c67e9;
+  --blue-deep: #2648b6;
+  --navy: #173080;
+  --pastel-pink: #f7eafc;
+  --pastel-pink-bd: #d8a7e8;
+  --pastel-yellow: #fffaea;
+  --pastel-yellow-bd: #e0bd55;
+  --pastel-green: #d7f2e3;
+  --pastel-green-bd: #5fbf92;
+  --pastel-lime: #fbffea;
+  --pastel-lime-bd: #a9c93f;
+  --pastel-blue: #dbeafd;
+  --pastel-blue-bd: #6ea3e8;
+  --pastel-orange: #ffedd7;
+  --pastel-orange-bd: #df9850;
+  --pastel-purple: #e9e3fb;
+  --pastel-purple-bd: #9d86e8;
+  --pastel-red: #ffe4e8;
+  --pastel-red-bd: #e5484d;
+  --canvas: #ffffff;
+  --canvas-soft: #fffff6;
+  --surface: #ffffff;
+  --surface-soft: #fffff6;
+  --body: #0a0a0a;
+  --muted: #5b6472;
+  --muted-soft: #9aa3b2;
+  --hairline: #e0e4ea;
+  --hairline-soft: #f0f3f7;
+  --hairline-strong: #0a0a0a;
+  --primary: #a3e636;
+  --primary-active: #8fd41f;
+  --on-primary: #0a0a0a;
+  --accent-grad: #a3e636;
+  --link: #2648b6;
+  --success: #15803d;
+  --error: #e5484d;
+  --crit: #65a30d;
+  --focus-ring: #0a0a0a;
   --r-md: 8px;
-  --r-lg: 12px;
-  --r-xl: 16px;
+  --r-lg: 16px;
+  --r-xl: 24px;
   --r-pill: 999px;
-  --shadow: none;
-/* Rarity: warna solid di seluruh web */
-  --rar-common: #9ca3af;
-  --rar-rare: #60a5fa;
-  --rar-epic: #c084fc;
+  --border: 1.5px solid #0a0a0a;
+  --shadow: 3px 3px 0 #0a0a0a;
+  --shadow-lg: 5px 6px 0 #0a0a0a;
+/* Rarity: warna solid */
+  --rar-common: #9aa3b2;
+  --rar-rare: #2c67e9;
+  --rar-epic: #a855f7;
   --rar-legendary: #eab308;
-  --rar-mythic: #ff2e63;
+  --rar-mythic: #e5484d;
 }
 
-/* ===== White mode: canvas #EAEAEA, ink #252A34, aksen tetap teal + red ===== */
-[data-theme='light'] {
-  --canvas: #eaeaea;
-  --canvas-soft: #f4f4f5;
-  --surface: #ffffff;
-  --surface-soft: #eef0f3;
-  --ink: #252a34;
-  --body: #4a5268;
-  --muted: #6b7280;
-  --muted-soft: #d1d5db;
-  --hairline: #dfe1e6;
-  --hairline-soft: #eceef1;
-  --hairline-strong: #c6cbd6;
-  --primary: #08d9d6;
-  --primary-active: #05a8a5;
-  --on-primary: #062a2a;
-  --accent-grad: #08d9d6;
-  --link: #078e8c;
-  --success: #0e9f6e;
-  --error: #ff2e63;
+/* ===== Dark mode baru: navy dalam + outline krem + bayangan lime ===== */
+[data-theme='dark'] {
+  --ink: #fffff6;
+  --white: #fffff6;
+  --cream: #fffff6;
+  --lime: #a3e636;
+  --lime-deep: #a3e636;
+  --sky-top: #1b2a6b;
+  --sky-bottom: #101a45;
+  --mint: #101a45;
+  --mint-deep: #1b2a6b;
+  --blue-bright: #7fb0ec;
+  --blue-deep: #9dbcff;
+  --navy: #0a0a0a;
+  --pastel-pink: #3d1f47;
+  --pastel-pink-bd: #e3a7f5;
+  --pastel-yellow: #3a2f10;
+  --pastel-yellow-bd: #e8c95a;
+  --pastel-green: #0e3b24;
+  --pastel-green-bd: #4ade80;
+  --pastel-lime: #2a3a10;
+  --pastel-lime-bd: #a3e636;
+  --pastel-blue: #16295e;
+  --pastel-blue-bd: #7fb0ec;
+  --pastel-orange: #3d2410;
+  --pastel-orange-bd: #f0a95e;
+  --pastel-purple: #2a1f5e;
+  --pastel-purple-bd: #b39dff;
+  --pastel-red: #4a1626;
+  --pastel-red-bd: #ff7a9c;
+  --canvas: #0a0a0a;
+  --canvas-soft: #101a45;
+  --surface: #182257;
+  --surface-soft: #101a45;
+  --body: #d7dcf0;
+  --muted: #9aa3c7;
+  --muted-soft: #4a5590;
+  --hairline: #2c3770;
+  --hairline-soft: #1b2560;
+  --hairline-strong: #fffff6;
+  --primary: #a3e636;
+  --primary-active: #b8f04a;
+  --on-primary: #0a0a0a;
+  --accent-grad: #a3e636;
+  --link: #9dbcff;
+  --success: #4ade80;
+  --error: #ff7a9c;
+  --crit: #a3e636;
+  --focus-ring: #a3e636;
   --r-md: 8px;
-  --r-lg: 12px;
-  --r-xl: 16px;
+  --r-lg: 16px;
+  --r-xl: 24px;
   --r-pill: 999px;
-  --shadow: none;
-  --rar-common: #6b7280;
-  --rar-rare: #2563eb;
-  --rar-epic: #9333ea;
-  --rar-legendary: #b8860b;
-  --rar-mythic: #ff2e63;
+  --border: 1.5px solid #fffff6;
+  --shadow: 3px 3px 0 #a3e636;
+  --shadow-lg: 5px 6px 0 #a3e636;
+  --rar-common: #9aa3b2;
+  --rar-rare: #7fb0ec;
+  --rar-epic: #c084fc;
+  --rar-legendary: #eab308;
+  --rar-mythic: #ff7a9c;
 }
 
 * {
@@ -71,8 +133,8 @@
 }
 
 body {
-  background-color: var(--canvas);
-  background-image: none;
+  background-color: var(--sky-bottom);
+  background-image: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 32%, var(--mint) 68%, var(--mint-deep) 100%);
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body);
@@ -91,9 +153,14 @@ body {
 }
 
 .page {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 20px 64px;
+  padding: 32px 48px 64px;
+}
+
+[data-theme='dark'] body {
+  background-color: #0a0a0a;
+  background-image: linear-gradient(to bottom, #1b2a6b 0%, #101a45 42%, #0a0a0a 100%);
 }
 
 @media (max-width: 720px) {
@@ -122,12 +189,12 @@ body {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  color: #08d9d6;
+  color: var(--ink);
 }
 
 .card {
   background: var(--surface);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow);
   padding: 24px;
@@ -139,22 +206,24 @@ body {
   padding: 10px 18px;
   background: var(--accent-grad);
   color: var(--on-primary);
-  border: none;
+  border: 1.5px solid var(--hairline-strong);
   border-radius: var(--r-md);
-  font-weight: 800;
+  font-weight: 700;
   font-size: 14px;
   cursor: pointer;
   font-family: inherit;
+  box-shadow: var(--shadow);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--hairline-strong);
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
   box-shadow: none;
-  transition: transform 0.12s, box-shadow 0.2s, filter 0.2s;
-}
-
-.btn:hover {
-  filter: brightness(1.08);
-}
-
-.btn:active {
-  transform: scale(0.97);
 }
 
 .btn:disabled {
@@ -164,9 +233,9 @@ body {
 }
 
 .btn-ghost {
-  background: var(--surface-soft);
+  background: var(--surface);
   color: var(--ink);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   box-shadow: none;
 }
 
@@ -175,7 +244,7 @@ body {
   height: 44px;
   padding: 12px 16px;
   border-radius: var(--r-md);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   font-size: 15px;
   font-family: inherit;
   outline: none;
@@ -183,9 +252,11 @@ body {
   color: var(--ink);
 }
 
-.input:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary);
+.input:focus, .select:focus {
+  border-color: var(--hairline-strong);
+  box-shadow: none;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .label {
@@ -200,9 +271,9 @@ body {
 }
 
 .alert-error {
-  background: #2a1415;
-  border: 1px solid var(--error);
-  color: #f3b8bb;
+  background: var(--pastel-red);
+  border: 1.5px solid var(--pastel-red-bd);
+  color: var(--ink);
   border-radius: var(--r-md);
   padding: 10px 14px;
   font-size: 13px;
@@ -231,11 +302,11 @@ body {
 
 .chip {
   padding: 6px 14px;
-  border-radius: var(--r-pill);
-  border: 1px solid var(--hairline-strong);
+  border-radius: 8px;
+  border: 1.5px solid var(--hairline-strong);
   background: var(--surface);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   font-family: inherit;
   color: var(--body);
@@ -244,8 +315,8 @@ body {
 .chip.active {
   background: var(--accent-grad);
   color: var(--on-primary);
-  border-color: #08d9d6;
-  box-shadow: none;
+  border-color: var(--hairline-strong);
+  box-shadow: 2px 2px 0 var(--hairline-strong);
 }
 
 /* Dot warna role untuk filter chip */
@@ -258,10 +329,10 @@ body {
   vertical-align: 1px;
 }
 
-.dot-Damage { background: #ff2e63; }
+.dot-Damage { background: #e5484d; }
 .dot-Tank { background: #9a6a3b; }
 .dot-Support { background: #16a34a; }
-.dot-Assist { background: #2563eb; }
+.dot-Assist { background: #2c67e9; }
 
 .tier-title {
   font-size: 13px;
@@ -290,8 +361,8 @@ body {
   position: relative;
   border-radius: var(--r-lg);
   overflow: hidden;
-  background: var(--surface-soft);
-  border: 2px solid var(--muted-soft);
+  background: var(--surface);
+  border: 2px solid var(--hairline-strong);
   transition: transform 0.18s ease-out, box-shadow 0.25s;
 }
 
@@ -361,88 +432,94 @@ body {
   border-radius: var(--r-pill);
   color: var(--on-primary);
   background: var(--accent-grad);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
 }
 
-/* ===== Role colors: Damage=merah ATK, Tank=coklat Shield, Support=hijau Heal, Assist=biru ===== */
-:root,
-[data-theme='dark'],
-[data-theme='light'] {
-  --role-dmg: #ff2e63;
-  --role-dmg-deep: #e11d48;
-  --role-tank: #9a6a3b;
-  --role-tank-deep: #7c5227;
-  --role-heal: #16a34a;
-  --role-heal-deep: #15803d;
-  --role-assist: #2563eb;
-  --fx-burn: #f97316;
-  --fx-stun: #8b5cf6;
-}
-
+/* ===== Role & status: chip pastel (terang) / deep (gelap) ===== */
 .pick-role,
 .flip-role {
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
 }
 
 .role-Damage {
-  background: var(--role-dmg-deep) !important;
-  color: #fff !important;
+  background: var(--pastel-red) !important;
+  border-color: var(--pastel-red-bd) !important;
+  color: var(--ink) !important;
 }
 
 .role-Tank {
-  background: var(--role-tank) !important;
-  color: #fff !important;
+  background: var(--pastel-orange) !important;
+  border-color: var(--role-tank) !important;
+  color: var(--ink) !important;
 }
 
 .role-Support {
-  background: var(--role-heal-deep) !important;
-  color: #fff !important;
+  background: var(--pastel-green) !important;
+  border-color: var(--pastel-green-bd) !important;
+  color: var(--ink) !important;
 }
 
 .role-Assist {
-  background: var(--role-assist) !important;
-  color: #fff !important;
+  background: var(--pastel-blue) !important;
+  border-color: var(--pastel-blue-bd) !important;
+  color: var(--ink) !important;
 }
 
-/* ===== Status badge bernada: shield coklat, heal hijau, burn oranye, stun ungu ===== */
+[data-theme='dark'] .role-Damage { background: #4a1626 !important; border-color: #ff7a9c !important; color: #ffd9e2 !important; }
+[data-theme='dark'] .role-Tank { background: #3d2a12 !important; border-color: #d9a86c !important; color: #f5e3c8 !important; }
+[data-theme='dark'] .role-Support { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
+[data-theme='dark'] .role-Assist { background: #16295e !important; border-color: #7fb0ec !important; color: #d9e7ff !important; }
+
+/* ===== Status badge bernada pastel ===== */
 .status-badge {
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
 }
 
 .st-shield {
-  background: var(--role-tank) !important;
-  color: #fff !important;
+  background: var(--pastel-orange) !important;
+  border-color: var(--role-tank) !important;
+  color: var(--ink) !important;
 }
 
 .st-heal {
-  background: var(--role-heal-deep) !important;
-  color: #fff !important;
+  background: var(--pastel-green) !important;
+  border-color: var(--pastel-green-bd) !important;
+  color: var(--ink) !important;
 }
 
 .st-burn {
-  background: #c2410c !important;
-  color: #fff !important;
+  background: var(--pastel-orange) !important;
+  border-color: var(--fx-burn) !important;
+  color: var(--ink) !important;
 }
 
 .st-stun {
-  background: var(--fx-stun) !important;
-  color: #fff !important;
+  background: var(--pastel-purple) !important;
+  border-color: var(--fx-stun) !important;
+  color: var(--ink) !important;
 }
 
 .st-focus {
-  background: var(--accent-grad) !important;
-  color: var(--on-primary) !important;
+  background: var(--pastel-lime) !important;
+  border-color: var(--pastel-lime-bd) !important;
+  color: var(--ink) !important;
 }
 
+[data-theme='dark'] .st-shield { background: #3d2a12 !important; border-color: #d9a86c !important; color: #f5e3c8 !important; }
+[data-theme='dark'] .st-heal { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
+[data-theme='dark'] .st-burn { background: #3d1f0e !important; border-color: #f59e5e !important; color: #ffe3c8 !important; }
+[data-theme='dark'] .st-stun { background: #2a1f5e !important; border-color: #b39dff !important; color: #e6defc !important; }
+[data-theme='dark'] .st-focus { background: #2a3a10 !important; border-color: #a3e636 !important; color: #eefbcf !important; }
+
 /* ===== Efek skill bernada di detail kartu ===== */
-.fx-heal { color: var(--role-heal-deep); font-weight: 800; }
+.fx-heal { color: var(--success); font-weight: 800; }
 .fx-shield { color: var(--role-tank-deep); font-weight: 800; }
-.fx-dmg { color: var(--role-dmg); font-weight: 800; }
-.fx-assist { color: var(--role-assist); font-weight: 800; }
+.fx-dmg { color: #c81e3a; font-weight: 800; }
+.fx-assist { color: var(--link); font-weight: 800; }
 [data-theme='dark'] .fx-heal { color: #4ade80; }
 [data-theme='dark'] .fx-shield { color: #d9a86c; }
 [data-theme='dark'] .fx-dmg { color: #ff7a9c; }
-[data-theme='dark'] .fx-assist { color: #93c5fd; }
+[data-theme='dark'] .fx-assist { color: #9dbcff; }
 
 .card-art {
   aspect-ratio: 3 / 4;
@@ -501,17 +578,19 @@ body {
   border-radius: var(--r-pill);
   color: var(--on-primary);
   background: var(--accent-grad);
+  border: 1.5px solid var(--hairline-strong);
 }
 
 .stat-tag.power {
   background: var(--surface);
   color: var(--ink);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
 }
 
 .stat-tag.showcase {
-  background: #08d9d6;
-  color: #062a2a;
+  background: var(--pastel-blue);
+  color: var(--ink);
+  border-color: var(--pastel-blue-bd);
 }
 
 .progress-wrap {
@@ -525,7 +604,8 @@ body {
   flex: 1;
   height: 8px;
   border-radius: var(--r-pill);
-  background: var(--hairline);
+  background: var(--hairline-soft);
+  border: 1.5px solid var(--hairline-strong);
   overflow: hidden;
 }
 
@@ -545,7 +625,7 @@ body {
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  border-right: 1px solid var(--hairline-strong);
+  border-right: 1.5px solid var(--hairline-strong);
   background: var(--surface);
   padding: 24px 16px;
   display: flex;
@@ -561,12 +641,28 @@ body {
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  color: #08d9d6;
+  color: var(--ink);
 }
 
 [data-theme='light'] .brand h1,
 [data-theme='light'] .sidebar-brand {
-  color: #078e8c;
+  color: var(--ink);
+}
+
+/* ===== Role & status: chip pastel + outline gelap + teks ink ===== */
+:root,
+[data-theme='dark'],
+[data-theme='light'] {
+  --role-dmg: #e5484d;
+  --role-dmg-deep: #e11d48;
+  --role-tank: #9a6a3b;
+  --role-tank-deep: #7c5227;
+  --role-heal: #16a34a;
+  --role-heal-deep: #15803d;
+  --role-assist: #2c67e9;
+  --role-assist-deep: #2648b6;
+  --fx-burn: #ea580c;
+  --fx-stun: #7c5cd6;
 }
 
 .sidebar-user {
@@ -590,6 +686,7 @@ body {
   color: var(--body);
   text-decoration: none;
   text-align: center;
+  border: 1.5px solid transparent;
 }
 
 .nav-item:hover {
@@ -599,7 +696,8 @@ body {
 .nav-item.active {
   background: var(--accent-grad);
   color: var(--on-primary);
-  box-shadow: none;
+  border-color: var(--hairline-strong);
+  box-shadow: 2px 2px 0 var(--hairline-strong);
 }
 
 .sidebar-logout {
@@ -638,7 +736,7 @@ body {
     align-items: center;
     gap: 8px;
     padding: 10px 16px;
-    border-bottom: 1px solid var(--hairline-strong);
+    border-bottom: 1.5px solid var(--hairline-strong);
     background: var(--surface);
     position: sticky;
     top: 0;
@@ -663,7 +761,7 @@ body {
     right: 0;
     z-index: 20;
     background: var(--surface);
-    border-top: 1px solid var(--hairline-strong);
+    border-top: 1.5px solid var(--hairline-strong);
     padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
     gap: 8px;
   }
@@ -706,7 +804,7 @@ body {
 
 .fighter {
   position: relative;
-  border: 2px solid var(--muted-soft);
+  border: 2px solid var(--hairline-strong);
   border-radius: var(--r-lg);
   overflow: hidden;
   background: var(--surface);
@@ -714,8 +812,8 @@ body {
 }
 
 .fighter.active {
-  border-color: var(--link);
-  box-shadow: 0 0 0 2px var(--link);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 .fighter.ko {
@@ -742,7 +840,7 @@ body {
 
 /* Targeting manual: tap-to-target */
 .fighter.targetable-foe {
-  border-color: #ff2e63;
+  border-color: var(--error);
   animation: targetPulseRed 1s infinite;
   cursor: pointer;
 }
@@ -754,8 +852,8 @@ body {
 }
 
 .fighter.pending-source {
-  border-color: var(--link);
-  box-shadow: 0 0 0 2px var(--link);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 .action-hint {
@@ -770,18 +868,18 @@ body {
 }
 
 .btn.armed {
-  border: 2px solid var(--link);
-  box-shadow: 0 0 0 2px var(--link);
+  border: 2px solid var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 @keyframes targetPulseRed {
   0%,
   100% {
-    box-shadow: 0 0 0 2px #ff2e63;
+    box-shadow: 0 0 0 2px var(--error);
   }
 
   50% {
-    box-shadow: 0 0 0 5px #ff2e63;
+    box-shadow: 0 0 0 5px var(--error);
   }
 }
 
@@ -838,7 +936,7 @@ body {
 }
 
 .dmg-float.crit {
-  color: #5ef2ef;
+  color: var(--lime);
   font-size: 26px;
   animation: critPop 1.1s forwards;
 }
@@ -872,8 +970,9 @@ body {
   transform: translateX(-50%);
   font-size: 10px;
   font-weight: 800;
-  color: var(--muted);
-  background: #ffffff;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: 9999px;
   padding: 1px 8px;
   animation: floatUp 1s forwards;
@@ -888,8 +987,8 @@ body {
   left: 6px;
   font-size: 10px;
   font-weight: 800;
-  color: #fff;
-  background: #252a34;
+  color: var(--canvas);
+  background: var(--ink);
   border-radius: 9999px;
   padding: 2px 8px;
   pointer-events: none;
@@ -939,14 +1038,14 @@ body {
 .fx-ember i:nth-child(2) {
   right: 8px;
   animation-delay: 0.3s;
-  background: #ff2e63;
+  background: var(--error);
   box-shadow: none;
 }
 
 .fx-ember i:nth-child(3) {
   right: 4px;
   animation-delay: 0.6s;
-  background: #5ef2ef;
+  background: var(--lime);
   box-shadow: none;
 }
 
@@ -1021,8 +1120,8 @@ body {
   font-size: 34px;
   font-weight: 900;
   letter-spacing: 2px;
-  color: #ff2e63;
-  border: 4px solid #ff2e63;
+  color: var(--error);
+  border: 4px solid var(--error);
   border-radius: 8px;
   padding: 2px 12px;
   transform: translate(-50%, -50%) rotate(-14deg);
@@ -1055,7 +1154,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 0 3px #ff2e63;
+    box-shadow: 0 0 0 3px var(--error);
   }
 }
 
@@ -1064,12 +1163,12 @@ body {
   display: inline-block;
   font-size: 11px;
   font-weight: 800;
-  color: #fff;
-  background: #ff2e63;
-  border: 2px solid #252a34;
+  color: var(--on-primary);
+  background: var(--lime);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: 9999px;
   padding: 4px 12px;
-  box-shadow: 3px 3px 0 #252a34;
+  box-shadow: var(--shadow);
   animation: comboFlicker 1s infinite;
 }
 
@@ -1092,7 +1191,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #252a34;
+  background: var(--navy);
   animation: vsFade 1.6s forwards;
   pointer-events: none;
 }
@@ -1111,15 +1210,15 @@ body {
   margin-top: 6px;
   font-size: 13px;
   font-weight: 700;
-  color: #b9bfcc;
+  color: #dbe4ff;
 }
 
 .vs-fight {
   margin-top: 10px;
   font-size: clamp(30px, 7vw, 60px);
   font-weight: 900;
-  color: #ff2e63;
-  text-shadow: 3px 3px 0 #08d9d6;
+  color: var(--lime);
+  text-shadow: 3px 3px 0 #0a0a0a;
   animation: vsZoom 0.4s 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
 }
 
@@ -1229,7 +1328,7 @@ body {
   transform: translateX(-50%);
   font-size: 20px;
   font-weight: 800;
-  color: #ff2e63;
+  color: var(--role-dmg-deep);
   animation: floatUp 1s forwards;
   pointer-events: none;
   z-index: 3;
@@ -1290,7 +1389,7 @@ body {
   right: 0;
   z-index: 15;
   background: var(--surface);
-  border-top: 1px solid var(--hairline-strong);
+  border-top: 1.5px solid var(--hairline-strong);
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
 }
 
@@ -1348,7 +1447,7 @@ body {
   height: 44px;
   padding: 0 12px;
   border-radius: var(--r-md);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   font-size: 14px;
   font-family: inherit;
   background: var(--surface);
@@ -1392,6 +1491,7 @@ body {
   border-radius: 9999px;
   background: var(--accent-grad);
   color: var(--on-primary);
+  border: 1.5px solid var(--hairline-strong);
   font-size: 12px;
   font-weight: 800;
   display: flex;
@@ -1400,8 +1500,8 @@ body {
 }
 
 .card-item.picked {
-  border: 3px solid var(--link);
-  box-shadow: 0 0 0 2px var(--link);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 2px var(--primary);
 }
 
 .flip-btn {
@@ -1412,7 +1512,7 @@ body {
   width: 26px;
   height: 26px;
   border-radius: 9999px;
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   background: var(--surface);
   color: var(--body);
   font-size: 12px;
@@ -1451,7 +1551,11 @@ body {
 
 /* ===== Profil ala APK ===== */
 .profile-hero {
-  background: var(--surface);
+  background: var(--pastel-lime);
+}
+
+[data-theme='dark'] .profile-hero {
+  background: var(--surface-soft);
 }
 
 .profile-top {
@@ -1467,11 +1571,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--ink);
   font-size: 28px;
   font-weight: 800;
   flex-shrink: 0;
-  border: 3px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
 }
 
 .profile-name {
@@ -1516,7 +1620,7 @@ body {
 
 .profile-stat {
   background: var(--surface);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: var(--r-md);
   padding: 8px 6px;
   text-align: center;
@@ -1540,7 +1644,7 @@ body {
   align-items: center;
   margin-top: 14px;
   background: var(--surface);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: var(--r-lg);
   padding: 10px;
 }
@@ -1560,8 +1664,9 @@ body {
 }
 
 .menu-tile {
-  background: var(--hairline-soft);
-  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-strong);
+  box-shadow: var(--shadow);
   border-radius: var(--r-lg);
   padding: 14px 6px;
   text-align: center;
@@ -1576,7 +1681,9 @@ body {
 }
 
 .menu-tile:hover {
-  background: var(--hairline);
+  background: var(--surface);
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--hairline-strong);
 }
 
 .menu-ico {
@@ -1590,21 +1697,29 @@ body {
 }
 
 .title-tile {
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: var(--r-md);
   padding: 10px;
   font-size: 12px;
 }
 
 .title-tile.earned {
-  border-color: #08d9d6;
-  background: var(--surface-soft);
-  box-shadow: none;
+  border-color: var(--pastel-lime-bd);
+  background: var(--pastel-lime);
+  color: var(--ink);
+  box-shadow: 2px 2px 0 var(--hairline-strong);
 }
 
 .title-tile.active {
-  border-color: var(--link);
-  background: var(--surface-soft);
+  border-color: var(--hairline-strong);
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: 2px 2px 0 var(--hairline-strong);
+}
+
+.title-tile.active .title-desc,
+.title-tile.active .title-active {
+  color: var(--on-primary);
 }
 
 .title-tile.locked {
@@ -1646,7 +1761,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: var(--canvas);
+  background: rgba(10, 10, 10, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1655,7 +1770,7 @@ body {
 
 .modal-card {
   background: var(--surface);
-  border: 1px solid var(--hairline-strong);
+  border: 1.5px solid var(--hairline-strong);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow);
   padding: 20px;
@@ -1705,6 +1820,7 @@ body {
   font-size: 48px;
   font-weight: 800;
   color: #ffffff;
+  text-shadow: 2px 2px 0 #0a0a0a;
 }
 
 .gacha-back.dim {
@@ -1731,15 +1847,17 @@ body {
   font-weight: 800;
   padding: 2px 8px;
   border-radius: 9999px;
-  color: #fff;
+  color: var(--ink);
+  border: 1.5px solid var(--hairline-strong);
 }
 
 .gacha-new {
-  background: var(--role-heal-deep);
+  background: var(--lime);
 }
 
 .gacha-dupe {
-  background: var(--role-assist);
+  background: var(--pastel-blue);
+  border-color: var(--pastel-blue-bd);
 }
 
 .gacha-noart {
@@ -1833,40 +1951,168 @@ body {
   opacity: 0.6;
 }
 
-[data-theme='light'] .alert-error {
-  background: #fdeef1;
-  color: #9f1239;
+[data-theme='dark'] .alert-error {
+  background: #4a1626;
+  border-color: #ff7a9c;
+  color: #ffd9e2;
 }
 
-[data-theme='light'] .absorb-float {
-  background: #252a34;
-  color: #eaeaea;
+[data-theme='dark'] .dmg-float.crit {
+  color: var(--lime);
 }
 
-[data-theme='light'] .ko-stamp {
-  background: #ffffff;
+/* ===== Brainfish: fokus keyboard, badge, trade-fair, skeleton, dekorasi ===== */
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
-[data-theme='light'] .dmg-float.crit {
-  color: #078e8c;
+.nav-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 1px 8px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: #c81e3a;
+  color: #fff;
+  border: 1.5px solid var(--hairline-strong);
+  vertical-align: 1px;
 }
 
-[data-theme='light'] .menu-tile {
-  background: #ffffff;
+.trade-fair {
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1.5px solid var(--hairline-strong);
 }
 
-[data-theme='light'] .nav-item {
-  color: #4a5268;
+.trade-fair.ok {
+  background: var(--pastel-green);
+  border-color: var(--pastel-green-bd);
+  color: var(--ink);
 }
 
-[data-theme='light'] .nav-item.active {
-  color: #062a2a;
+.trade-fair.err {
+  background: var(--pastel-red);
+  border-color: var(--pastel-red-bd);
+  color: var(--ink);
 }
 
-[data-theme='light'] .fighter.targetable-foe {
-  border-color: #ff2e63;
+.skeleton-line {
+  height: 14px;
+  border-radius: 8px;
+  background: var(--hairline-soft);
+  border: 1.5px solid var(--hairline);
+  margin-bottom: 10px;
 }
 
-[data-theme='light'] .profile-hero {
-  background: #ffffff;
+/* Dekorasi login: awan + ikan (aria-hidden) */
+.deco-wrap {
+  position: relative;
+}
+
+.deco-cloud {
+  position: absolute;
+  width: 72px;
+  height: 26px;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  animation: decoFloat 7s ease-in-out infinite;
+}
+
+.deco-cloud::before,
+.deco-cloud::after {
+  content: '';
+  position: absolute;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: 999px;
+}
+
+.deco-cloud::before {
+  width: 30px;
+  height: 30px;
+  top: -17px;
+  left: 10px;
+}
+
+.deco-cloud::after {
+  width: 20px;
+  height: 20px;
+  top: -12px;
+  left: 36px;
+}
+
+.deco-fish {
+  position: absolute;
+  width: 34px;
+  height: 20px;
+  background: var(--lime);
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: 999px 999px 999px 4px;
+  box-shadow: 2px 2px 0 var(--hairline-strong);
+  animation: decoSwim 9s ease-in-out infinite;
+}
+
+.deco-fish::before {
+  content: '';
+  position: absolute;
+  right: -9px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--lime);
+  border-top: 1.5px solid var(--hairline-strong);
+  border-right: 1.5px solid var(--hairline-strong);
+  transform: rotate(45deg);
+}
+
+.deco-fish::after {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 6px;
+  width: 5px;
+  height: 5px;
+  background: var(--hairline-strong);
+  border-radius: 999px;
+}
+
+@keyframes decoFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes decoSwim {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deco-cloud,
+  .deco-fish,
+  .fighter.attacking,
+  .fighter.hit,
+  .fighter.healed,
+  .fighter.shielded,
+  .gacha-card.spinning,
+  .gacha-card.revealed,
+  .combo-badge,
+  .hp-low,
+  .fighter.targetable-foe,
+  .fighter.targetable-ally,
+  .waiting-art.pulse,
+  .arena.shake-screen {
+    animation: none !important;
+  }
+}
+
+[data-theme='dark'] .title-tile.earned {
+  background: #2a3a10;
+  border-color: #a3e636;
+  color: #eefbcf;
 }

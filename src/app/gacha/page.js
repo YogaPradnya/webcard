@@ -7,11 +7,11 @@ import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 
 const TIER_COLORS = {
-  Mythic: '#ef4444',
+  Mythic: '#e5484d',
   Legendary: '#eab308',
   Epic: '#a855f7',
-  Rare: '#3b82f6',
-  Common: '#9ca3af',
+  Rare: '#2c67e9',
+  Common: '#9aa3b2',
 };
 
 const REVEAL_MS_BY_RARITY = {

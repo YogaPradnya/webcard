@@ -35,12 +35,12 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#1a1f2b',
+  themeColor: '#8ce4f0',
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id" data-theme="dark" suppressHydrationWarning className={`${bodyFont.variable} ${displayFont.variable}`}>
+    <html lang="id" data-theme="light" suppressHydrationWarning className={`${bodyFont.variable} ${displayFont.variable}`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" />
@@ -49,7 +49,7 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k='animein-theme';var s=localStorage.getItem(k);if(s!=='light'&&s!=='dark'){s=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+            __html: `(function(){try{var k='animein-theme';var s=localStorage.getItem(k);if(s!=='light'&&s!=='dark'){s=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
           }}
         />
       </head>

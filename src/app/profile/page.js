@@ -9,10 +9,11 @@ import MissionList from '@/components/MissionList';
 import { optImg } from '@/lib/images';
 
 function avatarColor(name) {
+  const pastels = ['#f7eafc', '#dbeafd', '#d7f2e3', '#fffaea', '#e9e3fb', '#ffedd7'];
   const s = String(name || '?');
   let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
-  return `hsl(${h} 60% 45%)`;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % pastels.length;
+  return pastels[h];
 }
 
 const DISPLAY_BORDER_FALLBACK = {
@@ -21,13 +22,13 @@ const DISPLAY_BORDER_FALLBACK = {
   neon: '#22d3ee',
   sakura: '#f9a8d4',
   shadow: '#111827',
-  classic: '#9ca3af',
+  classic: '#9aa3b2',
 };
 
 function displayBorderColor(c) {
-  if (!c) return '#9ca3af';
+  if (!c) return '#9aa3b2';
   if (c.borderType === 'custom' && c.borderColor) return c.borderColor;
-  return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9ca3af';
+  return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9aa3b2';
 }
 
 function displayShowcaseStyle(c) {

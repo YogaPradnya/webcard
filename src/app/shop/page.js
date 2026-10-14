@@ -300,7 +300,7 @@ export default function ShopPage() {
                   <span style={{ fontWeight: 700 }}>{o.kind === 'xp' ? `Top-Up ${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `Slot x${o.qty}`}</span>
                   <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>{idr(o.amountIdr)}</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#eab308' : '#ef4444' }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#b8860b' : 'var(--error)' }}>
                       {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
                     </span>
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
