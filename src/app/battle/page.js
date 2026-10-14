@@ -1139,6 +1139,25 @@ export default function BattlePage() {
                       </select>
                     </div>
                   ) : null}
+                  {mode === 'join' ? (
+                    <form id="joinForm" onSubmit={joinPvp} className="field" style={{ flex: 1, minWidth: 140, marginBottom: 0 }}>
+                      <label className="label" htmlFor="joinCode">
+                        Kode room angka
+                      </label>
+                      <input
+                        id="joinCode"
+                        className="input"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        placeholder="Contoh: 482910"
+                        value={joinCode}
+                        onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 12))}
+                        required
+                        style={{ letterSpacing: 4, fontWeight: 700, fontSize: 18 }}
+                      />
+                    </form>
+                  ) : null}
                 </div>
                 <div className="section-title">Pilih 3 kartumu</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -1294,29 +1313,6 @@ export default function BattlePage() {
                 </div>
               ) : null}
 
-              {mode === 'join' ? (
-                <div className="card" style={{ marginBottom: 16 }}>
-                  <form id="joinForm" onSubmit={joinPvp}>
-                    <div className="field" style={{ marginBottom: 0 }}>
-                      <label className="label" htmlFor="joinCode">
-                        Kode room angka
-                      </label>
-                      <input
-                        id="joinCode"
-                        className="input"
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        placeholder="Contoh: 482910"
-                        value={joinCode}
-                        onChange={(e) => setJoinCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 12))}
-                        required
-                        style={{ letterSpacing: 4, fontWeight: 700, fontSize: 18 }}
-                      />
-                    </div>
-                  </form>
-                </div>
-              ) : null}
             <div style={{ height: 90 }} />
             <div className="floating-bar">
               {mode === 'join' ? (
