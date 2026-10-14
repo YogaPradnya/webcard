@@ -632,7 +632,7 @@ export default function BattlePage() {
       setNowTick(Date.now());
       fetchRooms(roomPage, roomQ);
       fetchMine();
-    }, 5000);
+    }, 8000);
     const tick = setInterval(() => setNowTick(Date.now()), 1000);
     return () => {
       clearInterval(t);
@@ -666,7 +666,7 @@ export default function BattlePage() {
   }, [st?.code]);
 
   useEffect(() => {
-    if (!st?.code || st.status === 'finished') return;
+    if (!st?.code || st.status === 'finished' || st.battle?.over) return;
     const t = setInterval(async () => {
       if (document.hidden) return;
       try {
@@ -678,10 +678,10 @@ export default function BattlePage() {
           scrollChat();
         }
       } catch { /* abaikan */ }
-    }, 2500);
+    }, 4000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.code, st?.status]);
+  }, [st?.code, st?.status, st?.battle?.over]);
 
   function scrollChat() {
     requestAnimationFrame(() => {
@@ -920,14 +920,14 @@ export default function BattlePage() {
   }
 
   useEffect(() => {
-    if (!st || st.status === 'finished') return;
+    if (!st || st.status === 'finished' || st.battle?.over) return;
     const waiting = st.status === 'waiting';
     const myTurn = st.turn === me?.id;
     if (!waiting && myTurn) return;
-    const t = setInterval(() => { if (!document.hidden) refresh(); }, 1500);
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, 2500);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.code, st?.status, st?.turn, me?.id]);
+  }, [st?.code, st?.status, st?.turn, st?.battle?.over, me?.id]);
 
   // Battle selesai: scroll ke hasil + otomatis kembali ke menu pilih tim.
   const battleDone = Boolean(st && (st.status === 'finished' || st.battle?.over));

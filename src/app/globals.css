@@ -1349,11 +1349,11 @@ body {
 .wa-box {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 14px 18px;
+  padding: 16px 16px 20px;
   background: transparent;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
 }
 
 .wa-empty {
@@ -1374,9 +1374,9 @@ body {
 }
 
 .wa-mini-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1401,7 +1401,7 @@ body {
 }
 
 .wa-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--ink);
   display: flex;
@@ -1420,7 +1420,7 @@ body {
 .wa-time {
   margin-left: auto;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   color: #fb923c;
   font-variant-numeric: tabular-nums;
@@ -1449,9 +1449,9 @@ body {
 .wa-text {
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.5;
-  color: #d6d9e4;
-  font-size: 13.5px;
+  line-height: 1.55;
+  color: #e2e5ef;
+  font-size: 14.5px;
 }
 
 .wa-del {
@@ -1513,11 +1513,25 @@ body {
 
 .wa-inputbar {
   display: flex;
-  gap: 8px;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  gap: 10px;
+  padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid var(--hairline-strong);
   background: var(--surface);
   align-items: center;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+
+@media (max-width: 720px) {
+  .wa-inputbar {
+    bottom: 72px;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .wa-box {
+    gap: 20px;
+  }
 }
 
 .wa-inputbar .input {
