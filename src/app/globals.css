@@ -1893,6 +1893,34 @@ body {
   color: var(--muted);
 }
 
+/* ===== Bingkai rarity overlay (sprite SVG, vektor, pointer tembus) ===== */
+.framed-art {
+  position: relative;
+  aspect-ratio: 280 / 400;
+  background: var(--hairline-soft);
+  overflow: hidden;
+}
+
+.framed-art > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.framed-art > .framed-blank {
+  width: 100%;
+  height: 100%;
+}
+
+.frame-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 /* ===== Stepper jumlah (+/-) ===== */
 .stepper {
   display: flex;

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 
@@ -40,12 +41,15 @@ function RevealCard({ pull, face }) {
   return (
     <div className="gacha-card revealed" style={{ borderColor: color, boxShadow: '3px 3px 0 #0a0a0a' }}>
       {pull.isNew ? <span className="gacha-new">BARU</span> : <span className="gacha-dupe">+1 stack</span>}
-      {pull.imageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="card-art" src={optImg(pull.imageUrl, 400)} alt={pull.charName} decoding="async" />
-      ) : (
-        <div className="card-art gacha-noart" style={{ background: color }}><span>?</span></div>
-      )}
+      <div className="framed-art">
+        {pull.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={optImg(pull.imageUrl, 400)} alt={pull.charName} decoding="async" />
+        ) : (
+          <div className="framed-blank gacha-noart"><span>?</span></div>
+        )}
+        <FrameOverlay tier={pull.rarity} />
+      </div>
       <div className="card-meta">
         <div className="card-name">{pull.charName}</div>
         <div className="card-anime">{pull.anime} • {pull.rarity}</div>
@@ -201,6 +205,7 @@ export default function GachaPage() {
       <Sidebar username={me?.username} />
       <div className="layout-main">
         <div className="page">
+          <FrameDefs />
           <div className="brand"><h1>Gacha</h1></div>
           {error ? (
             <div className="alert-error">

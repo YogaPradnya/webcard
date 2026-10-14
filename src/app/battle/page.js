@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import { optImg } from '@/lib/images';
@@ -1114,6 +1115,7 @@ export default function BattlePage() {
       <Sidebar username={me?.username} />
       <div className="layout-main">
         <div className="page">
+          <FrameDefs />
           <div className="brand">
             <h1>Battle Kartu</h1>
           </div>
@@ -1351,12 +1353,15 @@ export default function BattlePage() {
                         {selected ? <span className="pick-check">{idx + 1}</span> : null}
                         <div className="flip-inner">
                           <div className="flip-front">
-                            {c.imageUrl ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
-                            ) : (
-                              <div className="card-art" />
-                            )}
+                            <div className="framed-art">
+                              {c.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
+                              ) : (
+                                <div className="framed-blank" />
+                              )}
+                              <FrameOverlay tier={c.tier} />
+                            </div>
                             <div className="card-meta">
                               <span className={`pick-role role-${c.stats?.role || 'Damage'}`}>{c.stats?.role || '-'}</span>
                               <div className="card-name">{c.name}</div>

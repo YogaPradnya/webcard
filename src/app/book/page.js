@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
@@ -366,6 +367,7 @@ export default function BookPage() {
       <Sidebar username={me?.username} />
       <div className="layout-main">
         <div className="page">
+          <FrameDefs />
           <div className="brand">
             <h1>Book Kartu</h1>
           </div>
@@ -639,7 +641,17 @@ export default function BookPage() {
             <div className="flip-inner">
               <div className="flip-front">
                 <span className="tier-ribbon" style={c.owned ? { ['--tier']: TIER_COLORS[c.tier], background: TIER_COLORS[c.tier] } : undefined} />
-                {c.imageUrl ? (
+                {c.owned ? (
+                  <div className="framed-art">
+                    {c.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
+                    ) : (
+                      <div className="framed-blank" />
+                    )}
+                    <FrameOverlay tier={c.tier} />
+                  </div>
+                ) : c.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
                 ) : (
