@@ -9,7 +9,7 @@ import { optImg } from '@/lib/images';
 
 function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
-  const color = pct > 50 ? 'var(--role-heal)' : pct > 20 ? '#eab308' : 'var(--role-dmg)';
+  const color = pct > 50 ? 'var(--role-heal)' : pct > 20 ? 'var(--link)' : 'var(--role-dmg)';
   return (
     <div style={{ background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.5s' }} />
@@ -1108,16 +1108,26 @@ export default function BattlePage() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Cari kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} aria-label="Cari kartu battle" />
-                  <select className="select" style={{ width: 130 }} value={pickRole} onChange={(e) => setPickRole(e.target.value)} aria-label="Filter role">
-                    {['All', 'Damage', 'Tank', 'Support', 'Assist'].map((r) => (
-                      <option key={r} value={r}>{r === 'All' ? 'Semua role' : r}</option>
-                    ))}
-                  </select>
                   <select className="select" style={{ width: 130 }} value={pickTier} onChange={(e) => setPickTier(e.target.value)} aria-label="Filter tier">
                     {['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'].map((t) => (
                       <option key={t} value={t}>{t === 'All' ? 'Semua tier' : t}</option>
                     ))}
                   </select>
+                </div>
+                <div className="chip-row" style={{ marginBottom: 12 }} role="radiogroup" aria-label="Filter role">
+                  {['All', 'Damage', 'Tank', 'Support', 'Assist'].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      role="radio"
+                      aria-checked={pickRole === r}
+                      className={pickRole === r ? 'chip active' : 'chip'}
+                      onClick={() => setPickRole(r)}
+                    >
+                      {r !== 'All' ? <span className={`role-dot dot-${r}`} aria-hidden="true" /> : null}
+                      {r === 'All' ? 'Semua role' : r}
+                    </button>
+                  ))}
                 </div>
                 {presets.length > 0 ? (
                   <div className="chip-row" style={{ marginBottom: 12 }}>

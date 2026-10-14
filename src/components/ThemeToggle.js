@@ -5,24 +5,20 @@ import { useEffect, useState } from 'react';
 const KEY = 'animein-theme';
 
 function getInitial() {
-  if (typeof document !== 'undefined') {
-    const cur = document.documentElement.getAttribute('data-theme');
-    if (cur === 'light' || cur === 'dark') return cur;
-  }
-  if (typeof window !== 'undefined') {
+  if (typeof window === 'undefined') return 'dark';
+  try {
     const saved = window.localStorage.getItem(KEY);
     if (saved === 'light' || saved === 'dark') return saved;
-    if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
-  }
+  } catch { /* abaikan: storage tidak tersedia */ }
+  const cur = document.documentElement.getAttribute('data-theme');
+  if (cur === 'light' || cur === 'dark') return cur;
+  if (window.matchMedia?.('(prefers-color-scheme: light)').matches) return 'light';
   return 'dark';
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState('dark');
-
-  useEffect(() => {
-    setTheme(getInitial());
-  }, []);
+  // Init sinkron dari localStorage/DOM agar tidak kedip ke dark dulu.
+  const [theme, setTheme] = useState(getInitial);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);

@@ -248,6 +248,21 @@ body {
   box-shadow: none;
 }
 
+/* Dot warna role untuk filter chip */
+.role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.dot-Damage { background: #ff2e63; }
+.dot-Tank { background: #9a6a3b; }
+.dot-Support { background: #16a34a; }
+.dot-Assist { background: #2563eb; }
+
 .tier-title {
   font-size: 13px;
   font-weight: 800;
@@ -354,6 +369,7 @@ body {
 [data-theme='dark'],
 [data-theme='light'] {
   --role-dmg: #ff2e63;
+  --role-dmg-deep: #e11d48;
   --role-tank: #9a6a3b;
   --role-tank-deep: #7c5227;
   --role-heal: #16a34a;
@@ -369,7 +385,7 @@ body {
 }
 
 .role-Damage {
-  background: var(--role-dmg) !important;
+  background: var(--role-dmg-deep) !important;
   color: #fff !important;
 }
 
