@@ -4,21 +4,21 @@ import { getDb } from './db.js';
 // Progres dicatat otomatis dari event game; klaim manual via tombol (XP masuk user_stats).
 
 export const DAILY_MISSIONS = [
-  { id: 'gacha_1', label: 'Gacha 1x', target: 1, xp: 100, event: 'gacha' },
-  { id: 'battle_1', label: 'Main battle 1x (AI/PvP)', target: 1, xp: 50, event: 'battle' },
-  { id: 'pvp_1', label: 'Battle vs teman 1x', target: 1, xp: 150, event: 'pvp' },
-  { id: 'pvp_5', label: 'Battle vs teman 5x', target: 5, xp: 400, event: 'pvp' },
-  { id: 'pvp_win_1', label: 'Menang vs teman 1x', target: 1, xp: 200, event: 'pvp_win' },
-  { id: 'trade_1', label: 'Trade 1x', target: 1, xp: 100, event: 'trade' },
-  { id: 'login_1', label: 'Buka web hari ini', target: 1, xp: 25, event: 'login' },
+  { id: 'gacha_1', label: 'Gacha 1x', target: 1, xp: 200, event: 'gacha' },
+  { id: 'battle_1', label: 'Main battle 1x (AI/PvP)', target: 1, xp: 100, event: 'battle' },
+  { id: 'pvp_1', label: 'Battle vs teman 1x', target: 1, xp: 300, event: 'pvp' },
+  { id: 'pvp_5', label: 'Battle vs teman 5x', target: 5, xp: 800, event: 'pvp' },
+  { id: 'pvp_win_1', label: 'Menang vs teman 1x', target: 1, xp: 400, event: 'pvp_win' },
+  { id: 'trade_1', label: 'Trade 1x', target: 1, xp: 200, event: 'trade' },
+  { id: 'login_1', label: 'Buka web hari ini', target: 1, xp: 50, event: 'login' },
 ];
 
 export const WEEKLY_MISSIONS = [
-  { id: 'gacha_15', label: 'Gacha 15x', target: 15, xp: 800, event: 'gacha' },
-  { id: 'battle_15', label: 'Main battle 15x (AI/PvP)', target: 15, xp: 500, event: 'battle' },
-  { id: 'pvp_25', label: 'Battle vs teman 25x', target: 25, xp: 1500, event: 'pvp' },
-  { id: 'pvp_win_5', label: 'Menang vs teman 5x', target: 5, xp: 1000, event: 'pvp_win' },
-  { id: 'trade_5', label: 'Trade 5x', target: 5, xp: 500, event: 'trade' },
+  { id: 'gacha_15', label: 'Gacha 15x', target: 15, xp: 1500, event: 'gacha' },
+  { id: 'battle_15', label: 'Main battle 15x (AI/PvP)', target: 15, xp: 1000, event: 'battle' },
+  { id: 'pvp_25', label: 'Battle vs teman 25x', target: 25, xp: 3000, event: 'pvp' },
+  { id: 'pvp_win_5', label: 'Menang vs teman 5x', target: 5, xp: 2000, event: 'pvp_win' },
+  { id: 'trade_5', label: 'Trade 5x', target: 5, xp: 1000, event: 'trade' },
 ];
 
 export function jakartaDateKey(d = new Date()) {

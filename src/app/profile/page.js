@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import MissionList from '@/components/MissionList';
 
 function avatarColor(name) {
   const s = String(name || '?');
@@ -56,6 +57,9 @@ export default function ProfilePage() {
   const [profilSource, setProfilSource] = useState('auto');
   const [customSlots, setCustomSlots] = useState([]);
   const [shopOn, setShopOn] = useState(false);
+  const [dailyMissions, setDailyMissions] = useState([]);
+  const [missionClaiming, setMissionClaiming] = useState('');
+  const [missionToast, setMissionToast] = useState('');
 
   async function load() {
     setLoading(true);
@@ -68,7 +72,7 @@ export default function ProfilePage() {
         return;
       }
       setMe(meData);
-      const [pRes, cRes, lbRes, dRes, srcRes, slotRes, shopRes] = await Promise.all([
+      const [pRes, cRes, lbRes, dRes, srcRes, slotRes, shopRes, mRes] = await Promise.all([
         fetch('/api/profile'),
         fetch('/api/cards'),
         fetch('/api/battle/leaderboard?tab=pvp'),
@@ -76,6 +80,7 @@ export default function ProfilePage() {
         fetch('/api/profile/showcase-source'),
         fetch('/api/shop/slots'),
         fetch('/api/shop/packages'),
+        fetch('/api/missions'),
       ]);
       const pData = await pRes.json().catch(() => ({}));
       if (!pRes.ok || !pData.success) {
@@ -103,6 +108,8 @@ export default function ProfilePage() {
       if (slotData.success) setCustomSlots(slotData.slots || []);
       const shopData = await shopRes.json().catch(() => ({}));
       if (shopData.success) setShopOn(Boolean(shopData.enabled));
+      const mData = await mRes.json().catch(() => ({}));
+      if (mData.success) setDailyMissions(mData.daily || []);
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -118,6 +125,27 @@ export default function ProfilePage() {
   async function onLogout() {
     await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
+  }
+
+  async function onClaimMission(period, missionId) {
+    setMissionClaiming(`${period}:${missionId}`);
+    setMissionToast('');
+    try {
+      const res = await fetch('/api/missions/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period, missionId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Gagal klaim misi.');
+        return;
+      }
+      setMissionToast(`+${data.xp} XP masuk! 🎉`);
+      await load();
+    } finally {
+      setMissionClaiming('');
+    }
   }
 
   async function saveShowcase(e) {
@@ -330,6 +358,17 @@ export default function ProfilePage() {
                 <button className="btn btn-ghost" onClick={onLogout} style={{ marginTop: 12 }}>
                   Keluar
                 </button>
+              </div>
+
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="section-title">Misi Harian (reset 00:00 WIB)</div>
+                {missionToast ? (
+                  <div className="trade-fair ok" role="status" style={{ marginBottom: 8 }}>{missionToast}</div>
+                ) : null}
+                <MissionList items={dailyMissions} period="daily" claiming={missionClaiming} onClaim={onClaimMission} />
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+                  Misi mingguan ada di halaman <Link href="/missions" style={{ color: 'var(--link)', fontWeight: 800 }}>Misi</Link>.
+                </div>
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
