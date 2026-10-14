@@ -1785,6 +1785,30 @@ body {
   gap: 14px;
 }
 
+/* Mobile: kartu lebih kecil, 3 kolom muat di HP 360px */
+@media (max-width: 720px) {
+  .gacha-grid,
+  .book-grid {
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 10px;
+  }
+
+  .gacha-grid .card-name,
+  .book-grid .card-name {
+    font-size: 11px;
+  }
+
+  .gacha-grid .card-anime,
+  .book-grid .card-anime {
+    font-size: 9px;
+  }
+
+  .gacha-grid .card-meta,
+  .book-grid .card-meta {
+    padding: 6px 8px 8px;
+  }
+}
+
 .gacha-card {
   position: relative;
   border-radius: var(--r-lg);

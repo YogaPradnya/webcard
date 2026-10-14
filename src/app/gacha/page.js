@@ -30,7 +30,7 @@ function RevealCard({ pull, face }) {
   const color = TIER_COLORS[pull.rarity] || '#9ca3af';
   if (face === 'back') {
     return (
-      <div className="gacha-card spinning" style={{ borderColor: color, boxShadow: `0 0 24px ${color}` }}>
+      <div className="gacha-card spinning" style={{ borderColor: color, boxShadow: '3px 3px 0 #0a0a0a' }}>
         <div className="gacha-back" style={{ background: color }}>
           <span>?</span>
         </div>
@@ -38,13 +38,13 @@ function RevealCard({ pull, face }) {
     );
   }
   return (
-    <div className="gacha-card revealed" style={{ borderColor: color, boxShadow: `0 2px 16px ${color}66` }}>
+    <div className="gacha-card revealed" style={{ borderColor: color, boxShadow: '3px 3px 0 #0a0a0a' }}>
       {pull.isNew ? <span className="gacha-new">BARU</span> : <span className="gacha-dupe">+1 stack</span>}
       {pull.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img className="card-art" src={optImg(pull.imageUrl, 400)} alt={pull.charName} decoding="async" />
       ) : (
-        <div className="card-art gacha-noart" style={{ background: `${color}33` }}><span>?</span></div>
+        <div className="card-art gacha-noart" style={{ background: color }}><span>?</span></div>
       )}
       <div className="card-meta">
         <div className="card-name">{pull.charName}</div>
@@ -66,7 +66,21 @@ export default function GachaPage() {
   const [turn, setTurn] = useState(0); // index kartu yang sedang di-reveal
   const [face, setFace] = useState('back'); // 'back' (spin) | 'front' (terbuka)
   const [finished, setFinished] = useState(false);
+  const [instant, setInstant] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      return localStorage.getItem('gacha_instant') === '1';
+    } catch { return false; }
+  });
   const timers = useRef([]);
+
+  function toggleInstant() {
+    setInstant((v) => {
+      const next = !v;
+      try { localStorage.setItem('gacha_instant', next ? '1' : '0'); } catch { /* abaikan */ }
+      return next;
+    });
+  }
 
   function clearTimers() {
     timers.current.forEach(clearTimeout);
@@ -138,6 +152,13 @@ export default function GachaPage() {
       }
       setPulls(data.pulls || []);
       setInfo((prev) => prev ? { ...prev, xp: data.xpAfter, totalPulls: data.total_pulls, pullsToday: data.pulls_today } : prev);
+      if (instant) {
+        // Mode langsung: semua terbuka sekaligus, tanpa animasi 1-1.
+        setTurn(Math.max(0, (data.pulls || []).length - 1));
+        setFace('front');
+        setFinished(true);
+        return;
+      }
       // Mulai reveal dari kartu pertama (next tick agar state pulls ter-commit).
       timers.current.push(setTimeout(() => {
         const firstMs = revealMsFor((data.pulls || [])[0]);
@@ -212,6 +233,18 @@ export default function GachaPage() {
                   const s = info.stocks?.[t];
                   return `${t} ${s ? `${s.left}/${s.total}` : '-'}`;
                 }).join(' • ')}
+              </div>
+              <div className="chip-row" style={{ marginTop: 12, marginBottom: 0 }}>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={instant}
+                  className={instant ? 'chip active' : 'chip'}
+                  onClick={toggleInstant}
+                  title="Buka semua kartu sekaligus tanpa animasi 1-1"
+                >
+                  ⚡ {instant ? 'Langsung: ON' : 'Reveal 1-1'}
+                </button>
               </div>
             </div>
           ) : null}
