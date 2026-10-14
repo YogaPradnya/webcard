@@ -1152,6 +1152,20 @@ body {
   }
 }
 
+/* ===== Misi harian + mingguan berdampingan (Profil) ===== */
+.mission-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .mission-duo {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ===== Trade ===== */
 .trade-code-big {
   font-size: 40px;

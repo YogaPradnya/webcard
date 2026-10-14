@@ -58,6 +58,7 @@ export default function ProfilePage() {
   const [customSlots, setCustomSlots] = useState([]);
   const [shopOn, setShopOn] = useState(false);
   const [dailyMissions, setDailyMissions] = useState([]);
+  const [weeklyMissions, setWeeklyMissions] = useState([]);
   const [missionClaiming, setMissionClaiming] = useState('');
   const [missionToast, setMissionToast] = useState('');
 
@@ -109,7 +110,10 @@ export default function ProfilePage() {
       const shopData = await shopRes.json().catch(() => ({}));
       if (shopData.success) setShopOn(Boolean(shopData.enabled));
       const mData = await mRes.json().catch(() => ({}));
-      if (mData.success) setDailyMissions(mData.daily || []);
+      if (mData.success) {
+        setDailyMissions(mData.daily || []);
+        setWeeklyMissions(mData.weekly || []);
+      }
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -352,7 +356,6 @@ export default function ProfilePage() {
                   <Link href="/leaderboard" className="menu-tile"><span className="menu-ico">★</span>Rank</Link>
                   <Link href="/battle" className="menu-tile"><span className="menu-ico">VS</span>Battle</Link>
                   <Link href="/book" className="menu-tile"><span className="menu-ico">▦</span>Book</Link>
-                  <Link href="/missions" className="menu-tile"><span className="menu-ico">☰</span>Misi</Link>
                   {shopOn ? <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link> : null}
                 </div>
                 <button className="btn btn-ghost" onClick={onLogout} style={{ marginTop: 12 }}>
@@ -360,15 +363,22 @@ export default function ProfilePage() {
                 </button>
               </div>
 
-              <div className="card" style={{ marginTop: 16 }}>
+              <div className="mission-duo">
+              <div className="card">
                 <div className="section-title">Misi Harian (reset 00:00 WIB)</div>
                 {missionToast ? (
                   <div className="trade-fair ok" role="status" style={{ marginBottom: 8 }}>{missionToast}</div>
                 ) : null}
                 <MissionList items={dailyMissions} period="daily" claiming={missionClaiming} onClaim={onClaimMission} />
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-                  Misi mingguan ada di halaman <Link href="/missions" style={{ color: 'var(--link)', fontWeight: 800 }}>Misi</Link>.
+              </div>
+
+              <div className="card">
+                <div className="section-title">Misi Mingguan (reset Senin)</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                  Vs teman = mode PvP (vs AI tidak dihitung).
                 </div>
+                <MissionList items={weeklyMissions} period="weekly" claiming={missionClaiming} onClaim={onClaimMission} />
+              </div>
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>

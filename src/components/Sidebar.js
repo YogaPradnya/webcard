@@ -54,7 +54,6 @@ export default function Sidebar({ username }) {
     <>
       {item('/book', 'Book Kartu')}
       {item('/battle', activeBattle > 0 ? `Battle (${activeBattle})` : 'Battle', activeBattle)}
-      {item('/missions', 'Misi')}
       {shopOn ? item('/shop', 'Shop') : null}
       {item('/chat', 'Chat Global')}
       {item('/profile', 'Profil')}
@@ -65,7 +64,6 @@ export default function Sidebar({ username }) {
     <>
       {item('/book', 'Book')}
       {item('/battle', activeBattle > 0 ? `Battle (${activeBattle})` : 'Battle', activeBattle)}
-      {item('/missions', 'Misi')}
       {shopOn ? item('/shop', 'Shop') : null}
       {item('/chat', 'Chat')}
       {item('/profile', 'Profil')}
