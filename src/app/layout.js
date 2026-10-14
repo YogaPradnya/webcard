@@ -40,13 +40,18 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="id" data-theme="dark" className={`${bodyFont.variable} ${displayFont.variable}`}>
+    <html lang="id" data-theme="dark" suppressHydrationWarning className={`${bodyFont.variable} ${displayFont.variable}`}>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k='animein-theme';var s=localStorage.getItem(k);if(s!=='light'&&s!=='dark'){s=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+          }}
+        />
       </head>
       <body>
         {children}

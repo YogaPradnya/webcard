@@ -1,5 +1,6 @@
-/* ===== Animein Dark Game Premium: satu tema, dark saja ===== */
-:root {
+/* ===== Animein Anime Theme: dark + white, palet #08D9D6 #252A34 #FF2E63 #EAEAEA ===== */
+:root,
+[data-theme='dark'] {
   --canvas: #1a1f2b;
   --canvas-soft: #202637;
   --surface: #252a34;
@@ -15,9 +16,18 @@
   --primary-active: #00c6c3;
   --on-primary: #062a2a;
   --accent-grad: linear-gradient(135deg, #5ef2ef, #08d9d6 55%, #05a8a5);
+  --accent-red-grad: linear-gradient(135deg, #ff7a9c, #ff2e63 55%, #c81e4e);
+  --accent-mix-grad: linear-gradient(135deg, #08d9d6, #ff2e63);
+  --manga-shadow: 4px 4px 0 rgba(8, 217, 214, 0.9);
+  --manga-shadow-red: 4px 4px 0 rgba(255, 46, 99, 0.9);
   --link: #08d9d6;
   --success: #34d399;
   --error: #ff2e63;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 /* Rarity: warna + glow seragam di seluruh web */
   --rar-common: #9ca3af;
   --rar-rare: #60a5fa;
@@ -28,7 +38,48 @@
   --rar-rare-glow: rgba(96, 165, 250, 0.45);
   --rar-epic-glow: rgba(192, 132, 252, 0.5);
   --rar-legendary-glow: rgba(234, 179, 8, 0.55);
-  --rar-mythic-glow: rgba(239, 68, 68, 0.6);
+  --rar-mythic-glow: rgba(255, 46, 99, 0.6);
+}
+
+/* ===== White mode: canvas #EAEAEA, ink #252A34, aksen tetap teal + red ===== */
+[data-theme='light'] {
+  --canvas: #eaeaea;
+  --canvas-soft: #f4f4f5;
+  --surface: #ffffff;
+  --surface-soft: #eef0f3;
+  --ink: #252a34;
+  --body: #4a5268;
+  --muted: #6b7280;
+  --muted-soft: #d1d5db;
+  --hairline: #dfe1e6;
+  --hairline-soft: #eceef1;
+  --hairline-strong: #c6cbd6;
+  --primary: #08d9d6;
+  --primary-active: #05a8a5;
+  --on-primary: #062a2a;
+  --accent-grad: linear-gradient(135deg, #5ef2ef, #08d9d6 55%, #05a8a5);
+  --accent-red-grad: linear-gradient(135deg, #ff7a9c, #ff2e63 55%, #c81e4e);
+  --accent-mix-grad: linear-gradient(135deg, #08d9d6, #ff2e63);
+  --manga-shadow: 4px 4px 0 #252a34;
+  --manga-shadow-red: 4px 4px 0 #ff2e63;
+  --link: #078e8c;
+  --success: #0e9f6e;
+  --error: #ff2e63;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+  --shadow: 0 8px 24px rgba(37, 42, 52, 0.12);
+  --rar-common: #6b7280;
+  --rar-rare: #2563eb;
+  --rar-epic: #9333ea;
+  --rar-legendary: #b8860b;
+  --rar-mythic: #ff2e63;
+  --rar-common-glow: rgba(107, 114, 128, 0.3);
+  --rar-rare-glow: rgba(37, 99, 235, 0.3);
+  --rar-epic-glow: rgba(147, 51, 234, 0.32);
+  --rar-legendary-glow: rgba(184, 134, 11, 0.35);
+  --rar-mythic-glow: rgba(255, 46, 99, 0.4);
 }
 
 * {
@@ -40,12 +91,25 @@
 body {
   background-color: var(--canvas);
   background-image:
-    radial-gradient(900px 480px at 85% -5%, rgba(8, 217, 214, 0.09), transparent 60%),
-    radial-gradient(760px 520px at -10% 20%, rgba(168, 85, 247, 0.1), transparent 60%);
+    radial-gradient(900px 480px at 85% -5%, rgba(8, 217, 214, 0.14), transparent 60%),
+    radial-gradient(760px 520px at -10% 20%, rgba(255, 46, 99, 0.12), transparent 60%),
+    radial-gradient(rgba(8, 217, 214, 0.1) 1px, transparent 1.4px);
+  background-size: auto, auto, 22px 22px;
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body);
   min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+[data-theme='light'] body,
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 .page {
@@ -84,6 +148,7 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  filter: drop-shadow(2px 2px 0 rgba(255, 46, 99, 0.55));
 }
 
 .card {
@@ -429,6 +494,16 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  filter: drop-shadow(1.5px 1.5px 0 rgba(255, 46, 99, 0.5));
+}
+
+[data-theme='light'] .brand h1,
+[data-theme='light'] .sidebar-brand {
+  background: linear-gradient(180deg, #252a34, #252a34);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(2px 2px 0 rgba(8, 217, 214, 0.8));
 }
 
 .sidebar-user {
@@ -643,7 +718,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.45);
+    box-shadow: 0 0 0 6px rgba(255, 46, 99, 0.45);
   }
 }
 
@@ -928,9 +1003,11 @@ body {
   font-size: 11px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #f97316, #ff2e63);
+  background: linear-gradient(135deg, #08d9d6, #ff2e63);
+  border: 2px solid #252a34;
   border-radius: 9999px;
   padding: 4px 12px;
+  box-shadow: 3px 3px 0 #252a34;
   animation: comboFlicker 1s infinite;
 }
 
@@ -979,8 +1056,8 @@ body {
   margin-top: 10px;
   font-size: clamp(30px, 7vw, 60px);
   font-weight: 900;
-  color: #5ef2ef;
-  text-shadow: 0 0 24px rgba(250, 204, 21, 0.8);
+  color: #ff2e63;
+  text-shadow: 3px 3px 0 #08d9d6, 0 0 24px rgba(255, 46, 99, 0.55);
   animation: vsZoom 0.4s 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
 }
 
@@ -1460,7 +1537,8 @@ body {
 
 .title-tile.earned {
   border-color: #08d9d6;
-  background: #2e250f;
+  background: rgba(8, 217, 214, 0.12);
+  box-shadow: 3px 3px 0 rgba(8, 217, 214, 0.7);
 }
 
 .title-tile.active {
@@ -1667,4 +1745,70 @@ body {
   font-size: 12px;
   font-weight: 800;
   color: var(--link);
+}
+
+/* ===== Toggle tema ===== */
+.theme-toggle {
+  width: 100%;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.topbar-toggle .theme-toggle {
+  width: auto;
+  min-height: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+/* ===== White mode: kontras di atas #EAEAEA / putih ===== */
+[data-theme='light'] body {
+  background-image:
+    radial-gradient(900px 480px at 85% -5%, rgba(8, 217, 214, 0.22), transparent 60%),
+    radial-gradient(760px 520px at -10% 20%, rgba(255, 46, 99, 0.14), transparent 60%),
+    radial-gradient(rgba(37, 42, 52, 0.12) 1px, transparent 1.4px);
+}
+
+[data-theme='light'] .card {
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(37, 42, 52, 0.1);
+}
+
+[data-theme='light'] .card-item.locked .card-art {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+[data-theme='light'] .alert-error {
+  background: #fdeef1;
+  color: #9f1239;
+}
+
+[data-theme='light'] .absorb-float {
+  background: #252a34;
+  color: #eaeaea;
+}
+
+[data-theme='light'] .ko-stamp {
+  background: rgba(255, 255, 255, 0.92);
+}
+
+[data-theme='light'] .menu-tile {
+  background: #ffffff;
+}
+
+[data-theme='light'] .nav-item {
+  color: #4a5268;
+}
+
+[data-theme='light'] .nav-item.active {
+  color: #062a2a;
+}
+
+[data-theme='light'] .fighter.targetable-foe {
+  border-color: #ff2e63;
+}
+
+[data-theme='light'] .profile-hero {
+  background: linear-gradient(180deg, #ffffff 0%, #eaeaea 100%);
 }

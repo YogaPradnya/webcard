@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import ThemeToggle from './ThemeToggle';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
@@ -74,6 +75,7 @@ export default function Sidebar({ username }) {
         {username ? <div className="sidebar-user">@{username}</div> : null}
         <nav className="sidebar-nav">{desktopLinks}</nav>
         <div className="sidebar-bottom">
+          <ThemeToggle />
           <Link href="/terms" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline', marginBottom: 8 }}>
             Syarat & Ketentuan
           </Link>
@@ -86,6 +88,7 @@ export default function Sidebar({ username }) {
       <header className="topbar">
         <span className="topbar-title">Animein</span>
         <span className="topbar-spacer" />
+        <span className="topbar-toggle"><ThemeToggle /></span>
       </header>
 
       <nav className="bottomnav">{mobileLinks}</nav>
