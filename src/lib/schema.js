@@ -66,7 +66,10 @@ export async function applyMigrations(db) {
         await db.execute(stmt);
       } catch (e) {
         const msg = String(e?.message || e);
-        if (/^ALTER\s/i.test(stmt.trim()) && /duplicate column/i.test(msg)) continue;
+        const isAlter = /^ALTER\s/i.test(stmt.trim());
+        // DB lama maju bertahap (kolom sudah ada) atau tabel milik bot
+        // belum dibuat bot -> keduanya aman dilewati.
+        if (isAlter && (/duplicate column/i.test(msg) || /no such table/i.test(msg))) continue;
         throw new Error(`[MIGRATE ${m.name}] ${msg}`);
       }
     }

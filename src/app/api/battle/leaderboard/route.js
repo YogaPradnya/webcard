@@ -4,10 +4,22 @@ import { getDb } from '@/lib/db';
 import { ensureBattleRooms } from '@/lib/rooms';
 
 // GET /api/battle/leaderboard?tab=pvp|collector|xp — klasemen PvP, kolektor, XP.
+// Publik & sama untuk semua user -> cache memori 60 dtk (0 query saat hit).
+const _lbCache = new Map(); // tab -> { at, payload }
+const LB_TTL_MS = 60 * 1000;
+
 export async function GET(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const tab = String(new URL(req.url).searchParams.get('tab') || 'pvp');
+  const hit = _lbCache.get(tab);
+  if (hit && Date.now() - hit.at < LB_TTL_MS) {
+    const rows = hit.payload.map((r) => {
+      const { user_id, ...pub } = r;
+      return { ...pub, isMe: String(user_id) === String(session.id) };
+    });
+    return NextResponse.json({ success: true, tab: hit.tab, leaderboard: rows });
+  }
 
   try {
     await ensureBattleRooms();
@@ -20,11 +32,12 @@ export async function GET(req) {
         args: [],
       });
       const rows = res.rows.map((r) => ({
+        user_id: String(r.user_id),
         username: String(r.username || ''),
         owned: Number(r.owned) || 0,
-        isMe: String(r.user_id) === String(session.id),
       }));
-      return NextResponse.json({ success: true, tab, leaderboard: rows });
+      _lbCache.set('collector', { at: Date.now(), tab: 'collector', payload: rows });
+      return NextResponse.json({ success: true, tab, leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
     }
     if (tab === 'xp') {
       const res = await db.execute({
@@ -32,12 +45,13 @@ export async function GET(req) {
         args: [],
       });
       const rows = res.rows.map((r) => ({
+        user_id: String(r.user_id),
         username: String(r.username || ''),
         xp: Number(r.xp) || 0,
         level: Number(r.level) || 1,
-        isMe: String(r.user_id) === String(session.id),
       }));
-      return NextResponse.json({ success: true, tab, leaderboard: rows });
+      _lbCache.set('xp', { at: Date.now(), tab: 'xp', payload: rows });
+      return NextResponse.json({ success: true, tab, leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
     }
     const res = await db.execute({
       sql: 'SELECT user_id, username, wins, losses, updated_at FROM battle_leaderboard ORDER BY wins DESC, losses ASC LIMIT 20',
@@ -48,14 +62,15 @@ export async function GET(req) {
       const losses = Number(r.losses) || 0;
       const total = wins + losses;
       return {
+        user_id: String(r.user_id),
         username: String(r.username || ''),
         wins,
         losses,
         winRate: total > 0 ? Math.round((wins / total) * 100) : 0,
-        isMe: String(r.user_id) === String(session.id),
       };
     });
-    return NextResponse.json({ success: true, tab: 'pvp', leaderboard: rows });
+    _lbCache.set('pvp', { at: Date.now(), tab: 'pvp', payload: rows });
+    return NextResponse.json({ success: true, tab: 'pvp', leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
   } catch (e) {
     console.error('[BATTLE LB]', e.message);
     return NextResponse.json({ success: false, message: 'Gagal memuat leaderboard.' }, { status: 500 });

@@ -3,7 +3,7 @@ import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
-import { ensureBattleRooms, getRoom, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
+import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
 import { checkRateCount } from '@/lib/rateLimit';
 
@@ -32,7 +32,7 @@ export async function POST(req) {
     await ensureBattleRooms();
     await cleanupExpiredWaitingRooms(Date.now());
     const db = getDb();
-    const room = await getRoom(code);
+    const room = await getRoomCached(code);
     if (!room || room.mode !== 'pvp' || room.status !== 'waiting') {
       return NextResponse.json({ success: false, message: 'Room tidak tersedia.' }, { status: 404 });
     }
@@ -76,7 +76,7 @@ export async function POST(req) {
     await saveRoom(room);
     bumpRoom(code);
 
-    const saved = await getRoom(code);
+    const saved = await getRoomCached(code);
     return NextResponse.json({
       success: true,
       state: {

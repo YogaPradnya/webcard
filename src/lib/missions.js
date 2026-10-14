@@ -82,25 +82,26 @@ export async function recordEvent(userId, username, event, n = 1) {
       { key: `d:${jakartaDateKey()}`, list: DAILY_MISSIONS },
       { key: `w:${jakartaWeekKey()}`, list: WEEKLY_MISSIONS },
     ];
-    // Paralel satu gelombang (dulu insert berurutan ke Tokyo).
-    const jobs = [];
+    // 1 round-trip via batch (dulu N insert berurutan ke Tokyo).
+    // Transaksional & best-effort: gagal -> abaikan seperti sebelumnya.
+    const stmts = [];
     for (const { key, list } of periods) {
       for (const m of list.filter((x) => x.event === event)) {
-        jobs.push(db.execute({
+        stmts.push({
           sql: `INSERT INTO mission_progress (user_id, period, mission_id, count) VALUES (?, ?, ?, ?)
                 ON CONFLICT(user_id, period, mission_id) DO UPDATE SET count = MIN(?, count + ?)`,
           args: [String(userId), key, m.id, Math.min(amount, m.target), m.target, amount],
-        }));
+        });
       }
     }
     if (username) {
-      jobs.push(db.execute({
+      stmts.push({
         sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, 0, 1)
               ON CONFLICT(user_id) DO UPDATE SET username = excluded.username`,
         args: [String(userId), String(username)],
-      }).catch(() => {}));
+      });
     }
-    await Promise.all(jobs);
+    if (stmts.length > 0) await db.batch(stmts);
   } catch { /* misi non-kritis: jangan gagalkan game */ }
 }
 

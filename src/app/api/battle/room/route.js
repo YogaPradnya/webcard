@@ -7,6 +7,7 @@ import {
   ensureBattleRooms,
   genRoomCode,
   getRoom,
+  getRoomCached,
   saveRoom,
   applyTimeout,
   applyForfeit,
@@ -37,17 +38,16 @@ async function validateTeam(db, userId, team) {
       level: Number(r.level) || 1,
     };
   }
-  for (const n of names) {
-    const owned = ownedMap[n.toLowerCase()];
-    if (!owned) return `Kamu tidak punya ${n}.`;
-    // Kartu pajangan (display-only) tidak bisa dipakai battle.
-    try {
-      const disp = await db.execute({
-        sql: 'SELECT id FROM user_display_cards WHERE user_id = ? AND LOWER(name) = LOWER(?) LIMIT 1',
-        args: [String(userId), n],
-      });
-      if (disp.rows.length > 0) return `${n} adalah kartu pajangan, tidak bisa dipakai battle.`;
-    } catch { /* tabel belum ada -> abaikan */ }
+  // Cek pajangan paralel (1 gelombang, bukan 3 berurutan ke Tokyo).
+  const dispChecks = await Promise.all(names.map((n) =>
+    db.execute({
+      sql: 'SELECT id FROM user_display_cards WHERE user_id = ? AND LOWER(name) = LOWER(?) LIMIT 1',
+      args: [String(userId), n],
+    }).catch(() => ({ rows: [] })),
+  ));
+  for (let i = 0; i < names.length; i++) {
+    if (!ownedMap[names[i].toLowerCase()]) return `Kamu tidak punya ${names[i]}.`;
+    if ((dispChecks[i].rows || []).length > 0) return `${names[i]} adalah kartu pajangan, tidak bisa dipakai battle.`;
   }
   return null;
 }
@@ -186,7 +186,7 @@ export async function GET(req) {
 
   try {
     await ensureBattleRooms();
-    const room = await getRoom(code);
+    const room = await getRoomCached(code);
     if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
     if (isWaitingExpired(room)) {
       await deleteRoom(room.code);

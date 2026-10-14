@@ -162,6 +162,7 @@ export function waitingSecondsLeft(room, now = Date.now()) {
 }
 
 export async function deleteRoom(code) {
+  _roomCache.delete(String(code));
   await getDb().execute({ sql: 'DELETE FROM battle_rooms WHERE code = ?', args: [String(code)] });
 }
 
@@ -180,7 +181,49 @@ export async function getRoom(code) {
   return parseRoom(res.rows[0]);
 }
 
+// Cache baca room di memori proses (TTL 2 dtk): polling/streaming tiap
+// klien tiap 2,5–15 dtk tidak lagi kena round-trip Tokyo. Tulis tetap ke
+// Turso via saveRoom (write-through) agar single source of truth terjaga.
+// Klon saat baca agar mutasi antar-request tidak berbagi objek.
+const _roomCache = new Map(); // code -> { room, at }
+const ROOM_CACHE_TTL_MS = 2000;
+
+function cloneRoom(room) {
+  if (!room) return room;
+  try {
+    return typeof structuredClone === 'function' ? structuredClone(room) : JSON.parse(JSON.stringify(room));
+  } catch {
+    return room;
+  }
+}
+
+export async function getRoomCached(code, ttlMs = ROOM_CACHE_TTL_MS) {
+  const key = String(code);
+  const hit = _roomCache.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return cloneRoom(hit.room);
+  const room = await getRoom(key);
+  if (room) _roomCache.set(key, { room, at: Date.now() });
+  else _roomCache.delete(key);
+  return room ? cloneRoom(room) : room;
+}
+
+export function touchRoomCache(room) {
+  if (room?.code) _roomCache.set(String(room.code), { room, at: Date.now() });
+}
+
+// Log battle di-cap agar JSON state tidak membengkak (payload + parse
+// makin berat tiap aksi). Klien sudah tahan trimming (reset seenLog).
+export const MAX_BATTLE_LOG = 300;
+
+export function trimBattleLog(battle) {
+  if (battle && Array.isArray(battle.log) && battle.log.length > MAX_BATTLE_LOG) {
+    battle.log = battle.log.slice(-MAX_BATTLE_LOG);
+  }
+  return battle;
+}
+
 export async function saveRoom(room) {
+  trimBattleLog(room.battle);
   await getDb().execute({
     sql: `UPDATE battle_rooms SET state = ?, turn = ?, status = ?, winner = ?, result = ?,
           xp_paid = ?, p2_id = ?, p2_username = ?, updated_at = ? WHERE code = ?`,
@@ -190,6 +233,7 @@ export async function saveRoom(room) {
       room.p2Id, room.p2Username, Date.now(), room.code,
     ],
   });
+  touchRoomCache(room);
 }
 
 export function sideOf(room, userId) {

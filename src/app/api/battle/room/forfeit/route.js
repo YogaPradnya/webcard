@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
-import { ensureBattleRooms, getRoom, saveRoom, surrender, finishIfOver, sideOf } from '@/lib/rooms';
+import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, surrender, finishIfOver, sideOf } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
 
 // POST /api/battle/room/forfeit { code } — menyerah manual, game langsung berakhir.
@@ -17,7 +17,7 @@ export async function POST(req) {
   if (!code) return NextResponse.json({ success: false, message: 'Kode wajib diisi.' }, { status: 400 });
   try {
     await ensureBattleRooms();
-    const room = await getRoom(code);
+    const room = await getRoomCached(code);
     if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
     if (!sideOf(room, session.id)) {
       return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });

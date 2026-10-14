@@ -262,8 +262,6 @@ export default function ProfilePage() {
     return <PageSkeleton username={me?.username} title="Profil" lines={[35, 80, 60]} />;
   }
 
-  const pct = profile ? Math.round((profile.xpInto / Math.max(1, profile.xpSpan)) * 100) : 0;
-
   return (
     <div className="layout">
       <Sidebar username={me?.username} />
@@ -294,11 +292,8 @@ export default function ProfilePage() {
                     ) : (
                       <div className="profile-sub">Belum ada gelar terpasang</div>
                     )}
-                    <div className="profile-sub">Lv {profile.level} • {profile.xp} XP • sisa {profile.xpSisa} XP ke Lv {profile.level + 1}</div>
+                    <div className="profile-sub">{profile.xp} XP</div>
                   </div>
-                </div>
-                <div className="progress-wrap">
-                  <div className="progress-bar"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
                 </div>
                 <div className="profile-stats">
                   <div className="profile-stat"><b>{profile.owned}/{profile.total}</b><span>kartu</span></div>
@@ -327,7 +322,7 @@ export default function ProfilePage() {
                       <img src={optImg(profile.displayShowcase.imageUrl, 300)} alt={profile.displayShowcase.name} loading="lazy" decoding="async" style={{ border: `3px solid ${displayBorderColor(profile.displayShowcase)}` }} />
                     ) : null}
                     <div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan spesial 🎁{(profilSource === 'display' || (profilSource === 'auto' && profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
+                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan spesial{(profilSource === 'display' || (profilSource === 'auto' && profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
                       <div style={{ fontWeight: 800 }}>{profile.displayShowcase.name}</div>
                       <div style={{ fontSize: 12, color: 'var(--body)' }}>{profile.displayShowcase.grade}</div>
                     </div>
@@ -388,7 +383,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
-                <div className="section-title">Ganti pajangan spesial 🎁</div>
+                <div className="section-title">Ganti pajangan spesial</div>
                 {displayCards.length === 0 ? (
                   <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada kartu pajangan. Kartu spesial hanya bisa di-gift admin.</div>
                 ) : (
@@ -443,7 +438,7 @@ export default function ProfilePage() {
                   {[
                     ['auto', 'Otomatis'],
                     ['gacha', 'Kartu gacha'],
-                    ['display', 'Kartu pajangan 🎁'],
+                    ['display', 'Kartu pajangan'],
                   ].map(([value, label]) => (
                     <button
                       key={value}

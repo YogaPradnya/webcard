@@ -2,6 +2,7 @@ import { getSessionFromRequest } from '@/lib/session';
 import {
   ensureBattleRooms,
   getRoom,
+  getRoomCached,
   saveRoom,
   applyTimeout,
   applyForfeit,
@@ -66,7 +67,7 @@ export async function GET(req) {
 
       async function snapshot() {
         try {
-          const room = await getRoom(code);
+          const room = await getRoomCached(code);
           if (!room) return { gone: true };
           if (isWaitingExpired(room)) return { gone: true, expired: true };
           let changed = false;
@@ -90,7 +91,7 @@ export async function GET(req) {
       }
 
       // Validasi awal: room ada + milik peserta.
-      const first = await getRoom(code);
+      const first = await getRoomCached(code);
       if (!first || !sideOf(first, session.id)) {
         send('error', { success: false, message: !first ? 'Room tidak ada.' : 'Bukan room kamu.' });
         try { controller.close(); } catch { /* abaikan */ }

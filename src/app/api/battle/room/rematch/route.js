@@ -6,6 +6,7 @@ import {
   ensureBattleRooms,
   genRoomCode,
   getRoom,
+  getRoomCached,
   sideOf,
   sideTeamNames,
 } from '@/lib/rooms';
@@ -30,7 +31,7 @@ export async function POST(req) {
 
   try {
     await ensureBattleRooms();
-    const room = await getRoom(code);
+    const room = await getRoomCached(code);
     if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
     if (room.mode !== 'pvp') {
       return NextResponse.json({ success: false, message: 'Rematch hanya untuk PvP.' }, { status: 400 });

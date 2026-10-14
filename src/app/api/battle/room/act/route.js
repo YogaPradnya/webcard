@@ -4,6 +4,7 @@ import { act as engineAct } from '@/lib/engine';
 import {
   ensureBattleRooms,
   getRoom,
+  getRoomCached,
   saveRoom,
   applyTimeout,
   applyForfeit,
@@ -34,7 +35,7 @@ export async function POST(req) {
 
   try {
     await ensureBattleRooms();
-    const room = await getRoom(code);
+    const room = await getRoomCached(code);
     if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
     const side = sideOf(room, session.id);
     if (!side) return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });

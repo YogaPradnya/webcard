@@ -26,22 +26,25 @@ export default function Sidebar({ username }) {
         clearTimeout(t);
       }
     }
+    // Halaman /battle sudah poll /api/battle/mine sendiri -> jangan dobel.
+    const skipMine = pathname === '/battle' || pathname?.startsWith('/battle/');
+    async function pollMine() {
+      if (skipMine) return;
+      try {
+        const data = await fetchJson('/api/battle/mine');
+        if (alive && data.success) setActiveBattle((data.rooms || []).length);
+      } catch { /* abaikan */ }
+    }
     (async () => {
       try {
         const data = await fetchJson('/api/shop/packages');
         if (alive && data.success) setShopOn(Boolean(data.enabled));
       } catch { /* abaikan: shop tetap sembunyi */ }
-      try {
-        const data = await fetchJson('/api/battle/mine');
-        if (alive && data.success) setActiveBattle((data.rooms || []).length);
-      } catch { /* abaikan */ }
+      await pollMine();
     })();
     const t = setInterval(async () => {
       if (document.hidden) return;
-      try {
-        const data = await fetchJson('/api/battle/mine');
-        if (alive && data.success) setActiveBattle((data.rooms || []).length);
-      } catch { /* abaikan */ }
+      await pollMine();
     }, 30000);
     return () => { alive = false; clearInterval(t); };
   }, [pathname]);

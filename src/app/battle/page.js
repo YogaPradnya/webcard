@@ -605,6 +605,8 @@ export default function BattlePage() {
     const animate = opts.animate !== false;
     setSt(state);
     const log = state.battle?.log || [];
+    // Server cap log (300): panjang menyusut -> sinkronkan basis diff.
+    if (log.length < seenLog.current) seenLog.current = log.length;
     if (log.length > seenLog.current) {
       const fresh = log.slice(seenLog.current);
       const ev = log[log.length - 1];
@@ -720,7 +722,7 @@ export default function BattlePage() {
       setNowTick(Date.now());
       fetchRooms(roomPage, roomQ);
       fetchMine();
-    }, 8000);
+    }, 15000);
     const tick = setInterval(() => setNowTick(Date.now()), 1000);
     return () => {
       clearInterval(t);
