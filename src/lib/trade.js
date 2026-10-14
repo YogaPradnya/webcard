@@ -188,6 +188,12 @@ export async function executeTrade(db, offer, accepterId, accepterUsername, acce
   }
 
   await db.execute({ sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] });
+  // Misi: catat trade selesai untuk kedua pihak.
+  try {
+    const { recordEvent } = await import('./missions.js');
+    await recordEvent(offer.ownerId, offer.ownerUsername, 'trade', 1);
+    await recordEvent(accepterId, accepterUsername, 'trade', 1);
+  } catch { /* misi non-kritis */ }
   return {
     ok: true,
     received: { ...giverCard, amount: giveAmount },

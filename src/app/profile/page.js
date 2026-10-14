@@ -324,6 +324,7 @@ export default function ProfilePage() {
                   <Link href="/leaderboard" className="menu-tile"><span className="menu-ico">★</span>Rank</Link>
                   <Link href="/battle" className="menu-tile"><span className="menu-ico">VS</span>Battle</Link>
                   <Link href="/book" className="menu-tile"><span className="menu-ico">▦</span>Book</Link>
+                  <Link href="/missions" className="menu-tile"><span className="menu-ico">☰</span>Misi</Link>
                   {shopOn ? <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link> : null}
                 </div>
                 <button className="btn btn-ghost" onClick={onLogout} style={{ marginTop: 12 }}>

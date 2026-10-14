@@ -450,6 +450,11 @@ export async function performWebPulls(userId, username, count, todayKey) {
       args: [String(userId), String(userId)],
     });
   } catch { /* non-kritis */ }
+  // Misi: catat jumlah pull ke progres harian/mingguan.
+  try {
+    const { recordEvent } = await import('./missions.js');
+    if (paidCount > 0) await recordEvent(userId, username, 'gacha', paidCount);
+  } catch { /* misi non-kritis */ }
   return { pulls, costTotal: paidTotal, xpBefore: curXp, xpAfter: newXp, ...next };
 }
 

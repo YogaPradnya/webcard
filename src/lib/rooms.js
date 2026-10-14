@@ -348,6 +348,26 @@ export async function finishIfOver(room) {
   } else {
     room.result = { winner: room.winner, xp: room.result?.xp || xp, reason };
   }
+  // Misi: catat battle selesai (AI/PvP) + menang PvP. Non-kritis, jangan gagalkan finish.
+  try {
+    const { recordEvent } = await import('./missions.js');
+    const isPvp = room.mode === 'pvp';
+    const humans = isPvp
+      ? [
+        { id: room.p1Id, username: room.p1Username },
+        ...(room.p2Id ? [{ id: room.p2Id, username: room.p2Username }] : []),
+      ]
+      : [{ id: room.p1Id, username: room.p1Username }];
+    for (const h of humans) {
+      await recordEvent(h.id, h.username, 'battle', 1);
+      if (isPvp) {
+        await recordEvent(h.id, h.username, 'pvp', 1);
+        if (String(room.winner) === String(h.id)) {
+          await recordEvent(h.id, h.username, 'pvp_win', 1);
+        }
+      }
+    }
+  } catch { /* abaikan */ }
   // Catat riwayat (best-effort, jangan gagalkan finish).
   try {
     const db = getDb();
