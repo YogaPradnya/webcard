@@ -36,7 +36,7 @@ function sanitizePoolInput(pool) {
   return clean;
 }
 
-// Pool efektif: override dashboard (settings.gacha_pool) atau default 250 kartu.
+// Pool efektif: override dashboard (settings.gacha_pool) atau default 265 kartu.
 async function getEffectivePool() {
   try {
     const raw = await readSetting('gacha_pool');
