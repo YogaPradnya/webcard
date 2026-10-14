@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 
 const TIER_COLORS = {
@@ -171,19 +172,7 @@ export default function GachaPage() {
   const newCount = pulls.filter((p) => p.isNew).length;
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '80%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Gacha" />;
   }
 
   return (

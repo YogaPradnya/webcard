@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 
 const RATES = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
@@ -106,19 +107,7 @@ export default function ConvertPage() {
   }
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '80%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Konversi" lines={[40, 80]} />;
   }
 
   return (

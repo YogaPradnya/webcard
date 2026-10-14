@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
 import { optImg } from '@/lib/images';
@@ -362,25 +363,7 @@ export default function BookPage() {
   }
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="brand"><h1>Book Kartu</h1></div>
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '90%' }} />
-              <div className="book-grid" style={{ marginTop: 16 }}>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="skeleton-card" />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Book Kartu" lines={[40, 90]} />;
   }
 
   return (

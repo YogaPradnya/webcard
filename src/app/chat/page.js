@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 
 function fmtTime(ts) {
@@ -186,20 +187,7 @@ export default function ChatPage() {
   }
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '90%' }} />
-              <div className="skeleton-line" style={{ width: '70%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Chat Global" lines={[40, 90, 70]} />;
   }
 
   return (

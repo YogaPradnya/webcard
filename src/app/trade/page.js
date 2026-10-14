@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 
 function formatSisa(ms) {
@@ -265,19 +266,7 @@ export default function TradePage() {
     : null;
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '50%' }} />
-              <div className="skeleton-line" style={{ width: '85%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Trade Kartu" lines={[50, 85]} />;
   }
 
   return (

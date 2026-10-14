@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 
 function idr(n) {
   return `Rp${Number(n || 0).toLocaleString('id-ID')}`;
@@ -178,19 +179,7 @@ export default function ShopPage() {
   }
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '80%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Shop" />;
   }
 
   const maxSlots = catalog?.slot?.maxPerUser || 50;
@@ -222,7 +211,7 @@ export default function ShopPage() {
       <div className="layout-main">
         <div className="page">
           <div className="brand"><h1>Shop</h1></div>
-          {error ? <div className="alert-error">{error}</div> : null}
+          <ErrorRetry message={error} onRetry={load} />
           {successMsg ? (
             <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{successMsg}</div>
           ) : null}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import MissionList from '@/components/MissionList';
 import { optImg } from '@/lib/images';
 
@@ -247,20 +248,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '35%' }} />
-              <div className="skeleton-line" style={{ width: '80%' }} />
-              <div className="skeleton-line" style={{ width: '60%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Profil" lines={[35, 80, 60]} />;
   }
 
   const pct = profile ? Math.round((profile.xpInto / Math.max(1, profile.xpSpan)) * 100) : 0;
@@ -271,14 +259,7 @@ export default function ProfilePage() {
       <div className="layout-main">
         <div className="page">
           <div className="brand"><h1>Profil</h1></div>
-          {error ? (
-            <div className="alert-error">
-              {error}{' '}
-              <button type="button" className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '4px 12px' }} onClick={load}>
-                Coba lagi
-              </button>
-            </div>
-          ) : null}
+          <ErrorRetry message={error} onRetry={load} />
 
           {profile ? (
             <>

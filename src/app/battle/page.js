@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import { optImg } from '@/lib/images';
 
@@ -996,19 +997,7 @@ export default function BattlePage() {
   }, [iWon, st?.code]);
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '80%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Battle Kartu" />;
   }
 
   return (
@@ -1019,7 +1008,7 @@ export default function BattlePage() {
           <div className="brand">
             <h1>Battle Kartu</h1>
           </div>
-          {error ? <div className="alert-error">{error}</div> : null}
+          <ErrorRetry message={error} onRetry={refresh} />
 
           {!st && myRooms.length > 0 ? (
             <div className="card" style={{ marginBottom: 16, borderColor: 'var(--link)' }}>

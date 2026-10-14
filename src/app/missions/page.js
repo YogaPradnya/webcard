@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import MissionList from '@/components/MissionList';
 
 export default function MissionsPage() {
@@ -67,19 +68,7 @@ export default function MissionsPage() {
   }
 
   if (loading) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="card">
-              <div className="skeleton-line" style={{ width: '40%' }} />
-              <div className="skeleton-line" style={{ width: '80%' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageSkeleton username={me?.username} title="Misi Mingguan" />;
   }
 
   return (
@@ -88,7 +77,7 @@ export default function MissionsPage() {
       <div className="layout-main">
         <div className="page">
           <div className="brand"><h1>Misi Mingguan</h1></div>
-          {error ? <div className="alert-error">{error}</div> : null}
+          <ErrorRetry message={error} onRetry={load} />
           {toast ? <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{toast}</div> : null}
 
           <div className="card">
