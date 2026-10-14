@@ -1,4 +1,5 @@
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 // Preferensi pajangan .profil: 'auto' (display dulu lalu gacha), 'gacha', atau 'display'.
 // Mirror bot src/database/profilePrefRepo.js.
@@ -10,6 +11,7 @@ export function normalizeSource(v) {
 }
 
 export async function ensureProfilePrefsTable() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   await getDb().execute(`
     CREATE TABLE IF NOT EXISTS user_profile_prefs (
       user_id TEXT PRIMARY KEY,

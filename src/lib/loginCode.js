@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 // Kode login lahir di WEB, diklaim dari CHAT (.login KODE).
 // Tanpa password: bukti kepemilikan = senderUserId pengirim di chat.
@@ -27,6 +28,7 @@ export function newToken() {
 }
 
 export async function ensureLoginCodeTable() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   await getDb().execute(`
     CREATE TABLE IF NOT EXISTS web_login_codes (
       code TEXT PRIMARY KEY,

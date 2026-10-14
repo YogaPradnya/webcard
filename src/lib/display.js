@@ -1,4 +1,5 @@
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 export const DISPLAY_BORDERS = ['gold', 'rainbow', 'neon', 'sakura', 'shadow', 'classic', 'custom'];
 
@@ -12,6 +13,7 @@ export const DISPLAY_BORDER_COLORS = {
 };
 
 export async function ensureDisplayTable() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   const db = getDb();
   await db.execute(`
     CREATE TABLE IF NOT EXISTS user_display_cards (

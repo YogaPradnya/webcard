@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
 // Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Midtrans.
@@ -147,6 +148,7 @@ function calcLevel(xp) {
 }
 
 export async function ensureShopTables() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   const db = getDb();
   await db.execute(`
     CREATE TABLE IF NOT EXISTS shop_orders (

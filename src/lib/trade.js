@@ -1,4 +1,5 @@
-import { getDb } from './db';
+import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 import { ensureQuantityColumn } from './cards.js';
 
 export const MAX_CARD_COPIES = 999;
@@ -52,6 +53,7 @@ export function normalizeTradeCode(value) {
 }
 
 export async function ensureTradeTable() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   await ensureQuantityColumn();
   await getDb().execute(`
     CREATE TABLE IF NOT EXISTS trade_offers (

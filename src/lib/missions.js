@@ -1,4 +1,5 @@
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 // Misi harian (reset 00:00 WIB) & mingguan (reset Senin 00:00 WIB).
 // Progres dicatat otomatis dari event game; klaim manual via tombol (XP masuk user_stats).
@@ -47,6 +48,7 @@ function calcLevel(xp) {
 }
 
 export async function ensureMissionTables() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   const db = getDb();
   await db.execute(`
     CREATE TABLE IF NOT EXISTS mission_progress (
@@ -80,24 +82,25 @@ export async function recordEvent(userId, username, event, n = 1) {
       { key: `d:${jakartaDateKey()}`, list: DAILY_MISSIONS },
       { key: `w:${jakartaWeekKey()}`, list: WEEKLY_MISSIONS },
     ];
+    // Paralel satu gelombang (dulu insert berurutan ke Tokyo).
+    const jobs = [];
     for (const { key, list } of periods) {
-      const targets = list.filter((m) => m.event === event);
-      if (targets.length === 0) continue;
-      for (const m of targets) {
-        await db.execute({
+      for (const m of list.filter((x) => x.event === event)) {
+        jobs.push(db.execute({
           sql: `INSERT INTO mission_progress (user_id, period, mission_id, count) VALUES (?, ?, ?, ?)
                 ON CONFLICT(user_id, period, mission_id) DO UPDATE SET count = MIN(?, count + ?)`,
           args: [String(userId), key, m.id, Math.min(amount, m.target), m.target, amount],
-        });
+        }));
       }
     }
     if (username) {
-      await db.execute({
+      jobs.push(db.execute({
         sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, 0, 1)
               ON CONFLICT(user_id) DO UPDATE SET username = excluded.username`,
         args: [String(userId), String(username)],
-      }).catch(() => {});
+      }).catch(() => {}));
     }
+    await Promise.all(jobs);
   } catch { /* misi non-kritis: jangan gagalkan game */ }
 }
 
@@ -106,18 +109,30 @@ export async function getMissionStatus(userId) {
   const db = getDb();
   const dayKey = `d:${jakartaDateKey()}`;
   const weekKey = `w:${jakartaWeekKey()}`;
-  async function fill(list, period) {
-    const progRes = await db.execute({
-      sql: 'SELECT mission_id, count FROM mission_progress WHERE user_id = ? AND period = ?',
-      args: [String(userId), period],
-    });
-    const prog = {};
-    for (const r of progRes.rows || []) prog[String(r.mission_id)] = Number(r.count) || 0;
-    const claimRes = await db.execute({
-      sql: 'SELECT mission_id FROM mission_claims WHERE user_id = ? AND period = ?',
-      args: [String(userId), period],
-    });
-    const claimed = new Set((claimRes.rows || []).map((r) => String(r.mission_id)));
+  // 2 gelombang paralel (dulu 4 query berurutan ke Tokyo).
+  const [progRes, claimRes] = await Promise.all([
+    db.execute({
+      sql: 'SELECT mission_id, period, count FROM mission_progress WHERE user_id = ? AND period IN (?, ?)',
+      args: [String(userId), dayKey, weekKey],
+    }),
+    db.execute({
+      sql: 'SELECT mission_id, period FROM mission_claims WHERE user_id = ? AND period IN (?, ?)',
+      args: [String(userId), dayKey, weekKey],
+    }),
+  ]);
+  const progByPeriod = { [dayKey]: {}, [weekKey]: {} };
+  for (const r of progRes.rows || []) {
+    const p = String(r.period);
+    if (progByPeriod[p]) progByPeriod[p][String(r.mission_id)] = Number(r.count) || 0;
+  }
+  const claimedByPeriod = { [dayKey]: new Set(), [weekKey]: new Set() };
+  for (const r of claimRes.rows || []) {
+    const p = String(r.period);
+    if (claimedByPeriod[p]) claimedByPeriod[p].add(String(r.mission_id));
+  }
+  function fill(list, period) {
+    const prog = progByPeriod[period] || {};
+    const claimed = claimedByPeriod[period] || new Set();
     return list.map((m) => {
       const count = Math.min(m.target, prog[m.id] || 0);
       const done = count >= m.target;
@@ -127,8 +142,8 @@ export async function getMissionStatus(userId) {
   return {
     dayKey,
     weekKey,
-    daily: await fill(DAILY_MISSIONS, dayKey),
-    weekly: await fill(WEEKLY_MISSIONS, weekKey),
+    daily: fill(DAILY_MISSIONS, dayKey),
+    weekly: fill(WEEKLY_MISSIONS, weekKey),
   };
 }
 

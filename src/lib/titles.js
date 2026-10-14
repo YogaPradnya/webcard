@@ -78,10 +78,12 @@ export function computeTitles(pool, ownedMap) {
 }
 
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 // Gelar web HANYA untuk web (kolom user_stats.web_title).
 // Bot (.profil) tetap memakai custom_title (gelar costume) dan tidak tersentuh.
 export async function ensureWebTitleColumn() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   try {
     await getDb().execute('ALTER TABLE user_stats ADD COLUMN web_title TEXT DEFAULT NULL');
   } catch { /* sudah ada */ }

@@ -5,6 +5,7 @@ const require = createRequire(import.meta.url);
 const staticArt = require('../data/cardArt.json');
 const cloudArt = require('../data/cardArtCloud.json');
 import { getDb, readSetting } from './db.js';
+import { isSchemaReady } from './schema.js';
 import { genCardStats, genSecondSkill } from './battleStats.js';
 
 export const RARITY_ORDER = { Common: 0, Rare: 1, Epic: 2, Legendary: 3, Mythic: 4 };
@@ -151,6 +152,7 @@ function mapBattleStatRow(r) {
 let _qtyPromise = null;
 let _qtyDone = false;
 export async function ensureQuantityColumn() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   if (_qtyDone) return;
   if (_qtyPromise) { await _qtyPromise; return; }
   _qtyPromise = (async () => {

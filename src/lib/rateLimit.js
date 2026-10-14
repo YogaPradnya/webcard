@@ -1,16 +1,19 @@
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 
 // Rate-limit persisten via Turso (aman untuk restart & multi-instance).
 // Return { ok } — ok=false bila masih dalam jeda.
 export async function checkRate(key, windowMs) {
   const now = Date.now();
   try {
+    if (!isSchemaReady()) {
     await getDb().execute(`
       CREATE TABLE IF NOT EXISTS web_rate_limits (
         key TEXT PRIMARY KEY,
         ts INTEGER NOT NULL
       )
     `);
+    }
     const res = await getDb().execute({ sql: 'SELECT ts FROM web_rate_limits WHERE key = ?', args: [String(key)] });
     if (res.rows.length > 0 && now - (Number(res.rows[0].ts) || 0) < windowMs) {
       return { ok: false };
@@ -33,6 +36,7 @@ export async function checkRateCount(key, maxHits, windowMs) {
   const now = Date.now();
   const windowStart = now - windowMs;
   try {
+    if (!isSchemaReady()) {
     await getDb().execute(`
       CREATE TABLE IF NOT EXISTS web_rate_counts (
         key TEXT NOT NULL,
@@ -40,6 +44,7 @@ export async function checkRateCount(key, maxHits, windowMs) {
       )
     `);
     await getDb().execute({ sql: 'CREATE INDEX IF NOT EXISTS idx_rate_counts ON web_rate_counts (key, ts)' });
+    }
     await getDb().execute({ sql: 'DELETE FROM web_rate_counts WHERE ts < ?', args: [windowStart - windowMs] });
     const res = await getDb().execute({
       sql: 'SELECT COUNT(*) AS c FROM web_rate_counts WHERE key = ? AND ts >= ?',

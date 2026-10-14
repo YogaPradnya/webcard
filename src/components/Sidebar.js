@@ -15,23 +15,31 @@ export default function Sidebar({ username }) {
 
   useEffect(() => {
     let alive = true;
+    // Timeout agar koneksi gantung tidak menumpuk (tiap navigasi = 2 fetch).
+    async function fetchJson(path, ms = 10000) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms);
+      try {
+        const res = await fetch(path, { signal: ctrl.signal });
+        return await res.json().catch(() => ({}));
+      } finally {
+        clearTimeout(t);
+      }
+    }
     (async () => {
       try {
-        const res = await fetch('/api/shop/packages');
-        const data = await res.json().catch(() => ({}));
+        const data = await fetchJson('/api/shop/packages');
         if (alive && data.success) setShopOn(Boolean(data.enabled));
       } catch { /* abaikan: shop tetap sembunyi */ }
       try {
-        const res = await fetch('/api/battle/mine');
-        const data = await res.json().catch(() => ({}));
+        const data = await fetchJson('/api/battle/mine');
         if (alive && data.success) setActiveBattle((data.rooms || []).length);
       } catch { /* abaikan */ }
     })();
     const t = setInterval(async () => {
       if (document.hidden) return;
       try {
-        const res = await fetch('/api/battle/mine');
-        const data = await res.json().catch(() => ({}));
+        const data = await fetchJson('/api/battle/mine');
         if (alive && data.success) setActiveBattle((data.rooms || []).length);
       } catch { /* abaikan */ }
     }, 30000);

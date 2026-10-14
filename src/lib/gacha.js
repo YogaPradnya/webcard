@@ -1,4 +1,5 @@
 import { getDb, readSetting } from './db.js';
+import { isSchemaReady } from './schema.js';
 import { WAIFU_POOL, VALID_TIERS } from '../data/waifuPool.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -255,6 +256,7 @@ function jakartaDateKey(d = new Date()) {
 
 async function getPityState(db, userId) {
   try {
+    if (!isSchemaReady()) {
     await db.execute(`
       CREATE TABLE IF NOT EXISTS user_card_pity (
         user_id TEXT PRIMARY KEY,
@@ -266,6 +268,7 @@ async function getPityState(db, userId) {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    }
     const res = await db.execute({
       sql: 'SELECT pity_count, total_pulls, pulls_today, today_key FROM user_card_pity WHERE user_id = ?',
       args: [String(userId)],
@@ -284,6 +287,7 @@ async function getPityState(db, userId) {
 }
 
 export async function ensureGachaHistory() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   await getDb().execute(`
     CREATE TABLE IF NOT EXISTS web_gacha_history (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

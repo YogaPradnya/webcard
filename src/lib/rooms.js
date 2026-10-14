@@ -1,4 +1,5 @@
 import { getDb } from './db.js';
+import { isSchemaReady } from './schema.js';
 import { createBattle, act as engineAct, aiChoose } from './engine.js';
 
 export const TURN_TIMEOUT_MS = 60 * 1000;
@@ -17,14 +18,20 @@ async function readBattleRewards() {
   try {
     const db = getDb();
     const pairs = { web_battle_xp_win: 'winXp', web_battle_xp_lose: 'loseXp', web_battle_daily_cap: 'dailyCap' };
-    for (const [key, field] of Object.entries(pairs)) {
-      try {
-        const r = await db.execute({ sql: 'SELECT value FROM settings WHERE key = ?', args: [key] });
-        if (r.rows.length > 0 && r.rows[0].value != null && r.rows[0].value !== '') {
-          const n = parseInt(r.rows[0].value, 10);
-          if (Number.isFinite(n)) out[field] = n;
-        }
-      } catch (_) { /* default */ }
+    // Paralel: 3 round-trip Tokyo -> 1 gelombang.
+    const rows = await Promise.all(
+      Object.keys(pairs).map((key) =>
+        db.execute({ sql: 'SELECT value FROM settings WHERE key = ?', args: [key] })
+          .then((r) => ({ key, row: r.rows[0] }))
+          .catch(() => ({ key, row: null })),
+      ),
+    );
+    for (const { key, row } of rows) {
+      const v = row?.value;
+      if (v != null && v !== '') {
+        const n = parseInt(v, 10);
+        if (Number.isFinite(n)) out[pairs[key]] = n;
+      }
     }
   } catch (_) { /* default */ }
   out.winXp = Math.min(10000, Math.max(0, out.winXp));
@@ -50,6 +57,7 @@ let _roomsReadyAt = 0;
 let _roomsPromise = null;
 const ROOMS_DDL_TTL_MS = 10 * 60 * 1000;
 export async function ensureBattleRooms() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
   const now = Date.now();
   if (now - _roomsReadyAt < ROOMS_DDL_TTL_MS) return;
   if (_roomsPromise) { await _roomsPromise; return; }

@@ -38,7 +38,25 @@ Buka http://localhost:3000 → otomatis ke `/book` → diminta kode `.pair`.
 > Bot juga butuh `CARDS_WEB_URL` di `.env` bot (URL publik web ini) agar
 > balasan `.pair` menyertakan link web. Contoh lokal: `http://localhost:3000`.
 
-## Deploy Vercel
+## Deploy VPS (produksi saat ini: kartu.yogaa.web.id)
+
+> Bagian Vercel di bawah sudah tidak akurat — yang live adalah VPS
+> self-hosted (`next start`). Jangan hapus bagian Vercel (arsip).
+
+```bash
+git pull
+npm install        # atau npm ci
+npm run migrate    # wajib: terapkan db/migrations/*.sql (idempoten)
+npm run build
+pm2 restart kartu  # sesuaikan nama proses / systemctl
+```
+
+Server juga auto-migrasi saat boot (`src/instrumentation.js`) sebagai jaring
+pengaman bila langkah `migrate` terlewat. Aturan skema:
+`db/SCHEMA_OWNERSHIP.md` — skema berubah hanya lewat file migrasi baru,
+request path dilarang DDL.
+
+## Deploy Vercel (arsip, tidak dipakai produksi)
 
 1. Push folder ini (repo sudah termasuk `web-cards/`).
 2. Di Vercel: Add New Project → pilih repo → **Root Directory = `web-cards`**.
