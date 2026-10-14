@@ -24,8 +24,6 @@ const DISPLAY_BORDER_FALLBACK = {
   classic: '#9ca3af',
 };
 
-const DISPLAY_RAINBOW_GRADIENT = 'linear-gradient(135deg,#ef4444,#eab308,#22c55e,#3b82f6,#a855f7)';
-
 function displayBorderColor(c) {
   if (!c) return '#9ca3af';
   if (c.borderType === 'custom' && c.borderColor) return c.borderColor;
@@ -33,15 +31,7 @@ function displayBorderColor(c) {
 }
 
 function displayShowcaseStyle(c) {
-  if (c && c.borderType === 'rainbow') {
-    return {
-      border: '2px solid transparent',
-      background: `linear-gradient(var(--surface), var(--surface)) padding-box, ${DISPLAY_RAINBOW_GRADIENT} border-box`,
-      boxShadow: '0 2px 14px #a855f755',
-    };
-  }
-  const color = displayBorderColor(c);
-  return { borderColor: color, boxShadow: `0 2px 14px ${color}55` };
+  return { borderColor: displayBorderColor(c) };
 }
 
 export default function ProfilePage() {

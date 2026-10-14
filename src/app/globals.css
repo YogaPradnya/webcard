@@ -15,11 +15,7 @@
   --primary: #08d9d6;
   --primary-active: #00c6c3;
   --on-primary: #062a2a;
-  --accent-grad: linear-gradient(135deg, #5ef2ef, #08d9d6 55%, #05a8a5);
-  --accent-red-grad: linear-gradient(135deg, #ff7a9c, #ff2e63 55%, #c81e4e);
-  --accent-mix-grad: linear-gradient(135deg, #08d9d6, #ff2e63);
-  --manga-shadow: 4px 4px 0 rgba(8, 217, 214, 0.9);
-  --manga-shadow-red: 4px 4px 0 rgba(255, 46, 99, 0.9);
+  --accent-grad: #08d9d6;
   --link: #08d9d6;
   --success: #34d399;
   --error: #ff2e63;
@@ -27,18 +23,13 @@
   --r-lg: 12px;
   --r-xl: 16px;
   --r-pill: 999px;
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
-/* Rarity: warna + glow seragam di seluruh web */
+  --shadow: none;
+/* Rarity: warna solid di seluruh web */
   --rar-common: #9ca3af;
   --rar-rare: #60a5fa;
   --rar-epic: #c084fc;
   --rar-legendary: #eab308;
   --rar-mythic: #ff2e63;
-  --rar-common-glow: rgba(156, 163, 175, 0.35);
-  --rar-rare-glow: rgba(96, 165, 250, 0.45);
-  --rar-epic-glow: rgba(192, 132, 252, 0.5);
-  --rar-legendary-glow: rgba(234, 179, 8, 0.55);
-  --rar-mythic-glow: rgba(255, 46, 99, 0.6);
 }
 
 /* ===== White mode: canvas #EAEAEA, ink #252A34, aksen tetap teal + red ===== */
@@ -57,11 +48,7 @@
   --primary: #08d9d6;
   --primary-active: #05a8a5;
   --on-primary: #062a2a;
-  --accent-grad: linear-gradient(135deg, #5ef2ef, #08d9d6 55%, #05a8a5);
-  --accent-red-grad: linear-gradient(135deg, #ff7a9c, #ff2e63 55%, #c81e4e);
-  --accent-mix-grad: linear-gradient(135deg, #08d9d6, #ff2e63);
-  --manga-shadow: 4px 4px 0 #252a34;
-  --manga-shadow-red: 4px 4px 0 #ff2e63;
+  --accent-grad: #08d9d6;
   --link: #078e8c;
   --success: #0e9f6e;
   --error: #ff2e63;
@@ -69,17 +56,12 @@
   --r-lg: 12px;
   --r-xl: 16px;
   --r-pill: 999px;
-  --shadow: 0 8px 24px rgba(37, 42, 52, 0.12);
+  --shadow: none;
   --rar-common: #6b7280;
   --rar-rare: #2563eb;
   --rar-epic: #9333ea;
   --rar-legendary: #b8860b;
   --rar-mythic: #ff2e63;
-  --rar-common-glow: rgba(107, 114, 128, 0.3);
-  --rar-rare-glow: rgba(37, 99, 235, 0.3);
-  --rar-epic-glow: rgba(147, 51, 234, 0.32);
-  --rar-legendary-glow: rgba(184, 134, 11, 0.35);
-  --rar-mythic-glow: rgba(255, 46, 99, 0.4);
 }
 
 * {
@@ -90,11 +72,7 @@
 
 body {
   background-color: var(--canvas);
-  background-image:
-    radial-gradient(900px 480px at 85% -5%, rgba(8, 217, 214, 0.14), transparent 60%),
-    radial-gradient(760px 520px at -10% 20%, rgba(255, 46, 99, 0.12), transparent 60%),
-    radial-gradient(rgba(8, 217, 214, 0.1) 1px, transparent 1.4px);
-  background-size: auto, auto, 22px 22px;
+  background-image: none;
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body);
@@ -144,15 +122,11 @@ body {
   font-size: 24px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  background: linear-gradient(180deg, #d9fffe, #08d9d6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(2px 2px 0 rgba(255, 46, 99, 0.55));
+  color: #08d9d6;
 }
 
 .card {
-  background: linear-gradient(180deg, var(--surface), var(--surface-soft));
+  background: var(--surface);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--r-xl);
   box-shadow: var(--shadow);
@@ -171,7 +145,7 @@ body {
   font-size: 14px;
   cursor: pointer;
   font-family: inherit;
-  box-shadow: 0 4px 16px rgba(8, 217, 214, 0.35);
+  box-shadow: none;
   transition: transform 0.12s, box-shadow 0.2s, filter 0.2s;
 }
 
@@ -211,7 +185,7 @@ body {
 
 .input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--primary), 0 0 12px rgba(8, 217, 214, 0.35);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .label {
@@ -270,8 +244,8 @@ body {
 .chip.active {
   background: var(--accent-grad);
   color: var(--on-primary);
-  border-color: transparent;
-  box-shadow: 0 2px 10px rgba(8, 217, 214, 0.35);
+  border-color: #08d9d6;
+  box-shadow: none;
 }
 
 .tier-title {
@@ -317,11 +291,11 @@ body {
 }
 
 /* Utilitas rarity: pakai sebagai class tambahan (rar-Common dst.) */
-.rar-Common { border-color: var(--rar-common) !important; box-shadow: 0 0 14px var(--rar-common-glow); }
-.rar-Rare { border-color: var(--rar-rare) !important; box-shadow: 0 0 14px var(--rar-rare-glow); }
-.rar-Epic { border-color: var(--rar-epic) !important; box-shadow: 0 0 16px var(--rar-epic-glow); }
-.rar-Legendary { border-color: var(--rar-legendary) !important; box-shadow: 0 0 18px var(--rar-legendary-glow); }
-.rar-Mythic { border-color: var(--rar-mythic) !important; box-shadow: 0 0 22px var(--rar-mythic-glow); }
+.rar-Common { border-color: var(--rar-common) !important; box-shadow: none; }
+.rar-Rare { border-color: var(--rar-rare) !important; box-shadow: none; }
+.rar-Epic { border-color: var(--rar-epic) !important; box-shadow: none; }
+.rar-Legendary { border-color: var(--rar-legendary) !important; box-shadow: none; }
+.rar-Mythic { border-color: var(--rar-mythic) !important; box-shadow: none; }
 
 /* Flip kartu milik sendiri: ketuk untuk lihat stat di baliknya */
 .flip-inner {
@@ -372,7 +346,7 @@ body {
   border-radius: var(--r-pill);
   color: var(--on-primary);
   background: var(--accent-grad);
-  border: 1px solid transparent;
+  border: 1px solid var(--hairline-strong);
 }
 
 /* ===== Role colors: Damage=merah ATK, Tank=coklat Shield, Support=hijau Heal, Assist=biru ===== */
@@ -380,22 +354,18 @@ body {
 [data-theme='dark'],
 [data-theme='light'] {
   --role-dmg: #ff2e63;
-  --role-dmg-soft: rgba(255, 46, 99, 0.16);
   --role-tank: #9a6a3b;
   --role-tank-deep: #7c5227;
-  --role-tank-soft: rgba(154, 106, 59, 0.2);
   --role-heal: #16a34a;
   --role-heal-deep: #15803d;
-  --role-heal-soft: rgba(22, 163, 74, 0.18);
   --role-assist: #2563eb;
-  --role-assist-soft: rgba(37, 99, 235, 0.16);
   --fx-burn: #f97316;
   --fx-stun: #8b5cf6;
 }
 
 .pick-role,
 .flip-role {
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--hairline-strong);
 }
 
 .role-Damage {
@@ -409,7 +379,7 @@ body {
 }
 
 .role-Support {
-  background: var(--role-heal) !important;
+  background: var(--role-heal-deep) !important;
   color: #fff !important;
 }
 
@@ -420,7 +390,7 @@ body {
 
 /* ===== Status badge bernada: shield coklat, heal hijau, burn oranye, stun ungu ===== */
 .status-badge {
-  border: 1px solid rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--hairline-strong);
 }
 
 .st-shield {
@@ -429,12 +399,12 @@ body {
 }
 
 .st-heal {
-  background: var(--role-heal) !important;
+  background: var(--role-heal-deep) !important;
   color: #fff !important;
 }
 
 .st-burn {
-  background: var(--fx-burn) !important;
+  background: #c2410c !important;
   color: #fff !important;
 }
 
@@ -471,7 +441,7 @@ body {
   display: block;
   height: 5px;
   background: var(--tier, var(--muted-soft));
-  box-shadow: 0 0 10px var(--tier, transparent);
+  box-shadow: none;
 }
 
 /* Belum punya: abu-abu */
@@ -524,7 +494,8 @@ body {
 }
 
 .stat-tag.showcase {
-  background: var(--link);
+  background: #08d9d6;
+  color: #062a2a;
 }
 
 .progress-wrap {
@@ -574,20 +545,12 @@ body {
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0.5px;
-  background: linear-gradient(180deg, #d9fffe, #08d9d6);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(1.5px 1.5px 0 rgba(255, 46, 99, 0.5));
+  color: #08d9d6;
 }
 
 [data-theme='light'] .brand h1,
 [data-theme='light'] .sidebar-brand {
-  background: linear-gradient(180deg, #252a34, #252a34);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(2px 2px 0 rgba(8, 217, 214, 0.8));
+  color: #078e8c;
 }
 
 .sidebar-user {
@@ -620,7 +583,7 @@ body {
 .nav-item.active {
   background: var(--accent-grad);
   color: var(--on-primary);
-  box-shadow: 0 4px 14px rgba(8, 217, 214, 0.35);
+  box-shadow: none;
 }
 
 .sidebar-logout {
@@ -776,7 +739,7 @@ body {
 
 .fighter.pending-source {
   border-color: var(--link);
-  box-shadow: 0 0 0 2px var(--link), 0 0 14px var(--link);
+  box-shadow: 0 0 0 2px var(--link);
 }
 
 .action-hint {
@@ -802,7 +765,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 0 6px rgba(255, 46, 99, 0.45);
+    box-shadow: 0 0 0 5px #ff2e63;
   }
 }
 
@@ -813,7 +776,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.4);
+    box-shadow: 0 0 0 5px var(--success);
   }
 }
 
@@ -824,7 +787,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 18px var(--link);
+    box-shadow: 0 0 0 3px var(--role-tank);
   }
 }
 
@@ -894,7 +857,7 @@ body {
   font-size: 10px;
   font-weight: 800;
   color: var(--muted);
-  background: rgba(255, 255, 255, 0.85);
+  background: #ffffff;
   border-radius: 9999px;
   padding: 1px 8px;
   animation: floatUp 1s forwards;
@@ -910,7 +873,7 @@ body {
   font-size: 10px;
   font-weight: 800;
   color: #fff;
-  background: rgba(0, 0, 0, 0.75);
+  background: #252a34;
   border-radius: 9999px;
   padding: 2px 8px;
   pointer-events: none;
@@ -921,9 +884,9 @@ body {
 .shield-ring {
   position: absolute;
   inset: 3px;
-  border: 3px solid rgba(154, 106, 59, 0.95);
+  border: 3px solid #9a6a3b;
   border-radius: 10px;
-  box-shadow: 0 0 12px rgba(154, 106, 59, 0.7), inset 0 0 12px rgba(154, 106, 59, 0.35);
+  box-shadow: none;
   pointer-events: none;
   animation: shieldPulse 1.6s ease-in-out infinite;
 }
@@ -953,7 +916,7 @@ body {
   height: 6px;
   border-radius: 9999px;
   background: #f97316;
-  box-shadow: 0 0 6px #f97316;
+  box-shadow: none;
   animation: emberRise 0.9s ease-in infinite;
 }
 
@@ -961,14 +924,14 @@ body {
   right: 8px;
   animation-delay: 0.3s;
   background: #ff2e63;
-  box-shadow: 0 0 6px #ff2e63;
+  box-shadow: none;
 }
 
 .fx-ember i:nth-child(3) {
   right: 4px;
   animation-delay: 0.6s;
   background: #5ef2ef;
-  box-shadow: 0 0 6px #5ef2ef;
+  box-shadow: none;
 }
 
 @keyframes emberRise {
@@ -1017,7 +980,6 @@ body {
   font-size: 14px;
   font-weight: 800;
   color: var(--success);
-  text-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
   pointer-events: none;
   z-index: 3;
   animation: regenFloat 1.4s ease-in-out infinite;
@@ -1048,7 +1010,7 @@ body {
   border-radius: 8px;
   padding: 2px 12px;
   transform: translate(-50%, -50%) rotate(-14deg);
-  background: rgba(255, 255, 255, 0.75);
+  background: #ffffff;
   pointer-events: none;
   z-index: 4;
   animation: koDrop 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
@@ -1077,7 +1039,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 8px #ff2e63;
+    box-shadow: 0 0 0 3px #ff2e63;
   }
 }
 
@@ -1087,7 +1049,7 @@ body {
   font-size: 11px;
   font-weight: 800;
   color: #fff;
-  background: linear-gradient(135deg, #08d9d6, #ff2e63);
+  background: #ff2e63;
   border: 2px solid #252a34;
   border-radius: 9999px;
   padding: 4px 12px;
@@ -1114,7 +1076,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.72);
+  background: #252a34;
   animation: vsFade 1.6s forwards;
   pointer-events: none;
 }
@@ -1133,7 +1095,7 @@ body {
   margin-top: 6px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--muted-soft);
+  color: #b9bfcc;
 }
 
 .vs-fight {
@@ -1141,7 +1103,7 @@ body {
   font-size: clamp(30px, 7vw, 60px);
   font-weight: 900;
   color: #ff2e63;
-  text-shadow: 3px 3px 0 #08d9d6, 0 0 24px rgba(255, 46, 99, 0.55);
+  text-shadow: 3px 3px 0 #08d9d6;
   animation: vsZoom 0.4s 0.35s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
 }
 
@@ -1252,7 +1214,6 @@ body {
   font-size: 20px;
   font-weight: 800;
   color: #ff2e63;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   animation: floatUp 1s forwards;
   pointer-events: none;
   z-index: 3;
@@ -1287,7 +1248,7 @@ body {
   }
 
   50% {
-    box-shadow: 0 0 18px var(--success);
+    box-shadow: 0 0 0 3px var(--success);
   }
 }
 
@@ -1424,7 +1385,7 @@ body {
 
 .card-item.picked {
   border: 3px solid var(--link);
-  box-shadow: 0 2px 14px rgba(13, 116, 206, 0.35);
+  box-shadow: 0 0 0 2px var(--link);
 }
 
 .flip-btn {
@@ -1474,7 +1435,7 @@ body {
 
 /* ===== Profil ala APK ===== */
 .profile-hero {
-  background: linear-gradient(180deg, var(--surface) 0%, var(--hairline-soft) 100%);
+  background: var(--surface);
 }
 
 .profile-top {
@@ -1621,13 +1582,13 @@ body {
 
 .title-tile.earned {
   border-color: #08d9d6;
-  background: rgba(8, 217, 214, 0.12);
-  box-shadow: 3px 3px 0 rgba(8, 217, 214, 0.7);
+  background: var(--surface-soft);
+  box-shadow: none;
 }
 
 .title-tile.active {
   border-color: var(--link);
-  background: rgba(124, 196, 255, 0.12);
+  background: var(--surface-soft);
 }
 
 .title-tile.locked {
@@ -1669,7 +1630,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--canvas);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1727,8 +1688,7 @@ body {
   justify-content: center;
   font-size: 48px;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.9);
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  color: #ffffff;
 }
 
 .gacha-back.dim {
@@ -1759,11 +1719,11 @@ body {
 }
 
 .gacha-new {
-  background: var(--success);
+  background: var(--role-heal-deep);
 }
 
 .gacha-dupe {
-  background: var(--link);
+  background: var(--role-assist);
 }
 
 .gacha-noart {
@@ -1846,16 +1806,10 @@ body {
 }
 
 /* ===== White mode: kontras di atas #EAEAEA / putih ===== */
-[data-theme='light'] body {
-  background-image:
-    radial-gradient(900px 480px at 85% -5%, rgba(8, 217, 214, 0.22), transparent 60%),
-    radial-gradient(760px 520px at -10% 20%, rgba(255, 46, 99, 0.14), transparent 60%),
-    radial-gradient(rgba(37, 42, 52, 0.12) 1px, transparent 1.4px);
-}
+
 
 [data-theme='light'] .card {
   background: var(--surface);
-  box-shadow: 0 10px 28px rgba(37, 42, 52, 0.1);
 }
 
 [data-theme='light'] .card-item.locked .card-art {
@@ -1874,7 +1828,11 @@ body {
 }
 
 [data-theme='light'] .ko-stamp {
-  background: rgba(255, 255, 255, 0.92);
+  background: #ffffff;
+}
+
+[data-theme='light'] .dmg-float.crit {
+  color: #078e8c;
 }
 
 [data-theme='light'] .menu-tile {
@@ -1894,5 +1852,5 @@ body {
 }
 
 [data-theme='light'] .profile-hero {
-  background: linear-gradient(180deg, #ffffff 0%, #eaeaea 100%);
+  background: #ffffff;
 }

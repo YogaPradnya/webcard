@@ -4,7 +4,7 @@ export const DISPLAY_BORDERS = ['gold', 'rainbow', 'neon', 'sakura', 'shadow', '
 
 export const DISPLAY_BORDER_COLORS = {
   gold: '#eab308',
-  rainbow: 'linear-gradient(135deg,#ef4444,#eab308,#22c55e,#3b82f6,#a855f7)',
+  rainbow: '#a855f7',
   neon: '#22d3ee',
   sakura: '#f9a8d4',
   shadow: '#111827',
