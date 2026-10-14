@@ -82,6 +82,15 @@ const SORTS = [
   ['level', 'Level tertinggi'],
 ];
 
+function effectTone(effect) {
+  const e = String(effect || 'none');
+  if (['heal', 'regen', 'energize'].includes(e)) return 'fx-heal';
+  if (['shield', 'bulwark'].includes(e)) return 'fx-shield';
+  if (['surge', 'focus'].includes(e)) return 'fx-assist';
+  if (e === 'none') return '';
+  return 'fx-dmg';
+}
+
 export default function BookPage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -687,7 +696,7 @@ export default function BookPage() {
               </div>
               {c.owned && c.stats ? (
                 <div className="flip-back" style={{ borderTop: `3px solid ${TIER_COLORS[c.tier]}` }}>
-                  <span className="flip-role">{c.stats.role}</span>
+                  <span className={`flip-role role-${c.stats.role}`}>{c.stats.role}</span>
                   <div className="flip-stat">
                     HP <b>{c.stats.hp}</b>
                   </div>
@@ -699,7 +708,7 @@ export default function BookPage() {
                     Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
                   </div>
                   <div className="flip-stat">
-                    Efek <b>{EFFECT_LABELS[c.stats.effect] || c.stats.effect}</b>
+                    Efek <b className={effectTone(c.stats.effect)}>{EFFECT_LABELS[c.stats.effect] || c.stats.effect}</b>
                   </div>
                   {c.stats.skill2Name ? (
                     <>
@@ -708,7 +717,7 @@ export default function BookPage() {
                         Skill2 <b>{c.stats.skill2}</b> / Cons <b>{c.stats.cons2}</b>
                       </div>
                       <div className="flip-stat">
-                        Efek <b>{EFFECT_LABELS[c.stats.effect2] || c.stats.effect2}</b>
+                        Efek <b className={effectTone(c.stats.effect2)}>{EFFECT_LABELS[c.stats.effect2] || c.stats.effect2}</b>
                       </div>
                     </>
                   ) : null}

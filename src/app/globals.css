@@ -372,7 +372,91 @@ body {
   border-radius: var(--r-pill);
   color: var(--on-primary);
   background: var(--accent-grad);
+  border: 1px solid transparent;
 }
+
+/* ===== Role colors: Damage=merah ATK, Tank=coklat Shield, Support=hijau Heal, Assist=biru ===== */
+:root,
+[data-theme='dark'],
+[data-theme='light'] {
+  --role-dmg: #ff2e63;
+  --role-dmg-soft: rgba(255, 46, 99, 0.16);
+  --role-tank: #9a6a3b;
+  --role-tank-deep: #7c5227;
+  --role-tank-soft: rgba(154, 106, 59, 0.2);
+  --role-heal: #16a34a;
+  --role-heal-deep: #15803d;
+  --role-heal-soft: rgba(22, 163, 74, 0.18);
+  --role-assist: #2563eb;
+  --role-assist-soft: rgba(37, 99, 235, 0.16);
+  --fx-burn: #f97316;
+  --fx-stun: #8b5cf6;
+}
+
+.pick-role,
+.flip-role {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.role-Damage {
+  background: var(--role-dmg) !important;
+  color: #fff !important;
+}
+
+.role-Tank {
+  background: var(--role-tank) !important;
+  color: #fff !important;
+}
+
+.role-Support {
+  background: var(--role-heal) !important;
+  color: #fff !important;
+}
+
+.role-Assist {
+  background: var(--role-assist) !important;
+  color: #fff !important;
+}
+
+/* ===== Status badge bernada: shield coklat, heal hijau, burn oranye, stun ungu ===== */
+.status-badge {
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.st-shield {
+  background: var(--role-tank) !important;
+  color: #fff !important;
+}
+
+.st-heal {
+  background: var(--role-heal) !important;
+  color: #fff !important;
+}
+
+.st-burn {
+  background: var(--fx-burn) !important;
+  color: #fff !important;
+}
+
+.st-stun {
+  background: var(--fx-stun) !important;
+  color: #fff !important;
+}
+
+.st-focus {
+  background: var(--accent-grad) !important;
+  color: var(--on-primary) !important;
+}
+
+/* ===== Efek skill bernada di detail kartu ===== */
+.fx-heal { color: var(--role-heal-deep); font-weight: 800; }
+.fx-shield { color: var(--role-tank-deep); font-weight: 800; }
+.fx-dmg { color: var(--role-dmg); font-weight: 800; }
+.fx-assist { color: var(--role-assist); font-weight: 800; }
+[data-theme='dark'] .fx-heal { color: #4ade80; }
+[data-theme='dark'] .fx-shield { color: #d9a86c; }
+[data-theme='dark'] .fx-dmg { color: #ff7a9c; }
+[data-theme='dark'] .fx-assist { color: #93c5fd; }
 
 .card-art {
   aspect-ratio: 3 / 4;
@@ -837,9 +921,9 @@ body {
 .shield-ring {
   position: absolute;
   inset: 3px;
-  border: 3px solid rgba(56, 189, 248, 0.9);
+  border: 3px solid rgba(154, 106, 59, 0.95);
   border-radius: 10px;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7), inset 0 0 12px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 12px rgba(154, 106, 59, 0.7), inset 0 0 12px rgba(154, 106, 59, 0.35);
   pointer-events: none;
   animation: shieldPulse 1.6s ease-in-out infinite;
 }

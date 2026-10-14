@@ -9,7 +9,7 @@ import { optImg } from '@/lib/images';
 
 function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
-  const color = pct > 50 ? 'var(--success)' : pct > 20 ? '#eab308' : '#ef4444';
+  const color = pct > 50 ? 'var(--role-heal)' : pct > 20 ? '#eab308' : 'var(--role-dmg)';
   return (
     <div style={{ background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
       <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.5s' }} />
@@ -82,12 +82,12 @@ function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTone, ref
         </div>
         <HpBar hp={f.hp} maxHp={f.maxHp} />
         <div className="status-row">
-          {f.shield > 0 ? <span className="status-badge">SHD {f.shield}</span> : null}
-          {f.burn ? <span className="status-badge">BURN</span> : null}
-          {f.regen ? <span className="status-badge">REGEN</span> : null}
-          {f.stun ? <span className="status-badge">STUN</span> : null}
+          {f.shield > 0 ? <span className="status-badge st-shield">SHD {f.shield}</span> : null}
+          {f.burn ? <span className="status-badge st-burn">BURN</span> : null}
+          {f.regen ? <span className="status-badge st-heal">REGEN</span> : null}
+          {f.stun ? <span className="status-badge st-stun">STUN</span> : null}
           {f.weaken > 0 ? <span className="status-badge">WEAK</span> : null}
-          {f.focus ? <span className="status-badge">FOKUS</span> : null}
+          {f.focus ? <span className="status-badge st-focus">FOKUS</span> : null}
         </div>
       </div>
       {foe != null ? (
@@ -118,6 +118,15 @@ function fmtClock(ms) {
 }
 
 const AUTO_TIER_SCORE = { Mythic: 50, Legendary: 40, Epic: 30, Rare: 20, Common: 10 };
+
+function effectTone(effect) {
+  const e = String(effect || 'none');
+  if (['heal', 'regen', 'energize'].includes(e)) return 'fx-heal';
+  if (['shield', 'bulwark'].includes(e)) return 'fx-shield';
+  if (['surge', 'focus'].includes(e)) return 'fx-assist';
+  if (e === 'none') return '';
+  return 'fx-dmg';
+}
 
 function scoreCard(c) {
   const s = c.stats || {};
@@ -1159,26 +1168,26 @@ export default function BattlePage() {
                               <div className="card-art" />
                             )}
                             <div className="card-meta">
-                              <span className="pick-role">{c.stats?.role || '-'}</span>
+                              <span className={`pick-role role-${c.stats?.role || 'Damage'}`}>{c.stats?.role || '-'}</span>
                               <div className="card-name">{c.name}</div>
                               <div className="card-anime">{c.tier}</div>
                             </div>
                           </div>
                           {c.stats ? (
                             <div className="flip-back">
-                              <span className="flip-role">{c.stats.role}</span>
+                              <span className={`flip-role role-${c.stats.role}`}>{c.stats.role}</span>
                               <div className="flip-stat">
                                 HP <b>{c.stats.hp}</b>
                               </div>
                               <div className="flip-stat">
-                                ATK <b>{c.stats.basic}</b>
+                                ATK <b className="fx-dmg">{c.stats.basic}</b>
                               </div>
                               <div className="flip-stat">{c.stats.skillName}</div>
                               <div className="flip-stat">
                                 Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
                               </div>
                               <div className="flip-stat">
-                                Efek <b>{c.stats.effect}</b>
+                                Efek <b className={effectTone(c.stats.effect)}>{c.stats.effect}</b>
                               </div>
                             </div>
                           ) : null}
