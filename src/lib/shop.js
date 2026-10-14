@@ -185,6 +185,8 @@ export async function ensureShopTables() {
     )
   `);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_display_slots_user ON user_display_slots (user_id)');
+  // Deskripsi kartu custom (best-effort untuk DB lama).
+  try { await db.execute('ALTER TABLE user_display_slots ADD COLUMN description TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
 }
 
 export async function createOrder({ userId, username, kind, ref, qty, amountIdr, xpAmount, snapToken }) {
@@ -318,7 +320,7 @@ export async function fulfillPaidOrder(order, payment = {}) {
 export async function listUserSlots(userId) {
   await ensureShopTables();
   const res = await getDb().execute({
-    sql: 'SELECT id, name, image_url, border_type, border_color, edits_used, created_at FROM user_display_slots WHERE user_id = ? ORDER BY id ASC',
+    sql: 'SELECT id, name, image_url, border_type, border_color, description, edits_used, created_at FROM user_display_slots WHERE user_id = ? ORDER BY id ASC',
     args: [String(userId)],
   });
   return (res.rows || []).map((r) => ({
@@ -327,6 +329,7 @@ export async function listUserSlots(userId) {
     imageUrl: r.image_url || null,
     borderType: String(r.border_type || 'classic'),
     borderColor: String(r.border_color || ''),
+    description: String(r.description || ''),
     editsUsed: Number(r.edits_used) || 0,
     editsLeft: editsLeft({ edits_used: r.edits_used }),
   }));
@@ -362,12 +365,13 @@ export async function updateSlotCard(userId, slotId, input = {}) {
   const borderType = SLOT_BORDER_TYPES.includes(String(input.borderType)) ? String(input.borderType) : 'classic';
   const borderColor = borderType === 'custom' ? cleanHex(input.borderColor) : '';
   if (borderType === 'custom' && !borderColor) return { ok: false, error: 'Warna custom harus hex (contoh #a855f7).' };
+  const description = String(input.description || '').trim().slice(0, 280);
   await getDb().execute({
     sql: `UPDATE user_display_slots
-          SET name = ?, image_url = ?, border_type = ?, border_color = ?,
+          SET name = ?, image_url = ?, border_type = ?, border_color = ?, description = ?,
               edits_used = edits_used + 1, updated_at = ?
           WHERE id = ? AND user_id = ?`,
-    args: [name, imageUrl || null, borderType, borderColor, Date.now(), Number(slotId), String(userId)],
+    args: [name, imageUrl || null, borderType, borderColor, description, Date.now(), Number(slotId), String(userId)],
   });
   return { ok: true, editsLeft: MAX_EDITS_PER_SLOT - used - 1 };
 }

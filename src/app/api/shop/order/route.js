@@ -6,6 +6,7 @@ import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
   createSnapTransaction, countUserSlots, ensureShopTables, isShopEnabled,
 } from '@/lib/shop';
+import { countDisplayCards } from '@/lib/display';
 
 // POST /api/shop/order { kind: 'xp', packId } | { kind: 'slot', qty }
 // Return { orderId, snapToken } untuk dibuka via Snap.js.
@@ -42,9 +43,10 @@ export async function POST(req) {
       itemName = `Top-Up ${xpAmount.toLocaleString('id-ID')} XP Animein`;
     } else if (kind === 'slot') {
       qty = Math.min(10, Math.max(1, parseInt(body.qty, 10) || 1));
-      const have = await countUserSlots(session.id);
+      // Kuota gabungan: slot custom + kartu admin, maks 50 total.
+      const have = (await countUserSlots(session.id)) + (await countDisplayCards(session.id));
       if (have + qty > MAX_SLOTS_PER_USER) {
-        return NextResponse.json({ success: false, message: `Maksimal ${MAX_SLOTS_PER_USER} slot per user (kamu punya ${have}).` }, { status: 400 });
+        return NextResponse.json({ success: false, message: `Maksimal ${MAX_SLOTS_PER_USER} kartu pajangan per user (punya ${have}: custom + admin).` }, { status: 400 });
       }
       amountIdr = SLOT_PRICE_IDR * qty;
       ref = 'display-slot';

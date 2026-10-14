@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
@@ -102,9 +102,11 @@ export default function BookPage() {
   const [displayFlipped, setDisplayFlipped] = useState(null);
   const [customSlots, setCustomSlots] = useState([]);
   const [shopOn, setShopOn] = useState(false);
-  const [editingSlot, setEditingSlot] = useState(null);
-  const [slotForm, setSlotForm] = useState({ name: '', imageUrl: '', borderType: 'classic', borderColor: '#a855f7' });
+  const [editingSlot, setEditingSlot] = useState(null); // { kind: 'slot'|'display', id }
+  const [slotForm, setSlotForm] = useState({ name: '', imageUrl: '', borderType: 'classic', borderColor: '#a855f7', description: '' });
   const [savingSlot, setSavingSlot] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
+  const fileInputRef = useRef(null);
 
   async function load() {
     setLoading(true);
@@ -196,6 +198,13 @@ export default function BookPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  // Daftar pajangan gabungan: slot custom + kartu gift admin (1 koleksi, maks 50).
+  const pajanganItems = useMemo(() => ([
+    ...customSlots.map((s) => ({ kind: 'slot', key: `slot-${s.id}`, ...s })),
+    ...displayCards.map((c) => ({ kind: 'display', key: `display-${c.id}`, ...c })),
+  ]), [customSlots, displayCards]);
+  const pajanganTotal = customSlots.length + displayCards.length;
+
   async function evolveCard(c) {
     if (!c.owned || showcaseBusy) return;
     setShowcaseBusy(`evo:${c.name}`);
@@ -247,15 +256,55 @@ export default function BookPage() {
     }
   }
 
-  function openSlotEditor(slot) {
-    setEditingSlot(slot.id);
+  async function reloadPajangan() {
+    try {
+      const [slotRes, dispRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/display')]);
+      const slotData = await slotRes.json().catch(() => ({}));
+      if (slotRes.ok && slotData.success) setCustomSlots(slotData.slots || []);
+      const dispData = await dispRes.json().catch(() => ({}));
+      if (dispRes.ok && dispData.success) setDisplayCards(dispData.cards || []);
+    } catch {
+      // abaikan
+    }
+  }
+
+  function openSlotEditor(item) {
+    setEditingSlot({ kind: item.kind, id: item.id });
     setSlotForm({
-      name: slot.name === 'Kartu Custom' ? '' : (slot.name || ''),
-      imageUrl: slot.imageUrl || '',
-      borderType: slot.borderType || 'classic',
-      borderColor: slot.borderColor || '#a855f7',
+      name: item.kind === 'slot' && item.name === 'Kartu Custom' ? '' : (item.name || ''),
+      imageUrl: item.imageUrl || '',
+      borderType: item.borderType || 'classic',
+      borderColor: item.borderColor || '#a855f7',
+      description: item.description || '',
     });
     setError('');
+  }
+
+  async function uploadSlotFile(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) {
+      setError('Ukuran gambar maks 5MB.');
+      return;
+    }
+    setUploadBusy(true);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', f);
+      const res = await fetch('/api/shop/slot/image', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Gagal upload gambar.');
+        return;
+      }
+      setSlotForm((prev) => ({ ...prev, imageUrl: data.imageUrl }));
+    } catch {
+      setError('Tidak bisa menghubungi server.');
+    } finally {
+      setUploadBusy(false);
+    }
   }
 
   async function saveSlot(e) {
@@ -264,10 +313,13 @@ export default function BookPage() {
     setSavingSlot(true);
     setError('');
     try {
-      const res = await fetch('/api/shop/slot/update', {
+      const isDisplay = editingSlot.kind === 'display';
+      const res = await fetch(isDisplay ? '/api/display/customize' : '/api/shop/slot/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slotId: editingSlot, ...slotForm }),
+        body: isDisplay
+          ? JSON.stringify({ id: editingSlot.id, imageUrl: slotForm.imageUrl, borderType: slotForm.borderType, borderColor: slotForm.borderColor, description: slotForm.description })
+          : JSON.stringify({ slotId: editingSlot.id, ...slotForm }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) {
@@ -275,9 +327,7 @@ export default function BookPage() {
         return;
       }
       setEditingSlot(null);
-      const slotRes = await fetch('/api/shop/slots');
-      const slotData = await slotRes.json().catch(() => ({}));
-      if (slotData.success) setCustomSlots(slotData.slots || []);
+      await reloadPajangan();
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -358,57 +408,124 @@ export default function BookPage() {
               onClick={() => setTab('display')}
               aria-pressed={tab === 'display'}
             >
-              Pajangan 🎁 ({displayCards.length + customSlots.length})
+              Pajangan 🎁 ({pajanganTotal})
             </button>
           </div>
 
           {tab === 'display' ? (
             <div>
-              {shopOn ? (
               <div className="card" style={{ marginTop: 12 }}>
-                <div className="section-title">Slot Custom ({customSlots.length}/50)</div>
+                <div className="section-title">Kartu Pajangan ({pajanganTotal}/50)</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-                  1 slot = 1 kartu pajangan custom. Tiap Simpan memakai 1 jatah ubah (maks 3x per slot).{' '}
-                  <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Beli slot di Shop</Link>
+                  1 koleksi: slot custom + kartu gift admin. Display-only (tidak bisa battle/trade/gacha/convert). Tiap Simpan memakai 1 jatah ubah (maks 3x per kartu).{' '}
+                  {shopOn ? (
+                    <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Beli slot di Shop</Link>
+                  ) : null}
                 </div>
-                {customSlots.length === 0 ? (
+                {pajanganItems.length === 0 ? (
                   <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                    Belum punya slot. Beli dulu di <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Shop</Link> (Rp10rb/slot).
+                    Belum ada kartu pajangan. {shopOn ? (
+                      <>Beli slot di <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Shop</Link> atau tunggu gift admin.</>
+                    ) : (
+                      <>Kartu spesial hanya bisa di-gift admin dari dashboard.</>
+                    )}
                   </div>
                 ) : (
                   <div className="book-grid">
-                    {customSlots.map((s) => {
-                      const empty = !s.imageUrl && (s.name === 'Kartu Custom' || !s.name);
-                      const locked = s.editsLeft <= 0;
+                    {pajanganItems.map((item) => {
+                      if (item.kind === 'slot') {
+                        const empty = !item.imageUrl && (item.name === 'Kartu Custom' || !item.name);
+                        const locked = item.editsLeft <= 0;
+                        return (
+                          <div
+                            key={item.key}
+                            className="card-item owned"
+                            style={empty ? { borderStyle: 'dashed', cursor: 'pointer' } : displayCardStyle({ borderType: item.borderType, borderColor: item.borderColor })}
+                            title={empty ? 'Slot kosong — ketuk untuk isi' : `${item.name} — ketuk untuk ubah`}
+                            onClick={() => { if (!locked) openSlotEditor(item); }}
+                          >
+                            {empty ? (
+                              <div className="card-art gacha-noart" style={{ fontSize: 48, fontWeight: 800 }}>+</div>
+                            ) : item.imageUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img className="card-art" src={item.imageUrl} alt={item.name} loading="lazy" decoding="async" />
+                            ) : (
+                              <div className="card-art" />
+                            )}
+                            <div className="card-meta">
+                              <div className="card-name">{empty ? 'Slot kosong' : shortName(item.name)}</div>
+                              <div className="card-anime">{empty ? 'ketuk untuk isi' : `Custom • sisa ubah ${item.editsLeft}/3`}</div>
+                              {!empty && item.description ? (
+                                <div className="card-anime" style={{ whiteSpace: 'pre-wrap' }}>{item.description.slice(0, 80)}</div>
+                              ) : null}
+                              {!empty && !locked ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                  onClick={(ev) => { ev.stopPropagation(); openSlotEditor(item); }}
+                                >
+                                  Ubah
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      }
+                      const c = item;
+                      const locked = c.editsLeft <= 0;
                       return (
                         <div
-                          key={s.id}
-                          className="card-item owned"
-                          style={empty ? { borderStyle: 'dashed', cursor: 'pointer' } : displayCardStyle({ borderType: s.borderType, borderColor: s.borderColor })}
-                          title={empty ? 'Slot kosong — ketuk untuk isi' : `${s.name} — ketuk untuk ubah`}
-                          onClick={() => { if (!locked) openSlotEditor(s); }}
+                          key={c.key}
+                          className={displayFlipped === c.name ? 'card-item owned flipped' : 'card-item owned'}
+                          style={displayCardStyle(c)}
+                          title={`${c.name} (ketuk untuk flip)`}
+                          onClick={() => setDisplayFlipped((f) => (f === c.name ? null : c.name))}
                         >
-                          {empty ? (
-                            <div className="card-art gacha-noart" style={{ fontSize: 48, fontWeight: 800 }}>+</div>
-                          ) : s.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img className="card-art" src={s.imageUrl} alt={s.name} loading="lazy" decoding="async" />
-                          ) : (
-                            <div className="card-art" />
-                          )}
-                          <div className="card-meta">
-                            <div className="card-name">{empty ? 'Slot kosong' : shortName(s.name)}</div>
-                            <div className="card-anime">{empty ? 'ketuk untuk isi' : `sisa ubah ${s.editsLeft}/3`}</div>
-                            {!empty && !locked ? (
-                              <button
-                                type="button"
-                                className="btn btn-ghost"
-                                style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
-                                onClick={(ev) => { ev.stopPropagation(); openSlotEditor(s); }}
-                              >
-                                Ubah
-                              </button>
-                            ) : null}
+                          <div className="flip-inner">
+                            <div className="flip-front">
+                              {c.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
+                              ) : (
+                                <div className="card-art" />
+                              )}
+                              <div className="card-meta">
+                                <div className="card-name">{shortName(c.name)}</div>
+                                <div className="card-anime">Gift 🎁 • sisa ubah {c.editsLeft}/3</div>
+                                <div className="card-stats">
+                                  {c.showcase ? <span className="stat-tag showcase">Pajangan</span> : null}
+                                </div>
+                                {!locked ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                    onClick={(e) => { e.stopPropagation(); openSlotEditor(c); }}
+                                  >
+                                    Ubah
+                                  </button>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                  disabled={showcaseBusy === `display:${c.name}`}
+                                  onClick={(e) => { e.stopPropagation(); toggleDisplayShowcase(c); }}
+                                >
+                                  {showcaseBusy === `display:${c.name}` ? '...' : c.showcase ? 'Lepas Pajangan' : 'Jadikan Pajangan'}
+                                </button>
+                              </div>
+                            </div>
+                            <div className="flip-back" style={{ borderTop: `3px solid ${displayBorderColor(c)}` }}>
+                              <span className="flip-role">{c.grade}</span>
+                              <div className="flip-stat" style={{ whiteSpace: 'pre-wrap' }}>
+                                {c.description || 'Display-only'}
+                              </div>
+                              <div className="flip-stat" style={{ color: 'var(--muted)' }}>
+                                Gift admin • Display-only
+                              </div>
+                            </div>
                           </div>
                         </div>
                       );
@@ -417,9 +534,20 @@ export default function BookPage() {
                 )}
                 {editingSlot ? (
                   <form onSubmit={saveSlot} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, padding: 12, border: '1px dashed var(--hairline-strong)', borderRadius: 8 }}>
-                    <div className="section-title" style={{ margin: 0 }}>Isi / Ubah kartu (pakai 1 jatah ubah)</div>
-                    <input className="input" placeholder="Nama kartu (maks 40)" value={slotForm.name} maxLength={40} onChange={(e) => setSlotForm((f) => ({ ...f, name: e.target.value }))} aria-label="Nama kartu" />
-                    <input className="input" placeholder="URL gambar https://... (opsional)" value={slotForm.imageUrl} onChange={(e) => setSlotForm((f) => ({ ...f, imageUrl: e.target.value }))} aria-label="URL gambar" />
+                    <div className="section-title" style={{ margin: 0 }}>
+                      {editingSlot.kind === 'display' ? `Ubah "${slotForm.name}" (pakai 1 jatah ubah)` : 'Isi / Ubah kartu (pakai 1 jatah ubah)'}
+                    </div>
+                    {editingSlot.kind === 'slot' ? (
+                      <input className="input" placeholder="Nama kartu (maks 40)" value={slotForm.name} maxLength={40} onChange={(e) => setSlotForm((f) => ({ ...f, name: e.target.value }))} aria-label="Nama kartu" />
+                    ) : null}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input className="input" placeholder="URL gambar https://... (opsional)" value={slotForm.imageUrl} onChange={(e) => setSlotForm((f) => ({ ...f, imageUrl: e.target.value }))} aria-label="URL gambar" style={{ flex: 1 }} />
+                      <button type="button" className="btn btn-ghost" style={{ width: 'auto', padding: '0 14px' }} disabled={uploadBusy} onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                        {uploadBusy ? '...' : 'Upload'}
+                      </button>
+                      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={uploadSlotFile} aria-label="Upload gambar" />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>Upload langsung ke Cloudinary (maks 5MB, JPG/PNG/WebP) atau tempel URL.</div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <select className="select" value={slotForm.borderType} onChange={(e) => setSlotForm((f) => ({ ...f, borderType: e.target.value }))} aria-label="Border" style={{ flex: 1 }}>
                         {['gold', 'rainbow', 'neon', 'sakura', 'shadow', 'classic', 'custom'].map((t) => (
@@ -430,6 +558,7 @@ export default function BookPage() {
                         <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(slotForm.borderColor) ? slotForm.borderColor : '#a855f7'} onChange={(e) => setSlotForm((f) => ({ ...f, borderColor: e.target.value }))} aria-label="Warna custom" style={{ width: 48, height: 44 }} />
                       ) : null}
                     </div>
+                    <textarea className="input" placeholder="Deskripsi kartu (maks 280, opsional)" value={slotForm.description} maxLength={280} rows={2} onChange={(e) => setSlotForm((f) => ({ ...f, description: e.target.value }))} aria-label="Deskripsi kartu" style={{ resize: 'vertical' }} />
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button className="btn" type="submit" disabled={savingSlot} style={{ flex: 1 }}>
                         {savingSlot ? 'Menyimpan...' : 'Simpan'}
@@ -441,68 +570,6 @@ export default function BookPage() {
                   </form>
                 ) : null}
               </div>
-              ) : null}
-              <div className="card" style={{ marginTop: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  {displayCards.length} kartu pajangan (display-only, gift admin)
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                  Tidak bisa battle/trade/gacha/convert. Ketuk kartu untuk balik (deskripsi).
-                </div>
-              </div>
-              {displayCards.length === 0 ? (
-                <div className="card" style={{ marginTop: 16 }}>
-                  Belum ada kartu pajangan. Kartu spesial hanya bisa di-gift admin dari dashboard.
-                </div>
-              ) : (
-                <div className="book-grid" style={{ marginTop: 16 }}>
-                  {displayCards.map((c) => (
-                    <div
-                      key={c.id || c.name}
-                      className={displayFlipped === c.name ? 'card-item owned flipped' : 'card-item owned'}
-                      style={displayCardStyle(c)}
-                      title={`${c.name} (ketuk untuk flip)`}
-                      onClick={() => setDisplayFlipped((f) => (f === c.name ? null : c.name))}
-                    >
-                      <div className="flip-inner">
-                        <div className="flip-front">
-                          {c.imageUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
-                          ) : (
-                            <div className="card-art" />
-                          )}
-                          <div className="card-meta">
-                            <div className="card-name">{shortName(c.name)}</div>
-                            <div className="card-anime">{c.grade}</div>
-                            <div className="card-stats">
-                              {c.showcase ? <span className="stat-tag showcase">Pajangan</span> : null}
-                            </div>
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
-                              disabled={showcaseBusy === `display:${c.name}`}
-                              onClick={(e) => { e.stopPropagation(); toggleDisplayShowcase(c); }}
-                            >
-                              {showcaseBusy === `display:${c.name}` ? '...' : c.showcase ? 'Lepas Pajangan' : 'Jadikan Pajangan'}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flip-back" style={{ borderTop: `3px solid ${displayBorderColor(c)}` }}>
-                          <span className="flip-role">{c.grade}</span>
-                          <div className="flip-stat" style={{ whiteSpace: 'pre-wrap' }}>
-                            {c.description}
-                          </div>
-                          <div className="flip-stat" style={{ color: 'var(--muted)' }}>
-                            Display-only
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           ) : (
           <>
