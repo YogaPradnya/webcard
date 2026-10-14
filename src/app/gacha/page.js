@@ -229,7 +229,7 @@ export default function GachaPage() {
                 Rate: {Object.entries(info.rates || {}).map(([k, v]) => `${k} ${v}%`).join(' • ')}
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                Stok tersisa: {['Mythic', 'Legendary', 'Epic'].map((t) => {
+                Stok tersisa (unit): {['Mythic', 'Legendary', 'Epic'].map((t) => {
                   const s = info.stocks?.[t];
                   return `${t} ${s ? `${s.left}/${s.total}` : '-'}`;
                 }).join(' • ')}

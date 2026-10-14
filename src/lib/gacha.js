@@ -27,6 +27,16 @@ export const CONVERT_XP_REWARD = { Common: 50, Rare: 150, Epic: 400, Legendary: 
 const BASE_POWER = { Common: 40, Rare: 70, Epic: 100, Legendary: 150, Mythic: 200 };
 const STOCK_LIMITS = { Common: Infinity, Rare: Infinity, Epic: 50, Legendary: 10, Mythic: 1 };
 const DEFAULT_STOCKS = { Mythic: 1, Legendary: 10, Epic: 50 };
+// Username yang diabaikan dari hitungan stok global (akun tes/admin).
+// Env STOCK_EXCLUDE_USERNAMES="yogaa,admin" (koma). Default: yogaa.
+export function parseStockExclusions(raw) {
+  const src = raw !== undefined ? raw : (process.env.STOCK_EXCLUDE_USERNAMES ?? 'yogaa');
+  return String(src).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+}
+
+function stockExclusionClause(excl) {
+  return excl.length ? ` AND LOWER(username) NOT IN (${excl.map(() => '?').join(',')})` : '';
+}
 const RARITY_DOWNGRADE = { Mythic: 'Legendary', Legendary: 'Epic', Epic: 'Rare', Rare: 'Common', Common: null };
 // Web: hanya Mythic yang unik per user (Epic/Legendary boleh menumpuk).
 function isUniqueRarityWeb(rarity) {
@@ -173,7 +183,11 @@ export function calcLevel(xp) {
 
 async function countCardOwners(db, charName) {
   try {
-    const res = await db.execute({ sql: 'SELECT COUNT(*) AS c FROM user_cards WHERE char_name = ?', args: [charName] });
+    const excl = parseStockExclusions();
+    const res = await db.execute({
+      sql: `SELECT COUNT(*) AS c FROM user_cards WHERE char_name = ?${stockExclusionClause(excl)}`,
+      args: [charName, ...excl],
+    });
     return Number(res.rows[0]?.c || 0);
   } catch {
     return 0;
@@ -458,29 +472,40 @@ export async function performWebPulls(userId, username, count, todayKey) {
   return { pulls, costTotal: paidTotal, xpBefore: curXp, xpAfter: newXp, ...next };
 }
 
-// Ringkasan stok global tier terbatas: jumlah kartu yang masih ada stoknya.
+// Hitung unit stok dari map {namaLower: pemilik} (murni, gampang dites).
+// left = total unit tersisa serum tier, total = total unit serum tier.
+export function computeStockUnits(pool, stocks, owners = {}) {
+  const out = { Mythic: null, Legendary: null, Epic: null };
+  const norm = {};
+  for (const [k, v] of Object.entries(owners)) norm[String(k).toLowerCase()] = Number(v) || 0;
+  for (const tier of ['Mythic', 'Legendary', 'Epic']) {
+    const limit = stocks?.[tier] ?? STOCK_LIMITS[tier];
+    if (!Number.isFinite(limit)) { out[tier] = null; continue; }
+    let left = 0;
+    let total = 0;
+    for (const p of pool || []) {
+      if (p.tier !== tier) continue;
+      total += limit;
+      left += Math.max(0, limit - (norm[String(p.name).toLowerCase()] || 0));
+    }
+    out[tier] = { left, total };
+  }
+  return out;
+}
+
+// Ringkasan stok global tier terbatas (dalam unit, bukan jumlah kartu).
 export async function stockSummary(pool, stocks) {
   const db = getDb();
   const out = { Mythic: null, Legendary: null, Epic: null };
   try {
+    const excl = parseStockExclusions();
     const res = await db.execute({
-      sql: `SELECT char_name, COUNT(*) AS c FROM user_cards WHERE rarity IN ('Mythic','Legendary','Epic') GROUP BY char_name`,
-      args: [],
+      sql: `SELECT LOWER(char_name) AS n, COUNT(*) AS c FROM user_cards WHERE rarity IN ('Mythic','Legendary','Epic')${stockExclusionClause(excl)} GROUP BY LOWER(char_name)`,
+      args: [...excl],
     });
     const owners = {};
-    for (const r of res.rows) owners[String(r.char_name)] = Number(r.c) || 0;
-    for (const tier of ['Mythic', 'Legendary', 'Epic']) {
-      const limit = stocks?.[tier] ?? STOCK_LIMITS[tier];
-      if (!Number.isFinite(limit)) { out[tier] = null; continue; }
-      let left = 0;
-      let total = 0;
-      for (const p of pool) {
-        if (p.tier !== tier) continue;
-        total += 1;
-        if ((owners[p.name] || 0) < limit) left += 1;
-      }
-      out[tier] = { left, total };
-    }
+    for (const r of res.rows) owners[String(r.n)] = Number(r.c) || 0;
+    return computeStockUnits(pool, stocks, owners);
   } catch { /* null = tak diketahui */ }
   return out;
 }
