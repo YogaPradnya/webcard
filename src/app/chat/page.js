@@ -221,13 +221,11 @@ export default function ChatPage() {
               <div className="wa-hint">Tahan lama chat untuk balas.</div>
               {messages.map((m) => (
                 <div key={m.id} className={m.isMine ? 'wa-row mine' : 'wa-row'}>
-                  {!m.isMine ? (
-                    <div className="wa-mini-avatar" style={{ background: avatarColor(m.username) }}>
-                      {String(m.username || '?').slice(0, 1).toUpperCase()}
-                    </div>
-                  ) : null}
+                  <div className="wa-mini-avatar" style={{ background: avatarColor(m.username) }}>
+                    {String(m.username || '?').slice(0, 1).toUpperCase()}
+                  </div>
                   <div
-                    className={m.isMine ? 'wa-bubble mine' : 'wa-bubble'}
+                    className="wa-bubble"
                     onContextMenu={(e) => { e.preventDefault(); setReply(m); }}
                     onTouchStart={() => startPress(m)}
                     onTouchEnd={cancelPress}
@@ -235,9 +233,9 @@ export default function ChatPage() {
                     onDoubleClick={() => setReply(m)}
                     title="Tahan untuk balas"
                   >
-                    {!m.isMine ? (
-                      <div className="wa-name">
-                        @{m.username}
+                    <div className="wa-namerow">
+                      <span className="wa-name">
+                        {m.username}
                         {m.title ? (
                           <span className="wa-title-pill">
                             {m.titleIcon ? (
@@ -247,16 +245,16 @@ export default function ChatPage() {
                             {m.title}
                           </span>
                         ) : null}
-                      </div>
-                    ) : m.title ? (
-                      <div className="wa-title-pill mine">
-                        {m.titleIcon ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.titleIcon} alt="" width={14} height={14} className="wa-title-ico" loading="lazy" decoding="async" />
+                      </span>
+                      <span className="wa-time">
+                        {fmtTime(m.createdAt)}
+                        {m.isMine ? (
+                          <button type="button" className="wa-del" onClick={(e) => { e.stopPropagation(); setDelTarget(m); }}>
+                            hapus
+                          </button>
                         ) : null}
-                        {m.title}
-                      </div>
-                    ) : null}
+                      </span>
+                    </div>
                     {m.replyUsername ? (
                       <div className="wa-quote">
                         <b>@{m.replyUsername}</b>
@@ -264,14 +262,6 @@ export default function ChatPage() {
                       </div>
                     ) : null}
                     <div className="wa-text">{m.message}</div>
-                    <div className="wa-time">
-                      {fmtTime(m.createdAt)}
-                      {m.isMine ? (
-                        <button type="button" className="link-btn" onClick={(e) => { e.stopPropagation(); setDelTarget(m); }}>
-                          hapus
-                        </button>
-                      ) : null}
-                    </div>
                   </div>
                 </div>
               ))}
@@ -293,8 +283,8 @@ export default function ChatPage() {
                 onChange={(e) => setInput(e.target.value)}
                 aria-label="Ketik pesan"
               />
-              <button className="btn" type="submit" disabled={!input.trim() || sending} style={{ width: 'auto', padding: '0 20px' }}>
-                Kirim
+              <button className="btn wa-sendbtn" type="submit" disabled={!input.trim() || sending} aria-label="Kirim">
+                ➤
               </button>
             </form>
           </div>
