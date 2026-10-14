@@ -522,37 +522,56 @@ export default function BattlePage() {
   const resultRef = useRef(null);
   const [autoExitIn, setAutoExitIn] = useState(0);
 
+  // Fetch dengan timeout agar tidak stuck skeleton selamanya bila satu API menggantung
+  // (Turso cold-start / koneksi lambat). Timeout 12 detik per request.
+  async function fetchJson(path, ms = 12000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const res = await fetch(path, { signal: ctrl.signal });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, data };
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const meRes = await fetch('/api/auth/me');
-        const meData = await meRes.json().catch(() => ({}));
-        if (!meRes.ok || !meData.success) {
+        const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+        if (!meOk || !meData.success) {
           router.push('/login');
           return;
         }
+        if (cancelled) return;
         setMe(meData);
-        const cardsRes = await fetch('/api/cards');
-        const cardsData = await cardsRes.json().catch(() => ({}));
-        if (cardsData.success) {
-          const all = cardsData.cards || [];
-          setCards(all.filter((c) => c.owned));
-          const artMap = {};
-          for (const c of all) if (c.imageUrl) artMap[c.name.toLowerCase()] = c.imageUrl;
-          setArts(artMap);
+        try {
+          const { data: cardsData } = await fetchJson('/api/cards');
+          if (cancelled) return;
+          if (cardsData.success) {
+            const all = cardsData.cards || [];
+            setCards(all.filter((c) => c.owned));
+            const artMap = {};
+            for (const c of all) if (c.imageUrl) artMap[c.name.toLowerCase()] = c.imageUrl;
+            setArts(artMap);
+          }
+        } catch {
+          // kartu gagal/timeout -> halaman tetap tampil, user bisa tekan Coba lagi
+          if (!cancelled) setError('Gagal memuat kartu (timeout). Tekan Coba lagi.');
         }
         try {
           const raw = localStorage.getItem(PRESET_KEY);
           if (raw) setPresets(JSON.parse(raw) || []);
         } catch { /* abaikan */ }
         try {
-          const hRes = await fetch('/api/battle/history?limit=10');
-          const hData = await hRes.json().catch(() => ({}));
-          if (hData.success) setHistory(hData.history || []);
+          const { data: hData } = await fetchJson('/api/battle/history?limit=10', 8000);
+          if (!cancelled && hData.success) setHistory(hData.history || []);
         } catch { /* abaikan */ }
         try {
-          const mineRes = await fetch('/api/battle/mine');
-          const mineData = await mineRes.json().catch(() => ({}));
+          const { data: mineData } = await fetchJson('/api/battle/mine', 8000);
+          if (cancelled) return;
           if (mineData.success && mineData.rooms?.length) {
             setMyRooms(mineData.rooms);
             const first = mineData.rooms[0];
@@ -568,12 +587,17 @@ export default function BattlePage() {
         } catch {
           // abaikan
         }
-      } catch {
-        setError('Tidak bisa menghubungi server.');
+      } catch (e) {
+        if (e?.name === 'AbortError') {
+          if (!cancelled) setError('Server lambat (timeout). Tekan Coba lagi.');
+        } else if (!cancelled) {
+          setError('Tidak bisa menghubungi server.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1119,7 +1143,7 @@ export default function BattlePage() {
           <div className="brand">
             <h1>Battle Kartu</h1>
           </div>
-          <ErrorRetry message={error} onRetry={refresh} />
+          <ErrorRetry message={error} onRetry={() => (st ? refresh() : window.location.reload())} />
           {notice ? <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{notice}</div> : null}
 
           {!st && myRooms.length > 0 ? (

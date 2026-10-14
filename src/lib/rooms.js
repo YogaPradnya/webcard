@@ -43,7 +43,17 @@ export function normalizeRoomCode(value) {
   return String(value || '').replace(/[^0-9]/g, '').slice(0, 12);
 }
 
+// DDL hanya sekali per proses (TTL 10 menit). Sebelumnya tiap API battle
+// menjalankan 6x CREATE/INDEX ke Turso Tokyo (~1-2 detik per request,
+// halaman battle memanggilnya 3-4x sequential = 5-6 detik sendiri).
+let _roomsReadyAt = 0;
+let _roomsPromise = null;
+const ROOMS_DDL_TTL_MS = 10 * 60 * 1000;
 export async function ensureBattleRooms() {
+  const now = Date.now();
+  if (now - _roomsReadyAt < ROOMS_DDL_TTL_MS) return;
+  if (_roomsPromise) { await _roomsPromise; return; }
+  _roomsPromise = (async () => {
   const db = getDb();
   await db.execute(`
     CREATE TABLE IF NOT EXISTS battle_rooms (
@@ -90,6 +100,13 @@ export async function ensureBattleRooms() {
     )
   `);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_bhist_user ON battle_history (p1_id, p2_id, created_at DESC)');
+  })();
+  try {
+    await _roomsPromise;
+    _roomsReadyAt = Date.now();
+  } finally {
+    _roomsPromise = null;
+  }
 }
 
 function jakartaDateKey(d = new Date()) {

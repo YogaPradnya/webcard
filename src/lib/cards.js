@@ -37,21 +37,30 @@ function sanitizePoolInput(pool) {
 }
 
 // Pool efektif: override dashboard (settings.gacha_pool) atau default 265 kartu.
+// Di-cache 60 detik: sebelumnya tiap /api/cards = 1 round-trip ke Tokyo.
+let _poolCache = null;
+let _poolAt = 0;
 async function getEffectivePool() {
+  if (_poolCache && Date.now() - _poolAt < 60 * 1000) return _poolCache;
   try {
     const raw = await readSetting('gacha_pool');
     if (raw) {
       const checked = sanitizePoolInput(JSON.parse(raw));
-      if (checked) return checked;
+      if (checked) { _poolCache = checked; _poolAt = Date.now(); return checked; }
     }
   } catch {
     // JSON rusak -> default
   }
+  _poolCache = WAIFU_POOL; _poolAt = Date.now();
   return WAIFU_POOL;
 }
 
 // Art efektif: dibaca SEKALI lalu dipetakan (jangan query per kartu).
+// Di-cache 60 detik.
+let _artCache = null;
+let _artAt = 0;
 async function getArtMap() {
+  if (_artCache && Date.now() - _artAt < 60 * 1000) return _artCache;
   let overrides = {};
   try {
     const raw = await readSetting('gacha_art');
@@ -64,6 +73,7 @@ async function getArtMap() {
   } catch {
     // abaikan
   }
+  _artCache = overrides; _artAt = Date.now();
   return overrides;
 }
 
@@ -79,7 +89,11 @@ export async function getEffectiveArt(charName) {
 
 // Stat battle semua kartu (1 query). Hilang -> fallback generator (tetap deterministik).
 // Kolom skill2 di-backfill dari generator bila DB lama belum migrasi.
+// Di-cache 60 detik (265 baris, jarang berubah).
+let _statsCache = null;
+let _statsAt = 0;
 export async function getCardStatsMap() {
+  if (_statsCache && Date.now() - _statsAt < 60 * 1000) return _statsCache;
   try {
     const res = await getDb().execute({
       sql: 'SELECT char_name, tier, role, hp, basic_dmg, skill_name, skill_dmg, cons_cost, skill_effect, skill_effect_val, skill2_name, skill2_dmg, skill2_cons, skill2_effect, skill2_effect_val FROM card_battle_stats',
@@ -89,6 +103,7 @@ export async function getCardStatsMap() {
     for (const r of res.rows) {
       map[String(r.char_name || '').toLowerCase()] = mapBattleStatRow(r);
     }
+    _statsCache = map; _statsAt = Date.now();
     return map;
   } catch {
     // DB lama tanpa kolom skill2 (atau tanpa tabel): baca kolom lama + generate skill2.
@@ -103,6 +118,7 @@ export async function getCardStatsMap() {
         const second = genSecondSkill({ name: base.name, tier: base.tier }, base.role, base.effect);
         map[String(base.name || '').toLowerCase()] = { ...base, ...second };
       }
+      _statsCache = map; _statsAt = Date.now();
       return map;
     } catch {
       return {};
@@ -129,13 +145,24 @@ function mapBattleStatRow(r) {
     effectVal2: Number(r.skill2_effect_val) || 0,
   };
 }
+// Migrasi kolom quantity: sekali per proses. Sebelumnya tiap /api/cards =
+// 1x ALTER (selalu gagal karena kolom sudah ada) + 1x UPDATE full-scan
+// (~350ms+ ke Tokyo).
+let _qtyPromise = null;
+let _qtyDone = false;
 export async function ensureQuantityColumn() {
+  if (_qtyDone) return;
+  if (_qtyPromise) { await _qtyPromise; return; }
+  _qtyPromise = (async () => {
   try {
     await getDb().execute('ALTER TABLE user_cards ADD COLUMN quantity INTEGER DEFAULT 1');
   } catch { /* sudah ada */ }
   try {
     await getDb().execute('UPDATE user_cards SET quantity = 1 WHERE quantity IS NULL OR quantity < 1');
   } catch { /* abaikan */ }
+  })();
+  try { await _qtyPromise; _qtyDone = true; }
+  finally { _qtyPromise = null; }
 }
 
 export async function getUserCollection(userId) {
