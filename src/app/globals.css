@@ -311,6 +311,14 @@ body {
   background: var(--hairline-soft);
 }
 
+/* Pita tier di atas cover kartu (warna via inline style / var(--tier)) */
+.tier-ribbon {
+  display: block;
+  height: 5px;
+  background: var(--tier, var(--muted-soft));
+  box-shadow: 0 0 10px var(--tier, transparent);
+}
+
 /* Belum punya: abu-abu */
 .card-item.locked .card-art {
   filter: grayscale(1);

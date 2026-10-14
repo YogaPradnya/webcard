@@ -648,17 +648,9 @@ export default function BookPage() {
             className={
               c.owned
                 ? flipped === c.name
-                  ? 'card-item owned flipped'
-                  : 'card-item owned'
+                  ? `card-item owned flipped rar-${c.tier}`
+                  : `card-item owned rar-${c.tier}`
                 : 'card-item locked'
-            }
-            style={
-              c.owned
-                ? {
-                    borderColor: TIER_COLORS[c.tier],
-                    boxShadow: `0 2px 14px ${TIER_COLORS[c.tier]}55`,
-                  }
-                : undefined
             }
             title={c.owned ? `${c.name} (ketuk untuk stat)` : c.name}
             onClick={() => {
@@ -668,6 +660,7 @@ export default function BookPage() {
           >
             <div className="flip-inner">
               <div className="flip-front">
+                <span className="tier-ribbon" style={c.owned ? { ['--tier']: TIER_COLORS[c.tier], background: TIER_COLORS[c.tier] } : undefined} />
                 {c.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
