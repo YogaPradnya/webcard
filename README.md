@@ -71,15 +71,10 @@ Buka http://localhost:3000 → otomatis ke `/book` → diminta kode `.pair`.
 | `POST /api/battle/room/join` | Gabung room PvP (batas tebak 20x/mnt) |
 | `POST /api/battle/room/act` | 1 aksi giliran (validasi server) |
 | `POST /api/battle/room/forfeit` | Menyerah manual (akhiri game) |
-| `GET+POST /api/battle/chat` | Chat sementara khusus room battle |
 | `GET /api/battle/history` | 10 riwayat battle milik sendiri |
 | `GET /api/battle/rooms` | List room PvP waiting (10/hal) |
 | `GET /api/battle/mine` | Room aktif milik sendiri (auto-restore) |
 | `GET /api/battle/leaderboard?tab=` | Klasemen pvp/kolektor/xp |
-| `GET /api/chat` | Pesan grup (afterId/beforeId, ikut gelar) |
-| `POST /api/chat/send` | Kirim pesan grup (+balas) |
-| `DELETE /api/chat/delete` | Hapus pesan sendiri |
-| `GET /api/chat/online` | User aktif 5 menit terakhir |
 
 ## Battle kartu (vs AI + PvP interaktif)
 
@@ -94,8 +89,6 @@ AI (Easy/Normal/Hard) → lawan AI atau buat/gabung room PvP via **kode 6 angka*
   Cek Lagi/Batal (hangus 5 menit).
 - **Timer forfeit 2 menit**: countdown terlihat. Diam 2 menit = otomatis
   menyerah, game berakhir. Tombol Menyerah manual tersedia.
-- **Chat battle sementara**: ganti log teknis. Hanya 2 pemain di room itu,
-  maks 200 char, rate-limit 1,5 dtk, chat >7 hari dibersihkan otomatis.
 - **Animasi**: kartu menyerang maju, target bergoyang, angka damage melayang,
   heal bersinar, KO jadi abu-abu, badge status (BURN/SHD/STUN/WEAK/FOKUS).
 - PvP: giliran bergantian, polling adaptif (pause saat tab hidden), semua aksi

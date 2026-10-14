@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
-// Menu utama 4 saja: Book, Battle, Chat Global, Profil (Trade & Leaderboard via Profil).
+// Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 export default function Sidebar({ username }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -54,7 +54,6 @@ export default function Sidebar({ username }) {
       {item('/book', 'Book Kartu')}
       {item('/battle', activeBattle > 0 ? `Battle (${activeBattle})` : 'Battle', activeBattle)}
       {shopOn ? item('/shop', 'Shop') : null}
-      {item('/chat', 'Chat Global')}
       {item('/profile', 'Profil')}
     </>
   );
@@ -64,7 +63,6 @@ export default function Sidebar({ username }) {
       {item('/book', 'Book')}
       {item('/battle', activeBattle > 0 ? `Battle (${activeBattle})` : 'Battle', activeBattle)}
       {shopOn ? item('/shop', 'Shop') : null}
-      {item('/chat', 'Chat')}
       {item('/profile', 'Profil')}
     </>
   );

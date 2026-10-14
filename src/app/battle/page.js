@@ -467,12 +467,6 @@ export default function BattlePage() {
     } catch { /* animasi non-kritis */ }
   }
 
-  // Chat battle sementara
-  const [chatMsgs, setChatMsgs] = useState([]);
-  const [chatInput, setChatInput] = useState('');
-  const [chatSending, setChatSending] = useState(false);
-  const chatAfter = useRef(0);
-  const chatBoxRef = useRef(null);
   const resultRef = useRef(null);
   const [autoExitIn, setAutoExitIn] = useState(0);
 
@@ -641,77 +635,6 @@ export default function BattlePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, st, roomPage, roomQ]);
 
-  // Chat battle: load awal + polling saat battle ongoing
-  useEffect(() => {
-    if (!st?.code) {
-      setChatMsgs([]);
-      chatAfter.current = 0;
-      return;
-    }
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch(`/api/battle/chat?code=${encodeURIComponent(st.code)}&afterId=0`);
-        const data = await res.json().catch(() => ({}));
-        if (alive && data.success) {
-          setChatMsgs(data.messages || []);
-          const last = (data.messages || []).at(-1);
-          if (last) chatAfter.current = last.id;
-          scrollChat();
-        }
-      } catch { /* abaikan */ }
-    })();
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.code]);
-
-  useEffect(() => {
-    if (!st?.code || st.status === 'finished' || st.battle?.over) return;
-    const t = setInterval(async () => {
-      if (document.hidden) return;
-      try {
-        const res = await fetch(`/api/battle/chat?code=${encodeURIComponent(st.code)}&afterId=${chatAfter.current}`);
-        const data = await res.json().catch(() => ({}));
-        if (data.success && data.messages?.length) {
-          setChatMsgs((prev) => [...prev, ...data.messages].slice(-100));
-          chatAfter.current = data.messages.at(-1).id;
-          scrollChat();
-        }
-      } catch { /* abaikan */ }
-    }, 4000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.code, st?.status, st?.battle?.over]);
-
-  function scrollChat() {
-    requestAnimationFrame(() => {
-      const el = chatBoxRef.current;
-      if (el) el.scrollTop = el.scrollHeight;
-    });
-  }
-
-  async function sendBattleChat(e) {
-    e.preventDefault();
-    const text = chatInput.trim();
-    if (!text || !st?.code || chatSending) return;
-    setChatSending(true);
-    try {
-      const res = await fetch('/api/battle/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: st.code, message: text.slice(0, 200) }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (data.success && data.message) {
-        setChatMsgs((prev) => [...prev, data.message].slice(-100));
-        chatAfter.current = Math.max(chatAfter.current, data.message.id || 0);
-        setChatInput('');
-        scrollChat();
-      }
-    } finally {
-      setChatSending(false);
-    }
-  }
 
   function fmtSisa(expiresAt) {
     const s = Math.max(0, Math.ceil((expiresAt - nowTick) / 1000));
@@ -878,8 +801,6 @@ export default function BattlePage() {
     setSplash(null);
     setAutoExitIn(0);
     fighterRefs.current = {};
-    setChatMsgs([]);
-    chatAfter.current = 0;
     fetchMine();
     fetchRooms(roomPage, roomQ);
     fetchHistory();
@@ -1569,38 +1490,7 @@ export default function BattlePage() {
                 </div>
               </div>
 
-              <div className="card">
-                <div className="section-title">Chat battle (sementara, hanya room ini)</div>
-                <div ref={chatBoxRef} style={{ maxHeight: 220, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, background: 'var(--hairline-soft)', borderRadius: 8, padding: 10 }}>
-                  {chatMsgs.length === 0 ? (
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>Belum ada chat. Sapa lawanmu!</div>
-                  ) : chatMsgs.map((m) => (
-                    <div key={m.id} style={{ fontSize: 12, textAlign: m.isMine ? 'right' : 'left' }}>
-                      <span style={{ fontWeight: 800, color: m.isMine ? 'var(--link)' : 'var(--body)' }}>@{m.username}</span>
-                      <div style={{ display: 'inline-block', marginLeft: 6, background: m.isMine ? '#d9fdd3' : 'var(--surface)', border: '1px solid var(--hairline-strong)', borderRadius: 8, padding: '4px 8px', maxWidth: '80%' }}>
-                        {m.message}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {!st.battle.over ? (
-                  <form onSubmit={sendBattleChat} style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      className="input"
-                      placeholder="Chat lawan..."
-                      value={chatInput}
-                      maxLength={200}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      aria-label="Chat battle"
-                    />
-                    <button className="btn" type="submit" disabled={!chatInput.trim() || chatSending} style={{ width: 'auto', padding: '0 20px' }}>
-                      Kirim
-                    </button>
-                  </form>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>Chat ditutup karena battle selesai.</div>
-                )}
-              </div>
+
             </div>
           )}
           {askSurrender ? (

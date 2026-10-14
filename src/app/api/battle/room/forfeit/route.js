@@ -25,10 +25,6 @@ export async function POST(req) {
     if (!res) return NextResponse.json({ success: false, message: 'Battle sudah selesai.' }, { status: 400 });
     await finishIfOver(room);
     await saveRoom(room);
-    try {
-      const { ensureBattleChatTable } = await import('@/lib/battleChat');
-      await ensureBattleChatTable();
-    } catch { /* abaikan */ }
     return NextResponse.json({ success: true, battle: room.battle, result: room.result, winner: room.winner });
   } catch (e) {
     console.error('[BATTLE FORFEIT]', e.message);
