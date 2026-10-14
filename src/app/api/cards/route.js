@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getBookCards } from '@/lib/cards';
 
-// GET /api/cards[?owned=1] — 200 kartu + flag owned per user login.
+// GET /api/cards[?owned=1] — 250 kartu + flag owned per user login.
 // owned=1: hanya kartu milik (ringkas untuk trade/convert).
 export async function GET(req) {
   const session = getSessionFromRequest(req);

@@ -17,11 +17,11 @@ const displayFont = Sora({
 
 export const metadata = {
   title: 'Book Kartu Animein',
-  description: 'Galeri book 200 kartu Animein — trade, battle PvP, grup chat. Login tanpa password via kode pairing.',
+  description: 'Galeri book 250 kartu Animein — trade, battle PvP, grup chat. Login tanpa password via kode pairing.',
   keywords: ['animein', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu'],
   openGraph: {
     title: 'Book Kartu Animein',
-    description: 'Kumpulkan 200 kartu, trade dengan teman, battle PvP interaktif.',
+    description: 'Kumpulkan 250 kartu, trade dengan teman, battle PvP interaktif.',
     type: 'website',
     locale: 'id_ID',
   },
