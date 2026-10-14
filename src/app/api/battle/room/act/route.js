@@ -11,6 +11,7 @@ import {
   playAiTurns,
   sideOf,
 } from '@/lib/rooms';
+import { bumpRoom } from '@/lib/roomEvents';
 
 // POST /api/battle/room/act { code, action: {type, target?, ally?} } — 1 aksi giliranmu.
 // type: basic|skill|skill2|switch. target = index kartu AKTIF lawan (ofensif),
@@ -43,6 +44,7 @@ export async function POST(req) {
     if (room.status !== 'ongoing' || room.battle.over) {
       await finishIfOver(room);
       await saveRoom(room);
+      bumpRoom(code);
       return NextResponse.json({ success: true, finished: true, battle: room.battle, result: room.result });
     }
     if (String(room.turn) !== String(session.id)) {
@@ -67,6 +69,7 @@ export async function POST(req) {
     }
     await finishIfOver(room);
     await saveRoom(room);
+    bumpRoom(code);
     return NextResponse.json({
       success: true,
       events: battle.log.slice(from),

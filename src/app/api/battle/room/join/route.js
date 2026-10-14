@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
 import { ensureBattleRooms, getRoom, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
+import { bumpRoom } from '@/lib/roomEvents';
 import { checkRateCount } from '@/lib/rateLimit';
 
 // POST /api/battle/room/join { code, team: [3 nama] } — gabung room PvP.
@@ -73,6 +74,7 @@ export async function POST(req) {
     room.turn = first === 'player' ? room.p1Id : room.p2Id;
     room.status = 'ongoing';
     await saveRoom(room);
+    bumpRoom(code);
 
     const saved = await getRoom(code);
     return NextResponse.json({

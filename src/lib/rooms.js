@@ -173,6 +173,37 @@ export function sideOf(room, userId) {
   return null;
 }
 
+// State publik untuk klien (dipakai GET room, SSE stream, rematch).
+export function publicState(room, youId) {
+  return {
+    code: room.code,
+    mode: room.mode,
+    status: room.status,
+    turn: room.turn,
+    you: String(youId),
+    yourSide: sideOf(room, youId),
+    p1Username: room.p1Username,
+    p2Username: room.p2Username,
+    battle: room.battle,
+    winner: room.winner,
+    result: room.result,
+    updatedAt: room.updatedAt,
+    forfeitMsLeft: forfeitMsLeft(room, Date.now()),
+    forfeitTimeoutMs: FORFEIT_TIMEOUT_MS,
+  };
+}
+
+// Nama 3 kartu milik userId di room (untuk rematch: tim penantang).
+export function sideTeamNames(room, userId) {
+  const side = sideOf(room, userId);
+  if (!side) return [];
+  const team = room.battle?.[side];
+  if (!team?.fighters) return [];
+  const names = team.fighters.map((f) => String(f?.name || '').trim()).filter(Boolean);
+  if (names.length !== 3 || new Set(names.map((n) => n.toLowerCase())).size !== 3) return [];
+  return names;
+}
+
 export function userIdOfSide(room, side) {
   if (side === 'player') return room.p1Id;
   return room.p2Id || 'AI';

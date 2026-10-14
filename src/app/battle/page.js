@@ -195,6 +195,24 @@ export default function BattlePage() {
   const [roomTotalPages, setRoomTotalPages] = useState(1);
   const [roomLoading, setRoomLoading] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [streamOn, setStreamOn] = useState(false);
+  const [streamFail, setStreamFail] = useState(false);
+  const [online, setOnline] = useState([]);
+  const [rematchOffer, setRematchOffer] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [foeBanner, setFoeBanner] = useState(null);
+  const [vibe, setVibe] = useState(null);
+  const [speed, setSpeed] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return '1';
+      return localStorage.getItem('battle_speed') || '1';
+    } catch { return '1'; }
+  });
+  const [autoBattle, setAutoBattle] = useState(false);
+  const esRef = useRef(null);
+  const speedRef = useRef('1');
+  const vibeTimer = useRef(null);
+  const foeBannerTimer = useRef(null);
 
   const MY_ROOM_KEY = 'battle_my_room';
   const PRESET_KEY = 'battle_presets';
@@ -217,7 +235,7 @@ export default function BattlePage() {
   function showSplash(title, sub) {
     setSplash({ title, sub });
     clearTimeout(splashTimer.current);
-    splashTimer.current = setTimeout(() => setSplash(null), 1600);
+    splashTimer.current = setTimeout(() => setSplash(null), Math.round(1600 * SPD()));
   }
 
   function splashFor(state) {
@@ -237,6 +255,7 @@ export default function BattlePage() {
   };
 
   function fireProjectile(fromKey, toKey, color, dur = 420) {
+    const D = Math.max(60, Math.round(dur * SPD()));
     return new Promise((resolve) => {
       try {
         const arena = arenaRef.current;
@@ -263,7 +282,7 @@ export default function BattlePage() {
             { transform: 'translate(-50%,-50%) scale(1.25)', opacity: 1, offset: 0.25 },
             { transform: `translate(calc(-50% + ${x2 - x1}px), calc(-50% + ${y2 - y1}px)) scale(1)`, opacity: 1 },
           ],
-          { duration: dur, easing: 'cubic-bezier(0.3,0.7,0.4,1)' }
+          { duration: D, easing: 'cubic-bezier(0.3,0.7,0.4,1)' }
         );
         anim.onfinish = () => { dot.remove(); resolve(); };
         setTimeout(() => { dot.remove(); resolve(); }, dur + 300);
@@ -310,6 +329,33 @@ export default function BattlePage() {
 
   function rageMult(battle) {
     return Math.min(1.3, 1 + 0.1 * Math.floor((battle?.turnCount || 0) / 10));
+  }
+
+  // Pengali durasi animasi (speed 2x = separuh waktu).
+  const SPD = () => (speedRef.current === '2' ? 0.5 : 1);
+
+  useEffect(() => {
+    speedRef.current = speed;
+    try { localStorage.setItem('battle_speed', speed); } catch { /* abaikan */ }
+  }, [speed]);
+
+  // Warna tombol skill mengikuti efeknya (A2).
+  function toneForEffect(fx) {
+    if (['heal', 'regen', 'energize'].includes(fx)) return 'tone-heal';
+    if (['shield', 'bulwark'].includes(fx)) return 'tone-shield';
+    if (['burn', 'heavy', 'crit', 'double', 'slam'].includes(fx)) return 'tone-atk';
+    if (['surge', 'weaken', 'focus'].includes(fx)) return 'tone-arcane';
+    return '';
+  }
+
+  // Warna baris log mengikuti tipenya (A5).
+  function logTone(ev) {
+    if (!ev) return {};
+    if (ev.type === 'ko' || ev.type === 'end') return { color: 'var(--ink)', fontWeight: 800 };
+    if (ev.type === 'heal' || ev.type === 'hot' || ev.type === 'regen') return { color: 'var(--success)', fontWeight: 700 };
+    if ((ev.type === 'basic' || ev.type === 'skill') && ev.crit) return { color: 'var(--error)', fontWeight: 700 };
+    if (ev.type === 'basic' || ev.type === 'skill') return { color: 'var(--body)' };
+    return { color: 'var(--muted)' };
   }
 
   // Estimasi range damage skill ofensif (tanpa crit).
@@ -367,6 +413,7 @@ export default function BattlePage() {
 
   function flyBetween(actorKey, targetKey, dur = 460) {
     return new Promise((resolve) => {
+      const D = Math.max(80, Math.round(dur * SPD()));
       const a = fighterRefs.current[actorKey];
       const b = fighterRefs.current[targetKey];
       if (!a || !b) return resolve();
@@ -378,7 +425,7 @@ export default function BattlePage() {
         const dx = rb.left + rb.width / 2 - (ra.left + ra.width / 2);
         const dy = rb.top + rb.height / 2 - (ra.top + ra.height / 2);
         a.style.zIndex = '5';
-        a.style.transition = `transform ${dur}ms cubic-bezier(0.3,0.7,0.4,1)`;
+        a.style.transition = `transform ${D}ms cubic-bezier(0.3,0.7,0.4,1)`;
         requestAnimationFrame(() => {
           a.style.transform = `translate(${dx * 0.82}px, ${dy * 0.82}px) scale(1.18)`;
         });
@@ -390,9 +437,9 @@ export default function BattlePage() {
             a.style.transform = '';
             a.style.zIndex = '';
             finish();
-          }, 400);
-        }, dur + 90);
-        setTimeout(finish, dur + 900);
+          }, Math.max(80, Math.round(400 * SPD())));
+        }, D + Math.max(30, Math.round(90 * SPD())));
+        setTimeout(finish, D + Math.max(200, Math.round(900 * SPD())));
       } catch {
         finish();
       }
@@ -403,8 +450,10 @@ export default function BattlePage() {
     return new Promise((resolve) => {
       const el = fighterRefs.current[key];
       if (!el) return resolve();
+      const up = Math.max(60, Math.round(220 * SPD()));
+      const down = Math.max(60, Math.round(240 * SPD()));
       try {
-        el.style.transition = 'transform 220ms ease-out';
+        el.style.transition = `transform ${up}ms ease-out`;
         el.style.transform = 'translateY(-16px) scale(1.06)';
         setTimeout(() => {
           el.style.transform = 'translate(0,0) scale(1)';
@@ -412,8 +461,8 @@ export default function BattlePage() {
             el.style.transition = '';
             el.style.transform = '';
             resolve();
-          }, 240);
-        }, 240);
+          }, down);
+        }, up);
       } catch {
         resolve();
       }
@@ -552,7 +601,24 @@ export default function BattlePage() {
         const selfTarget = ev.type === 'heal' || ev.type === 'hot' || ev.type === 'regen' || ev.type === 'ko' || ev.type === 'stun';
         setFx({ actor: ev.name, side: ev.side, target, targetSide: selfTarget ? ev.side : foeSideOf(ev.side), kind, num, key, allyTarget: ev.allyTarget || null, crit: ev.crit || false, absorbed: ev.absorbed || 0 });
         clearTimeout(fxTimer.current);
-        fxTimer.current = setTimeout(() => setFx(null), 1600);
+        fxTimer.current = setTimeout(() => setFx(null), Math.round(1600 * SPD()));
+      }
+      // Banner aksi musuh (A3) + vibe arena (A4).
+      if (animate) {
+        const foeActs = fresh.filter((e) => (e.type === 'basic' || e.type === 'skill') && e.side && e.side !== state.yourSide);
+        if (foeActs.length > 0) {
+          const last = foeActs[foeActs.length - 1];
+          const label = last.type === 'skill' ? (last.skill || 'Skill') : 'ATK';
+          setFoeBanner({ text: `${last.name || 'Lawan'}: ${label}${last.crit ? ' CRIT!' : ''}`, key: `${log.length}-${last.t}` });
+          clearTimeout(foeBannerTimer.current);
+          foeBannerTimer.current = setTimeout(() => setFoeBanner(null), Math.round(2200 * SPD()));
+        }
+        const vibeEv = [...fresh].reverse().find((e) => ['burn', 'regen', 'heal', 'energize', 'shield', 'bulwark'].includes(e.effect));
+        if (vibeEv) {
+          setVibe(vibeEv.effect === 'burn' ? 'burn' : (vibeEv.effect === 'shield' || vibeEv.effect === 'bulwark') ? 'shield' : 'heal');
+          clearTimeout(vibeTimer.current);
+          vibeTimer.current = setTimeout(() => setVibe(null), Math.round(1600 * SPD()));
+        }
       }
       seenLog.current = log.length;
       // Animasi terbang untuk SEMUA aksi serangan/heal baru (milikmu, lawan, AI).
@@ -560,11 +626,12 @@ export default function BattlePage() {
         const events = fresh.filter((e) =>
           e && (e.type === 'basic' || e.type === 'skill' || e.type === 'heal' || e.type === 'hot' || e.type === 'regen'));
         if (events.length > 0) {
+          const wait = Math.max(30, Math.round(90 * SPD()));
           setTimeout(() => {
             (async () => {
               for (const e of events.slice(-3)) await animateEvent(state, e);
             })();
-          }, 90);
+          }, wait);
         }
       }
     }
@@ -710,6 +777,7 @@ export default function BattlePage() {
 
   async function startAi() {
     setError('');
+    setNotice('');
     setPending(null);
     setHint('');
     const data = await api('/api/battle/room', { mode: 'ai', team: orderedTeam(), difficulty });
@@ -724,6 +792,7 @@ export default function BattlePage() {
 
   async function createPvp() {
     setError('');
+    setNotice('');
     setPending(null);
     setHint('');
     const data = await api('/api/battle/room', { mode: 'pvp', team: orderedTeam() });
@@ -740,6 +809,7 @@ export default function BattlePage() {
   async function joinPvp(e) {
     e.preventDefault();
     setError('');
+    setNotice('');
     setPending(null);
     setHint('');
     if (picked.length !== 3) {
@@ -768,6 +838,8 @@ export default function BattlePage() {
     setPending(null);
     setHint('');
     setSplash(null);
+    setRematchOffer(null);
+    setOnline([]);
     try {
       await fetch(`/api/battle/room?code=${encodeURIComponent(st.code)}`, { method: 'DELETE' });
     } catch {
@@ -793,6 +865,53 @@ export default function BattlePage() {
     refresh();
   }
 
+  function exitToJoin(code) {
+    clearMyRoom();
+    setSt(null);
+    setPicked([]);
+    setFx(null);
+    setPending(null);
+    setHint('');
+    setSplash(null);
+    setRematchOffer(null);
+    setOnline([]);
+    setFoeBanner(null);
+    setVibe(null);
+    setAutoBattle(false);
+    setJoinCode(code);
+    setMode('join');
+    setNotice('Pilih 3 kartumu lalu tekan Gabung & Mulai untuk menerima rematch.');
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* abaikan */ }
+  }
+
+  async function offerRematch() {
+    if (!st) return;
+    setError('');
+    const data = await api('/api/battle/room/rematch', { code: st.code });
+    if (!data.success || !data.code) {
+      setError(data.message || 'Gagal membuat rematch.');
+      return;
+    }
+    const r = await api(`/api/battle/room?code=${encodeURIComponent(data.code)}`);
+    if (r.success && r.state) {
+      clearMyRoom();
+      setSt(null);
+      setRematchOffer(null);
+      setOnline([]);
+      seenLog.current = 0;
+      applyState(r.state, { animate: false });
+      try { localStorage.setItem(MY_ROOM_KEY, r.state.code); } catch { /* abaikan */ }
+      setNotice('Room rematch dibuat. Bagikan kode ke lawan / tunggu lawan menerima.');
+    } else {
+      exitToJoin(data.code);
+    }
+  }
+
+  function acceptRematch() {
+    if (!rematchOffer?.code) return;
+    exitToJoin(rematchOffer.code);
+  }
+
   function exitBattle() {
     clearMyRoom();
     setSt(null);
@@ -801,6 +920,11 @@ export default function BattlePage() {
     setPending(null);
     setHint('');
     setSplash(null);
+    setRematchOffer(null);
+    setOnline([]);
+    setFoeBanner(null);
+    setVibe(null);
+    setAutoBattle(false);
     setAutoExitIn(0);
     fighterRefs.current = {};
     fetchMine();
@@ -842,20 +966,69 @@ export default function BattlePage() {
     if (data.state) applyState(data.state);
   }
 
+  // Realtime PvP via SSE; fallback polling bila stream gagal. AI sinkron penuh.
+  useEffect(() => {
+    if (!st || st.mode !== 'pvp' || st.status === 'finished' || st.battle?.over) return;
+    setRematchOffer(null);
+    setOnline([]);
+    let es = null;
+    try {
+      es = new EventSource(`/api/battle/room/stream?code=${encodeURIComponent(st.code)}`);
+    } catch {
+      setStreamFail(true);
+    }
+    if (es) {
+      esRef.current = es;
+      setStreamFail(false);
+      es.addEventListener('ready', () => setStreamOn(true));
+      es.addEventListener('state', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (Array.isArray(data.online)) setOnline(data.online);
+          if (data.rematch) setRematchOffer(data.rematch);
+          if (data.state) applyState(data.state);
+        } catch { /* abaikan */ }
+      });
+      es.addEventListener('gone', () => {
+        try { es.close(); } catch { /* abaikan */ }
+        esRef.current = null;
+        setStreamOn(false);
+        refresh();
+      });
+      es.onerror = () => {
+        setStreamFail(true);
+        setStreamOn(false);
+        try { es.close(); } catch { /* abaikan */ }
+        esRef.current = null;
+      };
+    }
+    return () => {
+      try { es?.close(); } catch { /* abaikan */ }
+      esRef.current = null;
+      setStreamOn(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st?.code]);
+
+  // Fallback polling: stream gagal (PvP 2.5 dtk) atau mode AI (15 dtk, hanya agar timeout/forfeit server teraplikasi).
   useEffect(() => {
     if (!st || st.status === 'finished' || st.battle?.over) return;
-    const waiting = st.status === 'waiting';
-    const myTurn = st.turn === me?.id;
-    if (!waiting && myTurn) return;
-    const t = setInterval(() => { if (!document.hidden) refresh(); }, 2500);
+    if (st.mode === 'pvp' && streamOn && !streamFail) return;
+    const ms = st.mode === 'pvp' ? 2500 : 15000;
+    const t = setInterval(() => { if (!document.hidden) refresh(); }, ms);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.code, st?.status, st?.turn, st?.battle?.over, me?.id]);
+  }, [st?.code, st?.status, st?.turn, st?.battle?.over, me?.id, streamOn, streamFail]);
 
   // Battle selesai: scroll ke hasil + otomatis kembali ke menu pilih tim.
   const battleDone = Boolean(st && (st.status === 'finished' || st.battle?.over));
   useEffect(() => {
     if (!battleDone) {
+      setAutoExitIn(0);
+      return;
+    }
+    // Beri waktu menerima rematch: jangan auto-keluar saat ada tawaran.
+    if (rematchOffer) {
       setAutoExitIn(0);
       return;
     }
@@ -867,7 +1040,20 @@ export default function BattlePage() {
     const to = setTimeout(() => { exitBattle(); }, 8000);
     return () => { clearInterval(tick); clearTimeout(to); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [st?.code, st?.status, st?.battle?.over]);
+  }, [st?.code, st?.status, st?.battle?.over, rematchOffer]);
+
+  // Auto-battle vs AI: mainkan giliranmu otomatis (A5).
+  useEffect(() => {
+    if (!autoBattle || !myTurn || acting || !st || st.mode !== 'ai' || st.battle?.over) return;
+    const t = setTimeout(() => {
+      const tgt = foeTeam?.active;
+      if (canSkill2) doAct({ type: 'skill2', target: tgt });
+      else if (canSkill) doAct({ type: 'skill', target: tgt });
+      else doAct({ type: 'basic', target: tgt });
+    }, Math.max(300, Math.round(700 * SPD())));
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
 
   const mySide = st?.yourSide || 'player';
   const foeSide = mySide === 'player' ? 'enemy' : 'player';
@@ -932,6 +1118,7 @@ export default function BattlePage() {
             <h1>Battle Kartu</h1>
           </div>
           <ErrorRetry message={error} onRetry={refresh} />
+          {notice ? <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{notice}</div> : null}
 
           {!st && myRooms.length > 0 ? (
             <div className="card" style={{ marginBottom: 16, borderColor: 'var(--link)' }}>
@@ -1297,7 +1484,15 @@ export default function BattlePage() {
                       ⏱ {fmtClock(fLeft)}
                     </span>
                   ) : null}
-                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={() => setSpeed((s) => (s === '2' ? '1' : '2'))} title="Kecepatan animasi battle">
+                      ⏩ {speed}x
+                    </button>
+                    {st.mode === 'ai' && !st.battle.over ? (
+                      <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={() => setAutoBattle((v) => !v)} title="Mainkan giliranmu otomatis (vs AI)">
+                        🤖 {autoBattle ? 'ON' : 'OFF'}
+                      </button>
+                    ) : null}
                     {!st.battle.over ? (
                       <button className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }} onClick={() => setAskSurrender(true)}>
                         Menyerah
@@ -1315,12 +1510,19 @@ export default function BattlePage() {
                 ) : null}
               </div>
 
-              <div ref={arenaRef} className="arena">
-              <div className="card" style={{ marginBottom: 16 }}>
+              <div ref={arenaRef} className={vibe ? `arena vibe-${vibe}` : 'arena'}>
+              {foeBanner ? <div key={foeBanner.key} className="foe-banner" role="status">⚔ {foeBanner.text}</div> : null}
+              <div className="card side-card side-foe" style={{ marginBottom: 16 }}>
                 <div className="arena-side-title">
+                  <span className="side-tag side-tag-foe">LAWAN</span>
                   {st.mode === 'ai' ? 'Lawan (AI)' : `@${mySide === 'player' ? st.p2Username : st.p1Username}`}
                   {st.turn !== me?.id && st.status === 'ongoing' && !st.battle.over ? (
                     <span className="turn-badge">Giliran lawan</span>
+                  ) : null}
+                  {st.mode === 'pvp' && !st.battle.over ? (
+                    online.some((id) => String(id) !== String(me?.id))
+                      ? <span className="online-dot online">● online</span>
+                      : <span className="online-dot">○ offline</span>
                   ) : null}
                 </div>
                 <div className="fighters">
@@ -1354,8 +1556,9 @@ export default function BattlePage() {
                 <ConsPips value={foeTeam?.cons || 0} />
               </div>
 
-              <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card side-card side-me" style={{ marginBottom: 16 }}>
                 <div className="arena-side-title">
+                  <span className="side-tag side-tag-me">KAMU</span>
                   Timmu
                   {myTurn ? <span className="turn-badge">Giliranmu</span> : null}
                 </div>
@@ -1404,7 +1607,7 @@ export default function BattlePage() {
                       ATK ({activeFighter?.basic})
                     </button>
                     <button
-                      className={pending?.type === 'skill' ? 'btn armed' : 'btn'}
+                      className={`${pending?.type === 'skill' ? 'btn armed' : 'btn'} ${toneForEffect(activeFighter?.effect)}`}
                       style={{ width: 'auto' }}
                       disabled={!canSkill}
                       onClick={() => armAction('skill')}
@@ -1414,7 +1617,7 @@ export default function BattlePage() {
                     </button>
                     {hasSkill2 ? (
                       <button
-                        className={pending?.type === 'skill2' ? 'btn armed' : 'btn'}
+                        className={`${pending?.type === 'skill2' ? 'btn armed' : 'btn'} ${toneForEffect(activeFighter?.effect2)}`}
                         style={{ width: 'auto' }}
                         disabled={!canSkill2}
                         onClick={() => armAction('skill2')}
@@ -1442,7 +1645,9 @@ export default function BattlePage() {
                 ) : null}
                 {st.turn && !myTurn && st.status === 'ongoing' && !st.battle.over ? (
                   <div style={{ marginTop: 8, fontSize: 12, color: 'var(--body)' }}>
-                    Menunggu lawan... (menyerah otomatis bila 2 menit diam)
+                    {st.mode === 'pvp' && online.some((id) => String(id) !== String(me?.id))
+                      ? 'Lawan sedang memilih…'
+                      : 'Menunggu lawan... (menyerah otomatis bila 2 menit diam)'}
                   </div>
                 ) : null}
               </div>
@@ -1482,6 +1687,26 @@ export default function BattlePage() {
                   >
                     Main Lagi
                   </button>
+                  {st.mode === 'pvp' ? (
+                    rematchOffer?.code ? (
+                      <div className="trade-fair ok" role="status" style={{ marginTop: 12 }}>
+                        ⚔ @{rematchOffer.from || 'lawan'} menantang rematch! (kode {rematchOffer.code})
+                        <div style={{ marginTop: 8 }}>
+                          <button className="btn" style={{ width: 'auto' }} onClick={acceptRematch}>
+                            Terima & Pilih Tim
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-ghost"
+                        style={{ marginTop: 8 }}
+                        onClick={offerRematch}
+                      >
+                        🔁 Rematch
+                      </button>
+                    )
+                  ) : null}
                   {autoExitIn > 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
                       Otomatis kembali dalam {autoExitIn} dtk…
@@ -1494,7 +1719,7 @@ export default function BattlePage() {
                 <div className="section-title">Jalannya battle ({st.battle?.turnCount || 0} giliran)</div>
                 <div style={{ maxHeight: 160, overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
                   {(st.battle?.log || []).slice(-8).reverse().map((ev, i) => (
-                    <div key={`${ev.t}-${i}`} style={{ color: ev.type === 'ko' || ev.type === 'end' ? 'var(--ink)' : 'var(--body)', fontWeight: ev.type === 'ko' || ev.type === 'end' ? 800 : 400 }}>
+                    <div key={`${ev.t}-${i}`} style={logTone(ev)}>
                       <span style={{ color: 'var(--muted)', marginRight: 6 }}>#{ev.t}</span>{describeLog(ev)}
                     </div>
                   ))}

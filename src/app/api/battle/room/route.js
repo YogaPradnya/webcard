@@ -10,34 +10,15 @@ import {
   saveRoom,
   applyTimeout,
   applyForfeit,
-  forfeitMsLeft,
-  FORFEIT_TIMEOUT_MS,
   finishIfOver,
   playAiTurns,
   sideOf,
+  publicState,
   isWaitingExpired,
   deleteRoom,
   cleanupExpiredWaitingRooms,
 } from '@/lib/rooms';
-
-function publicState(room, youId) {
-  return {
-    code: room.code,
-    mode: room.mode,
-    status: room.status,
-    turn: room.turn,
-    you: String(youId),
-    yourSide: sideOf(room, youId),
-    p1Username: room.p1Username,
-    p2Username: room.p2Username,
-    battle: room.battle,
-    winner: room.winner,
-    result: room.result,
-    updatedAt: room.updatedAt,
-    forfeitMsLeft: forfeitMsLeft(room, Date.now()),
-    forfeitTimeoutMs: FORFEIT_TIMEOUT_MS,
-  };
-}
+import { bumpRoom } from '@/lib/roomEvents';
 
 async function validateTeam(db, userId, team) {
   if (!Array.isArray(team) || team.length !== 3) return 'Pilih 3 kartu berbeda.';
@@ -189,6 +170,7 @@ export async function POST(req) {
         '{}', null, 'waiting', now, now],
     });
     const saved = await getRoom(code);
+    bumpRoom(code);
     return NextResponse.json({ success: true, state: publicState(saved, session.id) });
   } catch (e) {
     console.error('[BATTLE ROOM]', e.message);

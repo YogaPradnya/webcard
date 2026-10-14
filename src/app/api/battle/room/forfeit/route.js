@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { ensureBattleRooms, getRoom, saveRoom, surrender, finishIfOver, sideOf } from '@/lib/rooms';
+import { bumpRoom } from '@/lib/roomEvents';
 
 // POST /api/battle/room/forfeit { code } — menyerah manual, game langsung berakhir.
 export async function POST(req) {
@@ -25,6 +26,7 @@ export async function POST(req) {
     if (!res) return NextResponse.json({ success: false, message: 'Battle sudah selesai.' }, { status: 400 });
     await finishIfOver(room);
     await saveRoom(room);
+    bumpRoom(code);
     return NextResponse.json({ success: true, battle: room.battle, result: room.result, winner: room.winner });
   } catch (e) {
     console.error('[BATTLE FORFEIT]', e.message);

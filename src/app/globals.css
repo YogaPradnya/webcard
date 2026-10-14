@@ -2116,3 +2116,95 @@ body {
   border-color: #a3e636;
   color: #eefbcf;
 }
+
+/* ===== Battle realtime: identitas sisi, tone skill, banner, vibe arena ===== */
+.side-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.side-tag-me {
+  background: var(--lime);
+  color: var(--on-primary);
+}
+
+.side-tag-foe {
+  background: var(--pastel-red);
+  border-color: var(--pastel-red-bd);
+  color: var(--ink);
+}
+
+.online-dot {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.online-dot.online {
+  color: var(--success);
+}
+
+.btn.tone-heal { background: var(--pastel-green); border-color: var(--pastel-green-bd); color: var(--ink); }
+.btn.tone-shield { background: var(--pastel-orange); border-color: var(--role-tank); color: var(--ink); }
+.btn.tone-atk { background: var(--pastel-red); border-color: var(--pastel-red-bd); color: var(--ink); }
+.btn.tone-arcane { background: var(--pastel-purple); border-color: var(--pastel-purple-bd); color: var(--ink); }
+
+.foe-banner {
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  background: var(--pastel-red);
+  border: 1.5px solid var(--pastel-red-bd);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  animation: foeBannerIn 0.25s ease-out;
+}
+
+@keyframes foeBannerIn {
+  from { transform: translateY(-6px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.arena::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 5;
+}
+
+.arena.vibe-heal::after { opacity: 1; box-shadow: inset 0 0 70px rgba(22, 163, 74, 0.28); }
+.arena.vibe-burn::after { opacity: 1; box-shadow: inset 0 0 70px rgba(234, 88, 12, 0.3); }
+.arena.vibe-shield::after { opacity: 1; box-shadow: inset 0 0 70px rgba(154, 106, 59, 0.35); }
+
+.turn-badge {
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.turn-badge.danger {
+  background: var(--pastel-red);
+  border-color: var(--pastel-red-bd);
+  color: var(--ink);
+  animation: dangerPulse 1s infinite;
+}
+
+@keyframes dangerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foe-banner,
+  .turn-badge.danger {
+    animation: none !important;
+  }
+}
