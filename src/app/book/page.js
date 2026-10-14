@@ -409,7 +409,7 @@ export default function BookPage() {
               onClick={() => setTab('display')}
               aria-pressed={tab === 'display'}
             >
-              Pajangan 🎁 ({pajanganTotal})
+              Pajangan ({pajanganTotal})
             </button>
           </div>
 
