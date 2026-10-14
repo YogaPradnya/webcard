@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import MissionList from '@/components/MissionList';
+import { optImg } from '@/lib/images';
 
 function avatarColor(name) {
   const s = String(name || '?');
@@ -125,11 +126,6 @@ export default function ProfilePage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function onLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    router.push('/login');
-  }
 
   async function onClaimMission(period, missionId) {
     setMissionClaiming(`${period}:${missionId}`);
@@ -299,7 +295,7 @@ export default function ProfilePage() {
                           const found = (profile.titles.earned || []).find((t) => t.title === profile.title);
                           return found?.icon ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={found.icon} alt="" width={20} height={20} className="title-badge-sm" />
+                            <img src={found.icon} alt="" width={20} height={20} className="title-badge-sm" loading="lazy" decoding="async" />
                           ) : null;
                         })()}
                         [{profile.title}] <button type="button" className="link-btn" onClick={removeTitle} disabled={busy === 'title:'}>lepas</button></div>
@@ -321,7 +317,7 @@ export default function ProfilePage() {
                   <div className="profile-showcase">
                     {profile.showcase.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={profile.showcase.imageUrl} alt={profile.showcase.name} loading="lazy" decoding="async" />
+                      <img src={optImg(profile.showcase.imageUrl, 300)} alt={profile.showcase.name} loading="lazy" decoding="async" />
                     ) : null}
                     <div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan{(profilSource === 'gacha' || (profilSource === 'auto' && !profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
@@ -336,7 +332,7 @@ export default function ProfilePage() {
                   <div className="profile-showcase" style={{ marginTop: 12, ...displayShowcaseStyle(profile.displayShowcase) }}>
                     {profile.displayShowcase.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={profile.displayShowcase.imageUrl} alt={profile.displayShowcase.name} loading="lazy" decoding="async" style={{ border: `3px solid ${displayBorderColor(profile.displayShowcase)}` }} />
+                      <img src={optImg(profile.displayShowcase.imageUrl, 300)} alt={profile.displayShowcase.name} loading="lazy" decoding="async" style={{ border: `3px solid ${displayBorderColor(profile.displayShowcase)}` }} />
                     ) : null}
                     <div>
                       <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan spesial 🎁{(profilSource === 'display' || (profilSource === 'auto' && profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
@@ -358,9 +354,6 @@ export default function ProfilePage() {
                   <Link href="/book" className="menu-tile"><span className="menu-ico">▦</span>Book</Link>
                   {shopOn ? <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link> : null}
                 </div>
-                <button className="btn btn-ghost" onClick={onLogout} style={{ marginTop: 12 }}>
-                  Keluar
-                </button>
               </div>
 
               <div className="mission-duo">
@@ -434,7 +427,7 @@ export default function ProfilePage() {
                       <div key={s.id} className="card-item">
                         {s.imageUrl ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img className="card-art" src={s.imageUrl} alt={s.name} loading="lazy" decoding="async" />
+                          <img className="card-art" src={optImg(s.imageUrl, 300)} alt={s.name} loading="lazy" decoding="async" />
                         ) : (
                           <div className="card-art" />
                         )}
@@ -484,7 +477,7 @@ export default function ProfilePage() {
                         <div className="title-top">
                           {t.icon ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge" loading="lazy" />
+                            <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge" loading="lazy" decoding="async" />
                           ) : null}
                           <div className="title-name">{t.title}</div>
                         </div>
@@ -509,7 +502,7 @@ export default function ProfilePage() {
                           <div className="title-top">
                             {t.icon ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge locked-img" loading="lazy" />
+                              <img src={t.icon} alt={t.title} width={40} height={40} className="title-badge locked-img" loading="lazy" decoding="async" />
                             ) : null}
                             <div className="title-name">{t.title}</div>
                           </div>

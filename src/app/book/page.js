@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
+import { optImg } from '@/lib/images';
 
 const TIERS = ['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
 const PAGE_SIZE = 24;
@@ -448,7 +449,7 @@ export default function BookPage() {
                               <div className="card-art gacha-noart" style={{ fontSize: 48, fontWeight: 800 }}>+</div>
                             ) : item.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img className="card-art" src={item.imageUrl} alt={item.name} loading="lazy" decoding="async" />
+                              <img className="card-art" src={optImg(item.imageUrl, 300)} alt={item.name} loading="lazy" decoding="async" />
                             ) : (
                               <div className="card-art" />
                             )}
@@ -486,7 +487,7 @@ export default function BookPage() {
                             <div className="flip-front">
                               {c.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
+                                <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
                               ) : (
                                 <div className="card-art" />
                               )}
@@ -669,7 +670,7 @@ export default function BookPage() {
               <div className="flip-front">
                 {c.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
+                  <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
                 ) : (
                   <div className="card-art" />
                 )}

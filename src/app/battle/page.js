@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import ConfirmModal from '@/components/ConfirmModal';
+import { optImg } from '@/lib/images';
 
 function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
@@ -69,7 +70,7 @@ function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTone, ref
     >
       {art ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="fighter-img" src={art} alt={f.name} loading="lazy" decoding="async" />
+        <img className="fighter-img" src={optImg(art, 400)} alt={f.name} loading="lazy" decoding="async" />
       ) : (
         <div className="fighter-img" />
       )}
@@ -1224,7 +1225,7 @@ export default function BattlePage() {
                           <div className="flip-front">
                             {c.imageUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
+                              <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
                             ) : (
                               <div className="card-art" />
                             )}

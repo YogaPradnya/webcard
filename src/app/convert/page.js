@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { optImg } from '@/lib/images';
 
 const RATES = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
 
@@ -160,7 +161,7 @@ export default function ConvertPage() {
                   <div className="user-row" key={c.name}>
                     {c.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.imageUrl} alt={c.name} width={36} height={48} style={{ objectFit: 'cover', borderRadius: 6 }} loading="lazy" />
+                      <img src={optImg(c.imageUrl, 100)} alt={c.name} width={36} height={48} style={{ objectFit: 'cover', borderRadius: 6 }} loading="lazy" />
                     ) : null}
                     <span style={{ flex: 1 }}>
                       <b>{c.name}</b> <span style={{ color: 'var(--muted)', fontSize: 12 }}>[{c.tier}] x{c.quantity} • {RATES[c.tier] || 0} XP</span>

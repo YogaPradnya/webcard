@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { optImg } from '@/lib/images';
 
 function formatSisa(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -407,7 +408,7 @@ export default function TradePage() {
                       {pickCard === c.name ? <span className="pick-check">✓</span> : null}
                       {c.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img className="card-art" src={c.imageUrl} alt={c.name} loading="lazy" decoding="async" />
+                        <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
                       ) : (
                         <div className="card-art" />
                       )}

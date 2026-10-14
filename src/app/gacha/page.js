@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { optImg } from '@/lib/images';
 
 const TIER_COLORS = {
   Mythic: '#ef4444',
@@ -40,7 +41,7 @@ function RevealCard({ pull, face }) {
       {pull.isNew ? <span className="gacha-new">BARU</span> : <span className="gacha-dupe">+1 stack</span>}
       {pull.imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="card-art" src={pull.imageUrl} alt={pull.charName} decoding="async" />
+        <img className="card-art" src={optImg(pull.imageUrl, 400)} alt={pull.charName} decoding="async" />
       ) : (
         <div className="card-art gacha-noart" style={{ background: `${color}33` }}><span>?</span></div>
       )}

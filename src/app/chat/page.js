@@ -254,7 +254,7 @@ export default function ChatPage() {
                           <span className="wa-title-pill">
                             {m.titleIcon ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={m.titleIcon} alt="" width={14} height={14} className="wa-title-ico" />
+                              <img src={m.titleIcon} alt="" width={14} height={14} className="wa-title-ico" loading="lazy" decoding="async" />
                             ) : null}
                             {m.title}
                           </span>
@@ -264,7 +264,7 @@ export default function ChatPage() {
                       <div className="wa-title-pill mine">
                         {m.titleIcon ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.titleIcon} alt="" width={14} height={14} className="wa-title-ico" />
+                          <img src={m.titleIcon} alt="" width={14} height={14} className="wa-title-ico" loading="lazy" decoding="async" />
                         ) : null}
                         {m.title}
                       </div>
