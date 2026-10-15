@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from '@libsql/client';
 import {
-  loadMigrations, splitStatements, applyMigrations, assertSchemaReady,
+  loadMigrations, splitStatements, stripSqlComments, applyMigrations, assertSchemaReady,
   getExpectedVersion, getAppliedVersion, isSchemaReady, markSchemaReady,
 } from '../../src/lib/schema.js';
 
@@ -55,5 +55,38 @@ describe('migrasi skema', () => {
   it('splitStatements tidak memecah string kosong', () => {
     const parts = splitStatements("ALTER TABLE a ADD COLUMN b TEXT DEFAULT '';\nUPDATE a SET b = 1;");
     assert.equal(parts.length, 2);
+  });
+  it('komentar di depan ALTER dikupas (regresi SCHEMA BOOT GAGAL)', () => {
+    const cleaned = stripSqlComments('-- 008: komentar\nALTER TABLE a ADD COLUMN b INTEGER;');
+    assert.match(cleaned.trim(), /^ALTER\s/i);
+    const parts = splitStatements('-- 008: komentar\nALTER TABLE a ADD COLUMN b INTEGER;\nUPDATE a SET b = 1 WHERE b IS NULL;');
+    assert.equal(parts.length, 2);
+    assert.match(parts[0], /^ALTER\s/i);
+    // String berisi -- dan ; tidak rusak
+    const tricky = splitStatements("INSERT INTO t (a) VALUES ('a--b;c');");
+    assert.equal(tricky.length, 1);
+    assert.match(tricky[0], /a--b;c/);
+  });
+  it('008 tuntas di DB lama yang kolomnya sudah ada (seperti produksi)', async () => {
+    const db = createClient({ url: ':memory:' });
+    // Simulasi produksi: tabel bot SUDAH punya kolom web + versi macet di 7.
+    await db.execute('CREATE TABLE user_cards (user_id TEXT, char_name TEXT, quantity INTEGER DEFAULT 1)');
+    await db.execute('CREATE TABLE user_stats (user_id TEXT PRIMARY KEY, username TEXT, web_title TEXT DEFAULT NULL)');
+    for (const m of loadMigrations()) {
+      if (m.version >= 8) continue;
+      for (const stmt of splitStatements(m.sql)) {
+        try { await db.execute(stmt); } catch (e) {
+          if (/duplicate column|no such table|already exists/i.test(String(e?.message || e))) continue;
+          throw e;
+        }
+      }
+    }
+    await getAppliedVersion(db); // buat tabel schema_version dulu
+    await db.execute({ sql: 'INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (7, ?)', args: [Date.now()] });
+    // Inilah yang meledak di produksi: sekarang harus tuntas tanpa throw.
+    const applied = await applyMigrations(db);
+    assert.deepEqual(applied, [8]);
+    assert.equal(await getAppliedVersion(db), 8);
+    await assertSchemaReady(db);
   });
 });

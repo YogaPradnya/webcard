@@ -36,13 +36,76 @@ export function getExpectedVersion() {
   return all.length > 0 ? Math.max(...all.map((m) => m.version)) : 0;
 }
 
-// Pecah file SQL jadi statement (satu statement per blok `;` + baris baru).
+// Kupas komentar SQL (-- baris & /* blok*) dengan hormat pada string
+// kutip ('...', "...", `...`, termasuk escape '' ). Wajib sebelum deteksi
+// jenis statement: statement 008 diawali baris komentar sehingga cek
+// /^ALTER/ gagal dan error "duplicate column" yang harusnya ditoleransi
+// malah dilempar (insiden SCHEMA BOOT GAGAL di produksi).
+export function stripSqlComments(sql) {
+  const s = String(sql || '');
+  let out = '';
+  let i = 0;
+  let quote = null;
+  while (i < s.length) {
+    const c = s[i];
+    const next = s[i + 1];
+    if (quote) {
+      out += c;
+      if (c === quote) {
+        if (next === quote) { out += next; i += 2; continue; }
+        quote = null;
+      }
+      i += 1;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') { quote = c; out += c; i += 1; continue; }
+    if (c === '-' && next === '-') {
+      while (i < s.length && s[i] !== '\n') i += 1;
+      continue;
+    }
+    if (c === '/' && next === '*') {
+      i += 2;
+      while (i < s.length && !(s[i] === '*' && s[i + 1] === '/')) i += 1;
+      i += 2;
+      continue;
+    }
+    out += c;
+    i += 1;
+  }
+  return out;
+}
+
+// Pecah SQL jadi statement pada `;` DI LUAR string kutip. Komentar dikupas
+// dulu agar statement bersih dieksekusi & terdeteksi jenisnya.
 export function splitStatements(sql) {
-  return String(sql || '')
-    .split(/;[ \t]*\r?\n/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((s) => (s.endsWith(';') ? s : `${s};`));
+  const clean = stripSqlComments(sql);
+  const parts = [];
+  let cur = '';
+  let quote = null;
+  let i = 0;
+  while (i < clean.length) {
+    const c = clean[i];
+    if (quote) {
+      cur += c;
+      if (c === quote) {
+        if (clean[i + 1] === quote) { cur += clean[i + 1]; i += 2; continue; }
+        quote = null;
+      }
+      i += 1;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === '`') { quote = c; cur += c; i += 1; continue; }
+    if (c === ';') {
+      if (cur.trim()) parts.push(`${cur.trim()};`);
+      cur = '';
+      i += 1;
+      continue;
+    }
+    cur += c;
+    i += 1;
+  }
+  if (cur.trim()) parts.push(`${cur.trim()};`);
+  return parts;
 }
 
 export async function getAppliedVersion(db) {
