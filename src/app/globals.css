@@ -175,6 +175,31 @@ body {
   .brand {
     margin-bottom: 16px;
   }
+
+  /* Input/select boleh menyusut di baris flex (anti meluber horizontal). */
+  .input,
+  .select {
+    min-width: 0;
+  }
+
+  /* Label bottomnav tidak boleh memaksa overflow. */
+  .bottomnav .nav-item {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Tombol "?" flip tidak menutupi nama/tier kartu. */
+  .card-item .card-meta {
+    padding-right: 34px;
+  }
+
+  /* Kode room waiting muat di layar kecil. */
+  .trade-code-big {
+    font-size: 32px;
+    letter-spacing: 4px;
+  }
 }
 
 .brand {

@@ -1427,6 +1427,7 @@ export default function BattlePage() {
                   placeholder="Cari usn / kode..."
                   value={roomQInput}
                   onChange={(e) => setRoomQInput(e.target.value)}
+                  style={{ flex: 1, minWidth: 0 }}
                 />
                 <button className="btn" type="submit" style={{ width: 'auto', padding: '0 20px' }}>
                   Cari
@@ -1566,8 +1567,8 @@ export default function BattlePage() {
                   ) : null}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                  <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Cari kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} aria-label="Cari kartu battle" />
-                  <select className="select" style={{ width: 130 }} value={pickTier} onChange={(e) => setPickTier(e.target.value)} aria-label="Filter tier">
+                  <input className="input" style={{ flex: 1, minWidth: 0 }} placeholder="Cari kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} aria-label="Cari kartu battle" />
+                  <select className="select" style={{ width: 130, flexShrink: 0 }} value={pickTier} onChange={(e) => setPickTier(e.target.value)} aria-label="Filter tier">
                     {['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'].map((t) => (
                       <option key={t} value={t}>{t === 'All' ? 'Semua tier' : t}</option>
                     ))}
@@ -1731,7 +1732,7 @@ export default function BattlePage() {
                 </div>
               ) : null}
 
-            <div style={{ height: 90 }} />
+            <div style={{ height: 150 }} />
             <div className="floating-bar">
               {mode === 'join' ? (
                 <button className="btn" disabled={picked.length !== 3} type="submit" form="joinForm">
