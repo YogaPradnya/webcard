@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
+import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 
 const RATES = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
 
@@ -24,23 +25,20 @@ export default function ConvertPage() {
   async function load() {
     setError('');
     try {
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json().catch(() => ({}));
-      if (!meRes.ok || !meData.success) {
+      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+      if (!meOk || !meData.success) {
         router.push('/login');
         return;
       }
       setMe(meData);
-      const [cardsRes, gachaRes] = await Promise.all([
-        fetch('/api/cards?owned=1'),
-        fetch('/api/gacha'),
+      const [cardsData, gachaData] = await Promise.all([
+        fetchLenient('/api/cards?owned=1'),
+        fetchLenient('/api/gacha'),
       ]);
-      const cardsData = await cardsRes.json().catch(() => ({}));
       if (cardsData.success) setCards((cardsData.cards || []).filter((c) => c.owned));
-      const gachaData = await gachaRes.json().catch(() => ({}));
       if (gachaData.success) setXp(gachaData.xp || 0);
-    } catch {
-      setError('Tidak bisa menghubungi server.');
+    } catch (e) {
+      setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
     }
@@ -85,13 +83,12 @@ export default function ConvertPage() {
     setBusy(true);
     setError('');
     try {
-      const res = await fetch('/api/convert', {
+      const { ok, data } = await fetchJson('/api/convert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: lines.map((l) => ({ charName: l.charName, qty: l.qty })) }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal konversi.');
         return;
       }

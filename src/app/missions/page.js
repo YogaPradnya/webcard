@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import MissionList from '@/components/MissionList';
+import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 
 export default function MissionsPage() {
   const router = useRouter();
@@ -17,22 +18,20 @@ export default function MissionsPage() {
 
   async function load() {
     try {
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json().catch(() => ({}));
-      if (!meRes.ok || !meData.success) {
+      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+      if (!meOk || !meData.success) {
         router.push('/login');
         return;
       }
       setMe(meData);
-      const res = await fetch('/api/missions');
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.success) {
+      const { ok, data: d } = await fetchJson('/api/missions');
+      if (!ok || !d.success) {
         setError(d.message || 'Gagal memuat misi.');
         return;
       }
       setData(d);
-    } catch {
-      setError('Tidak bisa menghubungi server.');
+    } catch (e) {
+      setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
     }
@@ -48,13 +47,12 @@ export default function MissionsPage() {
     setError('');
     setToast('');
     try {
-      const res = await fetch('/api/missions/claim', {
+      const { ok, data: d } = await fetchJson('/api/missions/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period, missionId }),
       });
-      const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.success) {
+      if (!ok || !d.success) {
         setError(d.message || 'Gagal klaim.');
         return;
       }
@@ -70,9 +68,8 @@ export default function MissionsPage() {
       });
       // Sinkron ringan di background.
       try {
-        const mRes = await fetch('/api/missions');
-        const mData = await mRes.json().catch(() => ({}));
-        if (mRes.ok && mData.success) setData(mData);
+        const mData = await fetchLenient('/api/missions');
+        if (mData.success) setData(mData);
       } catch { /* abaikan */ }
     } catch {
       setError('Tidak bisa menghubungi server.');

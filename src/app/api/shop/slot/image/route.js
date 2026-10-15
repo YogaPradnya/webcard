@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { checkRateCount } from '@/lib/rateLimit';
 import { uploadSlotImage, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_MIME } from '@/lib/cloudinary';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/shop/slot/image (multipart form-data, field "file")
 // Upload gambar ke Cloudinary, return { imageUrl }. Tidak makan jatah ubah
 // (jatah kemakan saat Simpan). Maks 5MB, JPG/PNG/WebP.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const attempt = await checkRateCount(`shopupload:${session.id}`, 20, 60 * 1000);
@@ -43,3 +44,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: msg }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/shop/slot/image/route.js');

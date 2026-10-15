@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, surrender, finishIfOver, sideOf } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/battle/room/forfeit { code } — menyerah manual, game langsung berakhir.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   let body = {};
@@ -33,3 +34,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal menyerah.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/forfeit/route.js');

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ensureLoginCodeTable, generateLoginCode, hashToken, newToken, LOGIN_CODE_TTL_MS } from '@/lib/loginCode';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 function tokenCookie(token, maxAge) {
   const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
@@ -9,7 +10,7 @@ function tokenCookie(token, maxAge) {
 
 // POST /api/auth/code { tnc: true } — buat kode login 6 huruf untuk sesi browser ini.
 // Wajib menyetujui TnC dulu (checkbox di UI + validasi server anti by-pass).
-export async function POST(req) {
+async function POST_impl(req) {
   try {
     let tnc = false;
     try {
@@ -50,3 +51,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal buat kode.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/auth/code/route.js');

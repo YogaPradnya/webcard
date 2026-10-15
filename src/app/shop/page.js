@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
+import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 
 function idr(n) {
   return `Rp${Number(n || 0).toLocaleString('id-ID')}`;
@@ -68,12 +69,11 @@ export default function ShopPage() {
     setChecking(orderId);
     setSuccessMsg('');
     try {
-      const res = await fetch('/api/shop/order/check', {
+      const { data } = await fetchJson('/api/shop/order/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orderId }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!data.success && data.message) {
         setError(data.message);
       } else if (data.status === 'paid') {
@@ -94,19 +94,14 @@ export default function ShopPage() {
   async function load() {
     setError('');
     try {
-      const catRes = await fetch('/api/shop/packages');
-      const catData = await catRes.json().catch(() => ({}));
-      if (catRes.ok && catData.success) setCatalog(catData);
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json().catch(() => ({}));
-      if (meRes.ok && meData.success) {
+      const catData = await fetchLenient('/api/shop/packages');
+      if (catData.success) setCatalog(catData);
+      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+      if (meOk && meData.success) {
         setMe(meData);
-        const [sRes, oRes, pRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/shop/orders'), fetch('/api/profile')]);
-        const sData = await sRes.json().catch(() => ({}));
+        const [sData, oData, pData] = await Promise.all([fetchLenient('/api/shop/slots'), fetchLenient('/api/shop/orders'), fetchLenient('/api/profile')]);
         if (sData.success) setSlots(sData.slots || []);
-        const oData = await oRes.json().catch(() => ({}));
         if (oData.success) setOrders(oData.orders || []);
-        const pData = await pRes.json().catch(() => ({}));
         if (pData.success && Number.isFinite(Number(pData.profile?.xp))) setMyXp(Number(pData.profile.xp));
       }
     } catch {
@@ -152,13 +147,12 @@ export default function ShopPage() {
     setPaying(label);
     setError('');
     try {
-      const res = await fetch('/api/shop/order', {
+      const { ok, data } = await fetchJson('/api/shop/order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal membuat pembayaran.');
         return;
       }

@@ -4,10 +4,11 @@ import { getDb } from '@/lib/db';
 import { ensureQuantityColumn, getUserCollection } from '@/lib/cards';
 import { isDisplayOwned } from '@/lib/display';
 import { CONVERT_XP_REWARD, calcLevel } from '@/lib/gacha';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/convert { items: [{ charName, qty }] } — konversi copy kartu menjadi XP.
 // Rate ikut tabel bot (Common 50 / Rare 150 / Epic 400 / Legendary 1000 / Mythic 2500 per copy).
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   let body = {};
@@ -80,3 +81,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal konversi.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/convert/route.js');

@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar';
 import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg } from '@/lib/images';
+import { fetchJson } from '@/lib/fetchJson';
 
 const TIER_COLORS = {
   Mythic: '#e5484d',
@@ -94,22 +95,20 @@ export default function GachaPage() {
   async function load() {
     setError('');
     try {
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json().catch(() => ({}));
-      if (!meRes.ok || !meData.success) {
+      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+      if (!meOk || !meData.success) {
         router.push('/login');
         return;
       }
       setMe(meData);
-      const res = await fetch('/api/gacha');
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      const { ok, data } = await fetchJson('/api/gacha');
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal memuat gacha.');
         return;
       }
       setInfo(data);
-    } catch {
-      setError('Tidak bisa menghubungi server.');
+    } catch (e) {
+      setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
     }
@@ -144,13 +143,12 @@ export default function GachaPage() {
     setPulls([]);
     setFinished(false);
     try {
-      const res = await fetch('/api/gacha/pull', {
+      const { ok, data } = await fetchJson('/api/gacha/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal gacha.');
         return;
       }

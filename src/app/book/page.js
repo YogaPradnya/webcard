@@ -9,6 +9,7 @@ import { PageSkeleton } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
 import { optImg } from '@/lib/images';
+import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 
 const TIERS = ['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
 const PAGE_SIZE = 24;
@@ -110,18 +111,16 @@ export default function BookPage() {
     setLoading(true);
     setError('');
     try {
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json().catch(() => ({}));
-      if (!meRes.ok || !meData.success) {
+      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+      if (!meOk || !meData.success) {
         router.push('/login');
         return;
       }
       setMe(meData);
 
-      const cardsRes = await fetch('/api/cards');
-      const cardsData = await cardsRes.json().catch(() => ({}));
-      if (!cardsRes.ok || !cardsData.success) {
-        if (cardsRes.status === 401) {
+      const { ok: cardsOk, status: cardsStatus, data: cardsData } = await fetchJson('/api/cards');
+      if (!cardsOk || !cardsData.success) {
+        if (cardsStatus === 401) {
           router.push('/login');
           return;
         }
@@ -133,25 +132,18 @@ export default function BookPage() {
       setOwnedCount(cardsData.ownedCount || 0);
 
       // Kartu pajangan (display-only): koleksi terpisah, tidak masuk book gacha.
-      try {
-        const dispRes = await fetch('/api/display');
-        const dispData = await dispRes.json().catch(() => ({}));
-        if (dispRes.ok && dispData.success) setDisplayCards(dispData.cards || []);
-      } catch {
-        // non-kritis: book gacha tetap tampil
-      }
+      // Non-kritis: timeout/lambat -> book gacha tetap tampil.
+      const dispData = await fetchLenient('/api/display');
+      if (dispData.success) setDisplayCards(dispData.cards || []);
       // Slot custom (beli di Shop): dikelola di tab Pajangan.
-      try {
-        const [slotRes, shopRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/shop/packages')]);
-        const slotData = await slotRes.json().catch(() => ({}));
-        if (slotRes.ok && slotData.success) setCustomSlots(slotData.slots || []);
-        const shopData = await shopRes.json().catch(() => ({}));
-        if (shopData.success) setShopOn(Boolean(shopData.enabled));
-      } catch {
-        // non-kritis
-      }
-    } catch {
-      setError('Tidak bisa menghubungi server. Coba lagi.');
+      const [slotData, shopData] = await Promise.all([
+        fetchLenient('/api/shop/slots'),
+        fetchLenient('/api/shop/packages'),
+      ]);
+      if (slotData.success) setCustomSlots(slotData.slots || []);
+      if (shopData.success) setShopOn(Boolean(shopData.enabled));
+    } catch (e) {
+      setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server. Coba lagi.');
     } finally {
       setLoading(false);
     }
@@ -208,13 +200,12 @@ export default function BookPage() {
     setShowcaseBusy(`evo:${c.name}`);
     setError('');
     try {
-      const res = await fetch('/api/cards/evolve', {
+      const { ok, data } = await fetchJson('/api/cards/evolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ charName: c.name }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal evolusi.');
         return;
       }
@@ -234,13 +225,12 @@ export default function BookPage() {
     setShowcaseBusy(c.name);
     setError('');
     try {
-      const res = await fetch('/api/cards/showcase', {
+      const { ok, data } = await fetchJson('/api/cards/showcase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ charName: c.name, showcase: !c.showcase }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal atur pajangan.');
         return;
       }
@@ -256,11 +246,9 @@ export default function BookPage() {
 
   async function reloadPajangan() {
     try {
-      const [slotRes, dispRes] = await Promise.all([fetch('/api/shop/slots'), fetch('/api/display')]);
-      const slotData = await slotRes.json().catch(() => ({}));
-      if (slotRes.ok && slotData.success) setCustomSlots(slotData.slots || []);
-      const dispData = await dispRes.json().catch(() => ({}));
-      if (dispRes.ok && dispData.success) setDisplayCards(dispData.cards || []);
+      const [slotData, dispData] = await Promise.all([fetchLenient('/api/shop/slots'), fetchLenient('/api/display')]);
+      if (slotData.success) setCustomSlots(slotData.slots || []);
+      if (dispData.success) setDisplayCards(dispData.cards || []);
     } catch {
       // abaikan
     }
@@ -291,9 +279,8 @@ export default function BookPage() {
     try {
       const fd = new FormData();
       fd.append('file', f);
-      const res = await fetch('/api/shop/slot/image', { method: 'POST', body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      const { ok, data } = await fetchJson('/api/shop/slot/image', { method: 'POST', body: fd, ms: 30000 });
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal upload gambar.');
         return;
       }
@@ -312,15 +299,14 @@ export default function BookPage() {
     setError('');
     try {
       const isDisplay = editingSlot.kind === 'display';
-      const res = await fetch(isDisplay ? '/api/display/customize' : '/api/shop/slot/update', {
+      const { ok, data } = await fetchJson(isDisplay ? '/api/display/customize' : '/api/shop/slot/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: isDisplay
           ? JSON.stringify({ id: editingSlot.id, imageUrl: slotForm.imageUrl, borderType: slotForm.borderType, borderColor: slotForm.borderColor, description: slotForm.description })
           : JSON.stringify({ slotId: editingSlot.id, ...slotForm }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal simpan kartu.');
         return;
       }
@@ -338,13 +324,12 @@ export default function BookPage() {
     setShowcaseBusy(`display:${c.name}`);
     setError('');
     try {
-      const res = await fetch('/api/display/showcase', {
+      const { ok, data } = await fetchJson('/api/display/showcase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: c.name, showcase: !c.showcase }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal atur pajangan.');
         return;
       }

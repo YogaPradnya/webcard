@@ -13,11 +13,12 @@ import {
   sideOf,
 } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/battle/room/act { code, action: {type, target?, ally?} } — 1 aksi giliranmu.
 // type: basic|skill|skill2|switch. target = index kartu AKTIF lawan (ofensif),
 // ally = index kartu tim sendiri (heal/shield manual).
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
 
@@ -83,3 +84,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal menjalankan aksi.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/act/route.js');

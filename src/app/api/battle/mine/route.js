@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms, WAITING_TTL_MS, FORFEIT_TIMEOUT_MS, forfeitMsLeft, cleanupExpiredWaitingRooms, parseRoom } from '@/lib/rooms';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // GET /api/battle/mine — room aktif milik user (waiting + ongoing) untuk auto-restore.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   try {
@@ -52,3 +53,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat room aktif.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/mine/route.js');

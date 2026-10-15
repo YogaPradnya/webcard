@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms, WAITING_TTL_MS, cleanupExpiredWaitingRooms } from '@/lib/rooms';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 const PAGE_SIZE = 10;
 
@@ -14,7 +15,7 @@ const CLEANUP_MIN_GAP_MS = 60 * 1000;
 
 // GET /api/battle/rooms?q=&page= — list room PvP waiting yang masih hidup (10/page).
 // Hanya usn + kode + sisa waktu. Search cocok ke username dan kode.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const params = new URL(req.url).searchParams;
@@ -99,3 +100,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat battle ready.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/rooms/route.js');

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { ensureBattleRooms } from '@/lib/rooms';
 import { getDb } from '@/lib/db';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // GET /api/battle/history?limit=10 — riwayat battle milik sendiri.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const params = new URL(req.url).searchParams;
@@ -36,3 +37,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat riwayat.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/history/route.js');

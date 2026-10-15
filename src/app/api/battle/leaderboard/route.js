@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms } from '@/lib/rooms';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // GET /api/battle/leaderboard?tab=pvp|collector|xp — klasemen PvP, kolektor, XP.
 // Publik & sama untuk semua user -> cache memori 60 dtk (0 query saat hit).
 const _lbCache = new Map(); // tab -> { at, payload }
 const LB_TTL_MS = 60 * 1000;
 
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const tab = String(new URL(req.url).searchParams.get('tab') || 'pvp');
@@ -76,3 +77,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat leaderboard.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/leaderboard/route.js');

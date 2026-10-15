@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { fetchJson } from '@/lib/fetchJson';
 
 const TNC_KEY = 'animein-tnc-ok';
 
@@ -27,13 +28,12 @@ export default function LoginPage() {
     setCopied(false);
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/code', {
+      const { ok, data } = await fetchJson('/api/auth/code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tnc: true }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal buat kode.');
         return;
       }
@@ -67,8 +67,7 @@ export default function LoginPage() {
     } catch { /* abaikan */ }
     (async () => {
       try {
-        const res = await fetch('/api/auth/code/status');
-        const data = await res.json().catch(() => ({}));
+        const { data } = await fetchJson('/api/auth/code/status', { ms: 8000 }).catch(() => ({ data: {} }));
         if (data.status === 'claimed') {
           router.push('/book');
           return;
@@ -97,8 +96,7 @@ export default function LoginPage() {
     if (!code) return;
     pollTimer.current = setInterval(async () => {
       try {
-        const res = await fetch('/api/auth/code/status');
-        const data = await res.json().catch(() => ({}));
+        const { data } = await fetchJson('/api/auth/code/status', { ms: 8000 }).catch(() => ({ data: {} }));
         if (data.status === 'claimed') {
           clearInterval(pollTimer.current);
           router.push('/book');

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { performWebPulls } from '@/lib/gacha';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 function jakartaDateKey(d = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -14,7 +15,7 @@ function jakartaDateKey(d = new Date()) {
 const inflight = new Set();
 
 // POST /api/gacha/pull { count: 1 | 10 } — gacha web (tanpa limit harian).
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   let body = {};
@@ -50,3 +51,6 @@ export async function POST(req) {
     inflight.delete(key);
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/gacha/pull/route.js');

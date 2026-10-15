@@ -20,6 +20,7 @@ import {
   cleanupExpiredWaitingRooms,
 } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 async function validateTeam(db, userId, team) {
   if (!Array.isArray(team) || team.length !== 3) return 'Pilih 3 kartu berbeda.';
@@ -72,7 +73,7 @@ async function teamLevels(db, userId, team) {
 }
 
 // POST /api/battle/room { mode: 'ai' | 'pvp', team: [3 nama] } — buat room + kode angka.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
 
@@ -179,7 +180,7 @@ export async function POST(req) {
 }
 
 // GET /api/battle/room?code=123456 — state terbaru (polling).
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const code = new URL(req.url).searchParams.get('code') || '';
@@ -209,7 +210,7 @@ export async function GET(req) {
 }
 
 // DELETE /api/battle/room?code=123456 — batalkan room waiting milik sendiri.
-export async function DELETE(req) {
+async function DELETE_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const code = new URL(req.url).searchParams.get('code') || '';
@@ -230,3 +231,8 @@ export async function DELETE(req) {
     return NextResponse.json({ success: false, message: 'Gagal membatalkan room.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/route.js');
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/room/route.js');
+export const DELETE = withTimeout(DELETE_impl, READ_TIMEOUT_MS, 'src/app/api/battle/room/route.js');

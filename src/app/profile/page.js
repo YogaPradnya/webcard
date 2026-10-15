@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import MissionList from '@/components/MissionList';
 import { optImg } from '@/lib/images';
+import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 
 function avatarColor(name) {
   const pastels = ['#f7eafc', '#dbeafd', '#d7f2e3', '#fffaea', '#e9e3fb', '#ffedd7'];
@@ -60,56 +61,49 @@ export default function ProfilePage() {
     setLoading(true);
     setError('');
     try {
-      const meRes = await fetch('/api/auth/me');
-      const meData = await meRes.json().catch(() => ({}));
-      if (!meRes.ok || !meData.success) {
+      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+      if (!meOk || !meData.success) {
         router.push('/login');
         return;
       }
       setMe(meData);
-      const [pRes, cRes, lbRes, dRes, srcRes, slotRes, shopRes, mRes] = await Promise.all([
-        fetch('/api/profile'),
-        fetch('/api/cards'),
-        fetch('/api/battle/leaderboard?tab=pvp'),
-        fetch('/api/display'),
-        fetch('/api/profile/showcase-source'),
-        fetch('/api/shop/slots'),
-        fetch('/api/shop/packages'),
-        fetch('/api/missions'),
+      // Profil wajib; sisanya pelengkap (timeout -> halaman tetap tampil).
+      const [pRes, cData, lbData, dData, srcData, slotData, shopData, mData] = await Promise.all([
+        fetchJson('/api/profile'),
+        fetchLenient('/api/cards'),
+        fetchLenient('/api/battle/leaderboard?tab=pvp'),
+        fetchLenient('/api/display'),
+        fetchLenient('/api/profile/showcase-source'),
+        fetchLenient('/api/shop/slots'),
+        fetchLenient('/api/shop/packages'),
+        fetchLenient('/api/missions'),
       ]);
-      const pData = await pRes.json().catch(() => ({}));
+      const pData = pRes.data;
       if (!pRes.ok || !pData.success) {
         setError(pData.message || 'Gagal memuat profil.');
         return;
       }
       setProfile(pData.profile);
-      const cData = await cRes.json().catch(() => ({}));
       if (cData.success) {
         const owned = (cData.cards || []).filter((c) => c.owned);
         setOwnedCards(owned);
         if (pData.profile?.showcase) setShowcasePick(pData.profile.showcase.name);
       }
-      const lbData = await lbRes.json().catch(() => ({}));
       if (lbData.success) setLbMini((lbData.leaderboard || []).slice(0, 5));
-      const dData = await dRes.json().catch(() => ({}));
       if (dData.success) {
         setDisplayCards(dData.cards || []);
         const active = (dData.cards || []).find((c) => c.showcase);
         if (active) setDisplayPick(active.name);
       }
-      const srcData = await srcRes.json().catch(() => ({}));
       if (srcData.success && srcData.source) setProfilSource(srcData.source);
-      const slotData = await slotRes.json().catch(() => ({}));
       if (slotData.success) setCustomSlots(slotData.slots || []);
-      const shopData = await shopRes.json().catch(() => ({}));
       if (shopData.success) setShopOn(Boolean(shopData.enabled));
-      const mData = await mRes.json().catch(() => ({}));
       if (mData.success) {
         setDailyMissions(mData.daily || []);
         setWeeklyMissions(mData.weekly || []);
       }
-    } catch {
-      setError('Tidak bisa menghubungi server.');
+    } catch (e) {
+      setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
     }
@@ -124,13 +118,12 @@ export default function ProfilePage() {
     setMissionClaiming(`${period}:${missionId}`);
     setMissionToast('');
     try {
-      const res = await fetch('/api/missions/claim', {
+      const { ok, data } = await fetchJson('/api/missions/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period, missionId }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal klaim misi.');
         return;
       }
@@ -146,14 +139,12 @@ export default function ProfilePage() {
       }
       // Sinkron ringan di background: misi + XP profil saja (tanpa /api/cards yang berat).
       try {
-        const [mRes, pRes] = await Promise.all([fetch('/api/missions'), fetch('/api/profile')]);
-        const mData = await mRes.json().catch(() => ({}));
-        if (mRes.ok && mData.success) {
+        const [mData, pData] = await Promise.all([fetchLenient('/api/missions'), fetchLenient('/api/profile')]);
+        if (mData.success) {
           setDailyMissions(mData.daily || []);
           setWeeklyMissions(mData.weekly || []);
         }
-        const pData = await pRes.json().catch(() => ({}));
-        if (pRes.ok && pData.success && pData.profile) setProfile(pData.profile);
+        if (pData.success && pData.profile) setProfile(pData.profile);
       } catch { /* abaikan: state optimistik sudah benar */ }
     } finally {
       setMissionClaiming('');
@@ -166,13 +157,12 @@ export default function ProfilePage() {
     setBusy('showcase');
     setError('');
     try {
-      const res = await fetch('/api/cards/showcase', {
+      const { ok, data } = await fetchJson('/api/cards/showcase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ charName: showcasePick, showcase: true }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal ganti pajangan.');
         return;
       }
@@ -188,13 +178,12 @@ export default function ProfilePage() {
     setBusy('display-showcase');
     setError('');
     try {
-      const res = await fetch('/api/display/showcase', {
+      const { ok, data } = await fetchJson('/api/display/showcase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: displayPick, showcase: true }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal ganti pajangan spesial.');
         return;
       }
@@ -208,13 +197,12 @@ export default function ProfilePage() {
     setBusy('profil-source');
     setError('');
     try {
-      const res = await fetch('/api/profile/showcase-source', {
+      const { ok, data } = await fetchJson('/api/profile/showcase-source', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ source }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal simpan pilihan.');
         return;
       }
@@ -228,13 +216,12 @@ export default function ProfilePage() {
     setBusy(`title:${title}`);
     setError('');
     try {
-      const res = await fetch('/api/profile/title', {
+      const { ok, data } = await fetchJson('/api/profile/title', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.success) {
+      if (!ok || !data.success) {
         setError(data.message || 'Gagal pasang gelar.');
         return;
       }
@@ -247,7 +234,7 @@ export default function ProfilePage() {
   async function removeTitle() {
     setBusy('title:');
     try {
-      await fetch('/api/profile/title', {
+      await fetchJson('/api/profile/title', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: '' }),

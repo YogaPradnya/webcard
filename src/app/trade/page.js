@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
+import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 
 function formatSisa(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -75,27 +76,23 @@ export default function TradePage() {
   useEffect(() => {
     (async () => {
       try {
-        const meRes = await fetch('/api/auth/me');
-        const meData = await meRes.json().catch(() => ({}));
-        if (!meRes.ok || !meData.success) {
+        const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+        if (!meOk || !meData.success) {
           router.push('/login');
           return;
         }
         setMe(meData);
 
-        const [cardsRes, usersRes, offersRes] = await Promise.all([
-          fetch('/api/cards?owned=1'),
-          fetch('/api/trade/users'),
-          fetch('/api/trade/create'),
+        const [cardsData, usersData, offersData] = await Promise.all([
+          fetchLenient('/api/cards?owned=1'),
+          fetchLenient('/api/trade/users'),
+          fetchLenient('/api/trade/create'),
         ]);
-        const cardsData = await cardsRes.json().catch(() => ({}));
         if (cardsData.success) setMyCards((cardsData.cards || []).filter((c) => c.owned));
-        const usersData = await usersRes.json().catch(() => ({}));
         if (usersData.success) setUsers(usersData.users || []);
-        const offersData = await offersRes.json().catch(() => ({}));
         if (offersData.success) setMyOffers(offersData.offers || []);
-      } catch {
-        setError('Tidak bisa menghubungi server. Coba lagi.');
+      } catch (e) {
+        setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server. Coba lagi.');
       } finally {
         setLoading(false);
       }
@@ -120,8 +117,7 @@ export default function TradePage() {
   async function fetchTradeReady(page = tradePage, q = tradeQ) {
     setTradeLoading(true);
     try {
-      const res = await fetch(`/api/trade/offers?q=${encodeURIComponent(q)}&page=${page}`);
-      const data = await res.json().catch(() => ({}));
+      const { data } = await fetchJson(`/api/trade/offers?q=${encodeURIComponent(q)}&page=${page}`, { ms: 8000 }).catch(() => ({ data: {} }));
       if (data.success) {
         setTradeList(data.offers || []);
         setTradeTotal(data.pagination?.total || 0);
@@ -140,8 +136,7 @@ export default function TradePage() {
   }, [loading, tradePage, tradeQ]);
 
   async function refreshOffers() {
-    const res = await fetch('/api/trade/create');
-    const data = await res.json().catch(() => ({}));
+    const { data } = await fetchJson('/api/trade/create', { ms: 8000 }).catch(() => ({ data: {} }));
     if (data.success) setMyOffers(data.offers || []);
     fetchTradeReady(tradePage, tradeQ);
   }
@@ -154,13 +149,12 @@ export default function TradePage() {
       setError('Pilih 1 kartumu dulu.');
       return;
     }
-    const res = await fetch('/api/trade/create', {
+    const { ok, data } = await fetchJson('/api/trade/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ charName: pickCard, amount: pickAmount }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
+    if (!ok || !data.success) {
       setError(data.message || 'Gagal buat kode.');
       return;
     }
@@ -179,7 +173,7 @@ export default function TradePage() {
   }
 
   async function onCancel(code) {
-    await fetch(`/api/trade/create?code=${encodeURIComponent(code)}`, { method: 'DELETE' });
+    await fetchJson(`/api/trade/create?code=${encodeURIComponent(code)}`, { method: 'DELETE', ms: 8000 }).catch(() => ({}));
     refreshOffers();
   }
 
@@ -191,9 +185,8 @@ export default function TradePage() {
     setGiveCard('');
     setGiveAmount(1);
     setInCode(code);
-    const res = await fetch(`/api/trade/offer?code=${encodeURIComponent(code)}`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
+    const { ok, data } = await fetchJson(`/api/trade/offer?code=${encodeURIComponent(code)}`, { ms: 8000 }).catch(() => ({ ok: false, data: {} }));
+    if (!ok || !data.success) {
       setError(data.message || 'Kode tidak ditemukan.');
       return;
     }
@@ -221,10 +214,10 @@ export default function TradePage() {
     }
     (async () => {
       try {
-        const res = await fetch(
+        const { data } = await fetchJson(
           `/api/trade/offer?code=${encodeURIComponent(inCode)}&my=${encodeURIComponent(giveCard)}&myQty=${giveAmount}`,
-        );
-        const data = await res.json().catch(() => ({}));
+          { ms: 8000 },
+        ).catch(() => ({ data: {} }));
         if (data.success) {
           setPreview(data);
           setCheck(data.mineOk);
@@ -239,13 +232,12 @@ export default function TradePage() {
   async function onAccept(e) {
     e.preventDefault();
     setError('');
-    const res = await fetch('/api/trade/offer', {
+    const { ok, data } = await fetchJson('/api/trade/offer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: inCode, myCharName: giveCard, myAmount: giveAmount }),
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.success) {
+    if (!ok || !data.success) {
       setError(data.message || 'Gagal tukar kartu.');
       return;
     }

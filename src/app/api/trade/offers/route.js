@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { ensureTradeTable } from '@/lib/trade';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 const PAGE_SIZE = 10;
 
 // GET /api/trade/offers?q=&page= — list global penawaran aktif (10/page).
 // Search cocok ke username pemilik, nama kartu, dan kode.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const params = new URL(req.url).searchParams;
@@ -59,3 +60,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat trade ready.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/trade/offers/route.js');

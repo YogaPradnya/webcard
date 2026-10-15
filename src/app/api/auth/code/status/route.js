@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { ensureLoginCodeTable, hashToken } from '@/lib/loginCode';
 import { sealSession, sessionCookieHeader, sessionMaxAgeSeconds } from '@/lib/session';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 function getToken(req) {
   const header = req.headers.get('cookie') || '';
@@ -13,7 +14,7 @@ function getToken(req) {
 }
 
 // GET /api/auth/code/status — polling: pending / claimed (buat sesi) / expired.
-export async function GET(req) {
+async function GET_impl(req) {
   const token = getToken(req);
   if (!token) return NextResponse.json({ success: true, status: 'expired' });
 
@@ -51,3 +52,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal cek status.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/auth/code/status/route.js');

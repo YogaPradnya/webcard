@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db';
 import { getBookCards } from '@/lib/cards';
 import { getDisplayCards } from '@/lib/display';
 import { computeTitles, ensureWebTitleColumn, allWebTitles } from '@/lib/titles';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 function xpForLevel(lv) {
   return Math.floor(20 * Math.pow(lv, 3));
@@ -16,7 +17,7 @@ function calcLevel(xp) {
 }
 
 // GET /api/profile — ringkasan profil: nama, xp/sisa, koleksi, battle, showcase, gelar.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   try {
@@ -101,3 +102,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat profil.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/profile/route.js');

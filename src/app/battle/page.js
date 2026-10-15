@@ -665,19 +665,18 @@ export default function BattlePage() {
   }
 
   async function api(path, body) {
-    const res = await fetch(path, {
+    const { data } = await fetchJson(path, {
       method: body ? 'POST' : 'GET',
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
       body: body ? JSON.stringify(body) : undefined,
-    });
-    return res.json().catch(() => ({}));
+    }).catch(() => ({ data: {} }));
+    return data;
   }
 
   async function fetchRooms(page = roomPage, q = roomQ) {
     setRoomLoading(true);
     try {
-      const res = await fetch(`/api/battle/rooms?q=${encodeURIComponent(q)}&page=${page}`);
-      const data = await res.json().catch(() => ({}));
+      const { data } = await fetchJson(`/api/battle/rooms?q=${encodeURIComponent(q)}&page=${page}`, { ms: 8000 }).catch(() => ({ data: {} }));
       if (data.success) {
         setRoomList(data.rooms || []);
         setRoomTotal(data.pagination?.total || 0);
@@ -692,8 +691,7 @@ export default function BattlePage() {
 
   async function fetchMine(silent = true) {
     try {
-      const res = await fetch('/api/battle/mine');
-      const data = await res.json().catch(() => ({}));
+      const { data } = await fetchJson('/api/battle/mine', { ms: 8000 }).catch(() => ({ data: {} }));
       if (data.success) setMyRooms(data.rooms || []);
     } catch {
       if (!silent) setError('Gagal memuat room aktifmu.');
@@ -702,8 +700,7 @@ export default function BattlePage() {
 
   async function fetchHistory() {
     try {
-      const res = await fetch('/api/battle/history?limit=10');
-      const data = await res.json().catch(() => ({}));
+      const { data } = await fetchJson('/api/battle/history?limit=10', { ms: 8000 }).catch(() => ({ data: {} }));
       if (data.success) setHistory(data.history || []);
     } catch { /* abaikan */ }
   }
@@ -868,7 +865,7 @@ export default function BattlePage() {
     setRematchOffer(null);
     setOnline([]);
     try {
-      await fetch(`/api/battle/room?code=${encodeURIComponent(st.code)}`, { method: 'DELETE' });
+      await fetchJson(`/api/battle/room?code=${encodeURIComponent(st.code)}`, { method: 'DELETE', ms: 8000 }).catch(() => ({}));
     } catch {
       // abaikan, tetap keluar
     }
@@ -1177,7 +1174,7 @@ export default function BattlePage() {
                         style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }}
                         onClick={async () => {
                           try {
-                            await fetch(`/api/battle/room?code=${encodeURIComponent(r.code)}`, { method: 'DELETE' });
+                            await fetchJson(`/api/battle/room?code=${encodeURIComponent(r.code)}`, { method: 'DELETE', ms: 8000 }).catch(() => ({}));
                           } catch { /* abaikan */ }
                           fetchMine();
                           fetchRooms(roomPage, roomQ);

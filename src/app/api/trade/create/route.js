@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { isDisplayOwned } from '@/lib/display';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 import {
   ensureTradeTable,
   generateTradeCode,
@@ -13,7 +14,7 @@ import {
 
 // POST /api/trade/create { charName, amount } — buat kode angka untuk N copy kartu milik sendiri.
 // 1 user boleh punya s/d MAX_ACTIVE_TRADES_PER_USER penawaran aktif, tiap kode TTL 10 menit.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
 
@@ -82,7 +83,7 @@ export async function POST(req) {
 }
 
 // GET /api/trade/create — penawaran aktif milik sendiri.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   try {
@@ -106,7 +107,7 @@ export async function GET(req) {
 }
 
 // DELETE /api/trade/create?code=123456 — batalkan penawaran sendiri.
-export async function DELETE(req) {
+async function DELETE_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const code = new URL(req.url).searchParams.get('code') || '';
@@ -122,3 +123,8 @@ export async function DELETE(req) {
     return NextResponse.json({ success: false, message: 'Gagal membatalkan.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/trade/create/route.js');
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/trade/create/route.js');
+export const DELETE = withTimeout(DELETE_impl, READ_TIMEOUT_MS, 'src/app/api/trade/create/route.js');

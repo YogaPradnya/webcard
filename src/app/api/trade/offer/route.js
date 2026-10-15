@@ -4,10 +4,11 @@ import { getDb } from '@/lib/db';
 import { isDisplayOwned } from '@/lib/display';
 import { ensureTradeTable, executeTrade, getCardOwner, getOffer, normalizeTradeCode, checkTradeTierRule } from '@/lib/trade';
 import { checkRateCount } from '@/lib/rateLimit';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // GET /api/trade/offer?code=123456[&my=Nama&myQty=N] — intip penawaran sebelum tukar.
 // Balik juga alreadyOwned dan penawaran milik sendiri.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   const params = new URL(req.url).searchParams;
@@ -62,7 +63,7 @@ export async function GET(req) {
 }
 
 // POST /api/trade/offer { code, myCharName, myAmount } — tukar copy kartumu dengan penawar.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
 
@@ -102,3 +103,7 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal tukar kartu.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/trade/offer/route.js');
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/trade/offer/route.js');

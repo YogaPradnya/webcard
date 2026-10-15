@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import RetryAlert from '@/components/RetryAlert';
+import { fetchJson } from '@/lib/fetchJson';
 
 const TABS = [
   ['pvp', 'PvP'],
@@ -28,12 +29,11 @@ export default function LeaderboardPage() {
     setLoading(true);
     setError('');
     try {
-      const lbRes = await fetch(`/api/battle/leaderboard?tab=${encodeURIComponent(t)}`);
-      const lbData = await lbRes.json().catch(() => ({}));
+      const { data: lbData } = await fetchJson(`/api/battle/leaderboard?tab=${encodeURIComponent(t)}`);
       if (lbData.success) setLb(lbData.leaderboard || []);
       else setError(lbData.message || 'Gagal memuat leaderboard.');
-    } catch {
-      setError('Tidak bisa menghubungi server.');
+    } catch (e) {
+      setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
     }
@@ -42,9 +42,8 @@ export default function LeaderboardPage() {
   useEffect(() => {
     (async () => {
       try {
-        const meRes = await fetch('/api/auth/me');
-        const meData = await meRes.json().catch(() => ({}));
-        if (!meRes.ok || !meData.success) {
+        const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
+        if (!meOk || !meData.success) {
           router.push('/login');
           return;
         }

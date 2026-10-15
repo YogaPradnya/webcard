@@ -11,12 +11,13 @@ import {
   sideTeamNames,
 } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/battle/room/rematch { code } — tantang rematch dari room PvP yang selesai.
 // Membuat room waiting baru (penantang = p1 + tim lamanya), lalu bump room lama
 // dengan tawaran { code } agar lawan menerima via SSE. Lawan gabung dengan
 // endpoint join biasa (boleh ganti tim).
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
 
@@ -103,3 +104,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal membuat rematch.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/rematch/route.js');

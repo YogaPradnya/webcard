@@ -7,10 +7,11 @@ import {
   createSnapTransaction, countUserSlots, ensureShopTables, isShopEnabled,
 } from '@/lib/shop';
 import { countDisplayCards } from '@/lib/display';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/shop/order { kind: 'xp', packId } | { kind: 'slot', qty }
 // Return { orderId, snapToken } untuk dibuka via Snap.js.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   if (!isShopEnabled()) {
@@ -77,3 +78,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: msg }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/shop/order/route.js');

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getGachaSettings, tenCost, ensureGachaHistory, stockSummary } from '@/lib/gacha';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // GET /api/gacha — info gacha web: cost 1x/10x (diskon 10%), rate, stok, XP, riwayat.
-export async function GET(req) {
+async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
   try {
@@ -39,3 +40,6 @@ export async function GET(req) {
     return NextResponse.json({ success: false, message: 'Gagal memuat gacha.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/gacha/route.js');

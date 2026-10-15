@@ -6,9 +6,10 @@ import { createBattle } from '@/lib/engine';
 import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
 import { checkRateCount } from '@/lib/rateLimit';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 // POST /api/battle/room/join { code, team: [3 nama] } — gabung room PvP.
-export async function POST(req) {
+async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
 
@@ -101,3 +102,6 @@ export async function POST(req) {
     return NextResponse.json({ success: false, message: 'Gagal gabung room.' }, { status: 500 });
   }
 }
+
+// Batas hang server (penjaga Turso menggantung).
+export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/join/route.js');
