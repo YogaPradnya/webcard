@@ -1690,6 +1690,21 @@ body {
   gap: 10px;
 }
 
+@media (max-width: 720px) {
+  /* 6 item jadi 2 baris seimbang (3+3), bukan 4+2. */
+  .menu-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .menu-tile {
+    padding: 12px 4px;
+    font-size: 11px;
+  }
+  .menu-ico {
+    font-size: 20px;
+  }
+}
+
 .menu-tile {
   background: var(--surface);
   border: 1.5px solid var(--hairline-strong);

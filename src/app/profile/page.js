@@ -44,11 +44,10 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showcasePick, setShowcasePick] = useState('');
+  const [showcaseSource, setShowcaseSource] = useState('gacha');
   const [ownedCards, setOwnedCards] = useState([]);
   const [busy, setBusy] = useState('');
   const [displayCards, setDisplayCards] = useState([]);
-  const [displayPick, setDisplayPick] = useState('');
-  const [profilSource, setProfilSource] = useState('auto');
   const [customSlots, setCustomSlots] = useState([]);
   const [shopOn, setShopOn] = useState(false);
   const [dailyMissions, setDailyMissions] = useState([]);
@@ -87,15 +86,24 @@ export default function ProfilePage() {
       if (cData.success) {
         const owned = (cData.cards || []).filter((c) => c.owned);
         setOwnedCards(owned);
-        if (pData.profile?.showcase) setShowcasePick(pData.profile.showcase.name);
       }
-      if (lbData.success) setLbMini((lbData.leaderboard || []).slice(0, 5));
+      let activeDisplay = null;
       if (dData.success) {
         setDisplayCards(dData.cards || []);
-        const active = (dData.cards || []).find((c) => c.showcase);
-        if (active) setDisplayPick(active.name);
+        activeDisplay = (dData.cards || []).find((c) => c.showcase) || null;
       }
-      if (srcData.success && srcData.source) setProfilSource(srcData.source);
+      // Satu slot pajangan: sumber efektif samakan dengan server
+      // (auto = display bila ada, else gacha). Pilihan tersimpan eksplisit
+      // saat user menekan Simpan.
+      const src = srcData.success && srcData.source ? srcData.source : 'auto';
+      const eff = src === 'gacha' ? 'gacha'
+        : src === 'display' ? 'display'
+        : activeDisplay ? 'display' : 'gacha';
+      setShowcaseSource(eff);
+      if (eff === 'display' && activeDisplay) setShowcasePick(activeDisplay.name);
+      else if (pData.profile?.showcase) setShowcasePick(pData.profile.showcase.name);
+      else setShowcasePick('');
+      if (lbData.success) setLbMini((lbData.leaderboard || []).slice(0, 5));
       if (slotData.success) setCustomSlots(slotData.slots || []);
       if (shopData.success) setShopOn(Boolean(shopData.enabled));
       if (mData.success) {
@@ -151,62 +159,39 @@ export default function ProfilePage() {
     }
   }
 
+  // Satu slot pajangan: simpan ke endpoint sesuai sumber, lalu kunci
+  // pilihan sumber agar .profil chat ikut (ganti `auto` -> eksplisit).
   async function saveShowcase(e) {
     e.preventDefault();
     if (!showcasePick) return;
     setBusy('showcase');
     setError('');
     try {
-      const { ok, data } = await fetchJson('/api/cards/showcase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ charName: showcasePick, showcase: true }),
-      });
+      const isDisplay = showcaseSource === 'display';
+      const { ok, data } = await fetchJson(
+        isDisplay ? '/api/display/showcase' : '/api/cards/showcase',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            isDisplay ? { name: showcasePick, showcase: true } : { charName: showcasePick, showcase: true }
+          ),
+        }
+      );
       if (!ok || !data.success) {
         setError(data.message || 'Gagal ganti pajangan.');
         return;
       }
-      await load();
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function saveDisplayShowcase(e) {
-    e.preventDefault();
-    if (!displayPick) return;
-    setBusy('display-showcase');
-    setError('');
-    try {
-      const { ok, data } = await fetchJson('/api/display/showcase', {
+      const srcRes = await fetchJson('/api/profile/showcase-source', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: displayPick, showcase: true }),
+        body: JSON.stringify({ source: showcaseSource }),
       });
-      if (!ok || !data.success) {
-        setError(data.message || 'Gagal ganti pajangan spesial.');
+      if (!srcRes.ok || !srcRes.data.success) {
+        setError(srcRes.data.message || 'Pajangan tersimpan, tapi pilihan sumber gagal.');
         return;
       }
       await load();
-    } finally {
-      setBusy('');
-    }
-  }
-
-  async function saveProfilSource(source) {
-    setBusy('profil-source');
-    setError('');
-    try {
-      const { ok, data } = await fetchJson('/api/profile/showcase-source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source }),
-      });
-      if (!ok || !data.success) {
-        setError(data.message || 'Gagal simpan pilihan.');
-        return;
-      }
-      setProfilSource(data.source);
     } finally {
       setBusy('');
     }
@@ -287,34 +272,43 @@ export default function ProfilePage() {
                   <div className="profile-stat"><b>{profile.wins}W-{profile.losses}L</b><span>PvP WR {profile.winRate}%</span></div>
                   <div className="profile-stat"><b>{profile.titles.earned.length}</b><span>gelar</span></div>
                 </div>
-                {profile.showcase ? (
-                  <div className="profile-showcase">
-                    {profile.showcase.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={optImg(profile.showcase.imageUrl, 300)} alt={profile.showcase.name} loading="lazy" decoding="async" />
-                    ) : null}
-                    <div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan{(profilSource === 'gacha' || (profilSource === 'auto' && !profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
-                      <div style={{ fontWeight: 800 }}>{profile.showcase.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--body)' }}>{profile.showcase.tier} ★{profile.showcase.level} • PWR {profile.showcase.power}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 12 }}>Belum ada pajangan. Pilih di bawah.</div>
-                )}
-                {profile.displayShowcase ? (
-                  <div className="profile-showcase" style={{ marginTop: 12, ...displayShowcaseStyle(profile.displayShowcase) }}>
-                    {profile.displayShowcase.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={optImg(profile.displayShowcase.imageUrl, 300)} alt={profile.displayShowcase.name} loading="lazy" decoding="async" style={{ border: `3px solid ${displayBorderColor(profile.displayShowcase)}` }} />
-                    ) : null}
-                    <div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan spesial{(profilSource === 'display' || (profilSource === 'auto' && profile.displayShowcase)) ? ' • tampil di .profil' : ''}</div>
-                      <div style={{ fontWeight: 800 }}>{profile.displayShowcase.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--body)' }}>{profile.displayShowcase.grade}</div>
-                    </div>
-                  </div>
-                ) : null}
+                {(() => {
+                  const showDisplay = showcaseSource === 'display' && profile.displayShowcase;
+                  const showGacha = !showDisplay && profile.showcase;
+                  if (showDisplay) {
+                    const c = profile.displayShowcase;
+                    return (
+                      <div className="profile-showcase" style={{ marginTop: 12, ...displayShowcaseStyle(c) }}>
+                        {c.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" style={{ border: `3px solid ${displayBorderColor(c)}` }} />
+                        ) : null}
+                        <div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan • tampil di .profil</div>
+                          <div style={{ fontWeight: 800 }}>{c.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--body)' }}>{c.grade}</div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  if (showGacha) {
+                    const s = profile.showcase;
+                    return (
+                      <div className="profile-showcase">
+                        {s.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={optImg(s.imageUrl, 300)} alt={s.name} loading="lazy" decoding="async" />
+                        ) : null}
+                        <div>
+                          <div style={{ fontSize: 12, color: 'var(--muted)' }}>Pajangan • tampil di .profil</div>
+                          <div style={{ fontWeight: 800 }}>{s.name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--body)' }}>{s.tier} ★{s.level} • PWR {s.power}</div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 12 }}>Belum ada pajangan. Pilih di bawah.</div>;
+                })()}
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
@@ -352,40 +346,59 @@ export default function ProfilePage() {
               </div>
 
               <div className="card" style={{ marginTop: 16 }}>
-                <div className="section-title">Ganti pajangan</div>
+                <div className="section-title">Pajangan</div>
+                <div className="chip-row" role="radiogroup" aria-label="Sumber pajangan" style={{ marginBottom: 8 }}>
+                  <button
+                    key="gacha"
+                    type="button"
+                    className={showcaseSource === 'gacha' ? 'chip active' : 'chip'}
+                    aria-pressed={showcaseSource === 'gacha'}
+                    disabled={ownedCards.length === 0}
+                    onClick={() => { setShowcaseSource('gacha'); setShowcasePick(''); }}
+                  >
+                    Kartu gacha
+                  </button>
+                  <button
+                    key="display"
+                    type="button"
+                    className={showcaseSource === 'display' ? 'chip active' : 'chip'}
+                    aria-pressed={showcaseSource === 'display'}
+                    disabled={displayCards.length === 0}
+                    onClick={() => { setShowcaseSource('display'); setShowcasePick(''); }}
+                  >
+                    Kartu spesial
+                  </button>
+                </div>
+                {showcaseSource === 'display' && displayCards.length === 0 ? (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                    Belum ada kartu spesial. Kartu spesial hanya bisa di-gift admin.
+                  </div>
+                ) : null}
                 <form onSubmit={saveShowcase} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <select className="select" value={showcasePick} onChange={(e) => setShowcasePick(e.target.value)} style={{ flex: 1, minWidth: 180 }} aria-label="Pilih pajangan">
+                  <select
+                    className="select"
+                    value={showcasePick}
+                    onChange={(e) => setShowcasePick(e.target.value)}
+                    style={{ flex: 1, minWidth: 0 }}
+                    aria-label="Pilih pajangan"
+                    disabled={showcaseSource === 'display' ? displayCards.length === 0 : ownedCards.length === 0}
+                  >
                     <option value="">-- pilih kartumu --</option>
-                    {ownedCards.map((c) => (
-                      <option key={c.name} value={c.name}>{c.name} [{c.tier}] ★{c.level}</option>
-                    ))}
+                    {showcaseSource === 'display'
+                      ? displayCards.map((c) => (
+                        <option key={c.id || c.name} value={c.name}>{c.name} [{c.grade}]</option>
+                      ))
+                      : ownedCards.map((c) => (
+                        <option key={c.name} value={c.name}>{c.name} [{c.tier}] ★{c.level}</option>
+                      ))}
                   </select>
                   <button className="btn" type="submit" disabled={!showcasePick || busy === 'showcase'} style={{ width: 'auto', padding: '0 20px' }}>
                     {busy === 'showcase' ? '...' : 'Simpan'}
                   </button>
                 </form>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-                  Pajangan tampil di profil dan badge Book.
+                  Pajangan tampil di profil, badge Book, dan .profil chat.
                 </div>
-              </div>
-
-              <div className="card" style={{ marginTop: 16 }}>
-                <div className="section-title">Ganti pajangan spesial</div>
-                {displayCards.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum ada kartu pajangan. Kartu spesial hanya bisa di-gift admin.</div>
-                ) : (
-                  <form onSubmit={saveDisplayShowcase} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <select className="select" value={displayPick} onChange={(e) => setDisplayPick(e.target.value)} style={{ flex: 1, minWidth: 180 }} aria-label="Pilih pajangan spesial">
-                      <option value="">-- pilih kartu pajangan --</option>
-                      {displayCards.map((c) => (
-                        <option key={c.id || c.name} value={c.name}>{c.name} [{c.grade}]</option>
-                      ))}
-                    </select>
-                    <button className="btn" type="submit" disabled={!displayPick || busy === 'display-showcase'} style={{ width: 'auto', padding: '0 20px' }}>
-                      {busy === 'display-showcase' ? '...' : 'Simpan'}
-                    </button>
-                  </form>
-                )}
               </div>
 
               {shopOn ? (
@@ -415,30 +428,6 @@ export default function ProfilePage() {
                 )}
               </div>
               ) : null}
-
-              <div className="card" style={{ marginTop: 16 }}>
-                <div className="section-title">Tampil di .profil chat</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
-                  Pilih satu pajangan yang selalu tampil di .profil chat. Otomatis = kartu pajangan bila ada.
-                </div>
-                <div className="chip-row" role="radiogroup" aria-label="Pajangan profil">
-                  {[
-                    ['auto', 'Otomatis'],
-                    ['gacha', 'Kartu gacha'],
-                    ['display', 'Kartu pajangan'],
-                  ].map(([value, label]) => (
-                    <button
-                      key={value}
-                      className={profilSource === value ? 'chip active' : 'chip'}
-                      onClick={() => saveProfilSource(value)}
-                      disabled={busy === 'profil-source'}
-                      aria-pressed={profilSource === value}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               <div className="card" style={{ marginTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
