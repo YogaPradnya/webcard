@@ -45,7 +45,7 @@ export default function Sidebar({ username }) {
   }
 
   const item = (href, label, badge) => (
-    <Link key={href} href={href} className={pathname === href ? 'nav-item active' : 'nav-item'}>
+    <Link key={href} href={href} prefetch={false} className={pathname === href ? 'nav-item active' : 'nav-item'}>
       {label}
       {badge > 0 ? <span className="nav-badge" aria-label={`${badge} aktif`}>{badge}</span> : null}
     </Link>
@@ -77,7 +77,7 @@ export default function Sidebar({ username }) {
         <nav className="sidebar-nav">{desktopLinks}</nav>
         <div className="sidebar-bottom">
           <ThemeToggle />
-          <Link href="/terms" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline', marginBottom: 8 }}>
+          <Link href="/terms" prefetch={false} style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline', marginBottom: 8 }}>
             Syarat & Ketentuan
           </Link>
           <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
