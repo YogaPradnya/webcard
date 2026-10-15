@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { isDisplayOwned } from '@/lib/display';
-import { ensureTradeTable, executeTrade, getCardOwner, getOffer, normalizeTradeCode, checkTradeTierRule } from '@/lib/trade';
+import { ensureTradeTable, executeBundleTrade, getCardOwner, getOffer, normalizeTradeCode, normalizeBundleItems, checkBundleRule, bundleStats, cleanupTradeOffers } from '@/lib/trade';
 import { checkRateCount } from '@/lib/rateLimit';
 import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
-// GET /api/trade/offer?code=123456[&my=Nama&myQty=N] — intip penawaran sebelum tukar.
-// Balik juga alreadyOwned dan penawaran milik sendiri.
+// GET /api/trade/offer?code=123456[&my=Nama&myQty=N | &myItems=[{charName,amount}]] — intip penawaran.
+// Balik juga alreadyOwned dan penawaran milik sendiri. mineOk menilai bundle penuh.
 async function GET_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
@@ -15,6 +15,15 @@ async function GET_impl(req) {
   const code = normalizeTradeCode(params.get('code'));
   const myCharName = String(params.get('my') || '').trim();
   const myQty = Math.max(1, parseInt(params.get('myQty'), 10) || 1);
+  let myItemsRaw = [];
+  const myItemsParam = String(params.get('myItems') || '').trim();
+  if (myItemsParam) {
+    try {
+      const parsed = JSON.parse(myItemsParam);
+      if (Array.isArray(parsed)) myItemsRaw = parsed;
+    } catch { /* abaikan, fallback legacy */ }
+  }
+  if (!myItemsRaw.length && myCharName) myItemsRaw = [{ charName: myCharName, amount: myQty }];
   if (!code) return NextResponse.json({ success: false, message: 'Kode wajib angka.' }, { status: 400 });
   const attempt = await checkRateCount(`tradeview:${session.id}`, 30, 60 * 1000);
   if (!attempt.ok) {
@@ -24,7 +33,7 @@ async function GET_impl(req) {
   try {
     await ensureTradeTable();
     const db = getDb();
-    await db.execute('DELETE FROM trade_offers WHERE expires_at <= ?', [Date.now()]);
+    await cleanupTradeOffers(db);
     const offer = await getOffer(db, code);
     if (!offer) {
       return NextResponse.json({ success: false, message: 'Kode tidak ditemukan / kedaluwarsa.' }, { status: 404 });
@@ -33,20 +42,39 @@ async function GET_impl(req) {
     const isMine = String(offer.ownerId) === String(session.id);
     const alreadyOwned = isMine ? false : Boolean(await getCardOwner(db, session.id, offer.charName));
     let mineOk = null;
-    if (myCharName) {
-      const mine = await getCardOwner(db, session.id, myCharName);
-      const same = mine && mine.charName.toLowerCase() === offer.charName.toLowerCase();
-      const rule = mine && !same
-        ? checkTradeTierRule(offer.rarity, offer.amount, mine.rarity, myQty)
-        : { ok: true };
+    const takerReq = normalizeBundleItems(myItemsRaw);
+    if (takerReq.length) {
+      // Nilai dengan rarity live milik penukar.
+      const takerLive = [];
+      const perItem = [];
+      for (const it of takerReq) {
+        const mine = await getCardOwner(db, session.id, it.charName);
+        perItem.push({
+          charName: it.charName,
+          owned: Boolean(mine),
+          quantity: mine ? mine.quantity : 0,
+          enough: mine ? mine.quantity >= it.amount : false,
+          amount: it.amount,
+        });
+        if (mine) takerLive.push({ charName: mine.charName, rarity: mine.rarity, amount: it.amount });
+      }
+      const overlap = takerLive.some((t) =>
+        offer.items.some((g) => g.charName.toLowerCase() === t.charName.toLowerCase()));
+      const rule = overlap
+        ? { ok: false, message: 'Ada kartu yang sama di kedua sisi, tidak perlu tukar.' }
+        : checkBundleRule(offer.items, takerLive);
+      const allEnough = perItem.length > 0 && perItem.every((p) => p.owned && p.enough);
       mineOk = {
-        owned: Boolean(mine),
-        quantity: mine ? mine.quantity : 0,
-        enough: mine ? mine.quantity >= myQty : false,
-        same: Boolean(same),
+        items: perItem,
+        owned: allEnough,
+        quantity: perItem.reduce((n, p) => n + p.quantity, 0),
+        enough: allEnough,
+        same: overlap,
         ruleOk: Boolean(rule.ok),
         ruleMessage: rule.ok ? null : rule.message,
-        ok: Boolean(mine) && mine.quantity >= myQty && !same && !isMine && Boolean(rule.ok),
+        giveValue: rule.giveValue ?? bundleStats(offer.items).value,
+        takeValue: rule.takeValue ?? bundleStats(takerLive).value,
+        ok: allEnough && !overlap && !isMine && Boolean(rule.ok),
       };
     }
     return NextResponse.json({
@@ -62,7 +90,8 @@ async function GET_impl(req) {
   }
 }
 
-// POST /api/trade/offer { code, myCharName, myAmount } — tukar copy kartumu dengan penawar.
+// POST /api/trade/offer { code, myItems:[{charName, amount}] } — tukar bundle.
+// Kompatibel body lama { code, myCharName, myAmount } (1 kartu).
 async function POST_impl(req) {
   const session = getSessionFromRequest(req);
   if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
@@ -74,28 +103,34 @@ async function POST_impl(req) {
     return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
   }
   const code = normalizeTradeCode(body.code);
-  const myCharName = String(body.myCharName || '').trim();
-  const myAmount = Math.max(1, Math.floor(Number(body.myAmount) || 1));
-  if (!code || !myCharName) {
+  const rawItems = Array.isArray(body.myItems) && body.myItems.length
+    ? body.myItems
+    : [{ charName: body.myCharName, amount: body.myAmount }];
+  const takerItems = normalizeBundleItems(rawItems);
+  if (!code || !takerItems.length) {
     return NextResponse.json({ success: false, message: 'Kode dan kartumu wajib diisi.' }, { status: 400 });
   }
 
   try {
     await ensureTradeTable();
     const db = getDb();
-    await db.execute('DELETE FROM trade_offers WHERE expires_at <= ?', [Date.now()]);
+    await cleanupTradeOffers(db);
     const offer = await getOffer(db, code);
     if (!offer) {
       return NextResponse.json({ success: false, message: 'Kode tidak ditemukan / kedaluwarsa.' }, { status: 404 });
     }
-    // Kartu pajangan (display-only) tidak bisa di-trade.
-    if (await isDisplayOwned(session.id, myCharName)) {
-      return NextResponse.json({ success: false, message: 'Kartu pajangan tidak bisa di-trade.' }, { status: 400 });
+    // Kartu pajangan (display-only) tidak bisa di-trade — cek semua sisi.
+    for (const it of takerItems) {
+      if (await isDisplayOwned(session.id, it.charName)) {
+        return NextResponse.json({ success: false, message: `${it.charName} kartu pajangan, tidak bisa di-trade.` }, { status: 400 });
+      }
     }
-    if (await isDisplayOwned(offer.ownerId, offer.charName)) {
-      return NextResponse.json({ success: false, message: 'Kartu itu kartu pajangan, tidak bisa di-trade.' }, { status: 400 });
+    for (const it of offer.items) {
+      if (await isDisplayOwned(offer.ownerId, it.charName)) {
+        return NextResponse.json({ success: false, message: 'Ada kartu pajangan di penawaran, tidak bisa di-trade.' }, { status: 400 });
+      }
     }
-    const result = await executeTrade(db, offer, session.id, session.username, myCharName, myAmount);
+    const result = await executeBundleTrade(db, offer, session.id, session.username, takerItems);
     if (!result.ok) return NextResponse.json({ success: false, message: result.message }, { status: 400 });
     return NextResponse.json({ success: true, received: result.received, given: result.given });
   } catch (e) {

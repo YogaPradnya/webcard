@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
-import { ensureTradeTable } from '@/lib/trade';
+import { ensureTradeTable, cleanupTradeOffers, bundleStats } from '@/lib/trade';
 import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
 
 const PAGE_SIZE = 10;
@@ -20,7 +20,7 @@ async function GET_impl(req) {
     await ensureTradeTable();
     const db = getDb();
     const now = Date.now();
-    await db.execute('DELETE FROM trade_offers WHERE expires_at <= ?', [now]);
+    await cleanupTradeOffers(db, now);
 
     const like = `%${q}%`;
     const where = q
@@ -40,15 +40,44 @@ async function GET_impl(req) {
             ORDER BY rowid DESC LIMIT ? OFFSET ?`,
       args: [...args, PAGE_SIZE, offset],
     });
-    const offers = res.rows.map((r) => ({
-      code: String(r.code),
-      ownerUsername: String(r.owner_username || ''),
-      charName: String(r.char_name),
-      rarity: String(r.rarity || 'Common'),
-      expiresAt: Number(r.expires_at) || 0,
-      amount: Math.max(1, Number(r.amount) || 1),
-      isMine: String(r.owner_id) === String(session.id),
-    }));
+    const codes = res.rows.map((r) => String(r.code));
+    const itemsByCode = {};
+    if (codes.length) {
+      const placeholders = codes.map(() => '?').join(',');
+      const itemRes = await db.execute({
+        sql: `SELECT code, char_name, rarity, amount FROM trade_offer_items WHERE code IN (${placeholders})`,
+        args: codes,
+      });
+      for (const it of itemRes.rows) {
+        const c = String(it.code);
+        (itemsByCode[c] = itemsByCode[c] || []).push({
+          charName: String(it.char_name),
+          rarity: String(it.rarity || 'Common'),
+          amount: Math.max(1, Number(it.amount) || 1),
+        });
+      }
+    }
+    const offers = res.rows.map((r) => {
+      const code = String(r.code);
+      const list = itemsByCode[code] && itemsByCode[code].length ? itemsByCode[code] : [{
+        charName: String(r.char_name),
+        rarity: String(r.rarity || 'Common'),
+        amount: Math.max(1, Number(r.amount) || 1),
+      }];
+      const stats = bundleStats(list);
+      return {
+        code,
+        ownerUsername: String(r.owner_username || ''),
+        charName: String(r.char_name),
+        rarity: String(r.rarity || 'Common'),
+        expiresAt: Number(r.expires_at) || 0,
+        amount: Math.max(1, Number(r.amount) || 1),
+        isMine: String(r.owner_id) === String(session.id),
+        items: list,
+        totalCards: stats.count,
+        totalValue: stats.value,
+      };
+    });
     return NextResponse.json({
       success: true,
       offers,
