@@ -8,6 +8,7 @@ import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import { optImg } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
+import { readBattleCardsCache, writeBattleCardsCache } from '@/lib/battleLobby';
 
 function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
@@ -324,6 +325,13 @@ export default function BattlePage() {
       return;
     }
     const slot = type === 'skill2' ? 2 : 1;
+    // P4.2: jangan arm skill bila cons kurang — beri tahu kebutuhan, bukan diam.
+    const okCons = type === 'skill2' ? canSkill2 : canSkill;
+    if (!okCons) {
+      const need = type === 'skill2' ? (atk.cons2 ?? 99) : atk.cons;
+      flashHint(`Butuh ${need} cons (kamu ${myTeam?.cons || 0}). Pakai ATK dulu.`);
+      return;
+    }
     const fxName = slot === 2 ? atk.effect2 : atk.effect;
     const allyKind = atk.role === 'Support' || fxName === 'shield' || fxName === 'bulwark';
     setPending((p) => (p?.type === type ? null : { type, kind: allyKind ? 'ally' : 'foe', fx: fxName || 'skill' }));
@@ -565,30 +573,7 @@ export default function BattlePage() {
       } catch { /* abaikan */ }
       // Fase 2b: data pelengkap paralel.
       const tasks = [
-        (async () => {
-          try {
-            const { ok, data } = await fetchJson('/api/cards?owned=1', { ms: 12000 });
-            if (cancelled) return;
-            if (ok && data.success) {
-              const all = data.cards || [];
-              const owned = all.filter((c) => c.owned ?? true);
-              setCards(owned);
-              setArts((prev) => {
-                if (Object.keys(prev).length > 0) return prev;
-                const artMap = {};
-                for (const c of all) if (c.imageUrl) artMap[String(c.name || '').toLowerCase()] = c.imageUrl;
-                return artMap;
-              });
-              setCardsError('');
-            } else if (!cancelled) {
-              setCardsError('Gagal memuat kartu. Tekan muat ulang.');
-            }
-          } catch (e) {
-            if (!cancelled && e?.name !== 'AbortError') setCardsError('Gagal memuat kartu (timeout). Tekan muat ulang.');
-          } finally {
-            if (!cancelled) setCardsLoading(false);
-          }
-        })(),
+        loadCards(),
         (async () => {
           try {
             const { ok, data } = await fetchJson('/api/battle/history?limit=10', { ms: 8000 });
@@ -621,7 +606,7 @@ export default function BattlePage() {
           }
         })(),
         (async () => {
-          await fetchRooms(1, '', true);
+          await fetchLobby(1, '', true);
           if (!cancelled) setRoomsInitLoading(false);
         })(),
       ];
@@ -643,19 +628,8 @@ export default function BattlePage() {
     } catch { /* error ditangani per-seksi */ }
     setLoading(false);
     await Promise.allSettled([
-      (async () => {
-        try {
-          const { ok, data } = await fetchJson('/api/cards?owned=1', { ms: 12000 });
-          if (ok && data.success) {
-            const all = data.cards || [];
-            setCards(all.filter((c) => c.owned ?? true));
-            const artMap = {};
-            for (const c of all) if (c.imageUrl) artMap[String(c.name || '').toLowerCase()] = c.imageUrl;
-            setArts(artMap);
-          }
-        } catch { setCardsError('Gagal memuat kartu. Tekan muat ulang.'); } finally { setCardsLoading(false); }
-      })(),
-      fetchRooms(roomPageRef.current, roomQRef.current, true).finally(() => setRoomsInitLoading(false)),
+      loadCards(),
+      fetchLobby(roomPageRef.current, roomQRef.current, true).finally(() => setRoomsInitLoading(false)),
       fetchMine(),
     ]);
   }
@@ -723,13 +697,18 @@ export default function BattlePage() {
     }
   }
 
-  async function api(path, body, ms = 12000) {
+  // P1.3: timeout dibedakan GET vs POST. POST mutasi tidak pernah auto-retry
+  // (polling/refresh hanya memanggil GET) agar aksi tidak terkirim dobel.
+  const GET_TIMEOUT_MS = 10000;
+  const POST_TIMEOUT_MS = 20000;
+  async function api(path, body, ms) {
+    const timeout = ms ?? (body ? POST_TIMEOUT_MS : GET_TIMEOUT_MS);
     try {
       const { ok, data } = await fetchJson(
         path,
         body
-          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), ms }
-          : { ms }
+          ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), ms: timeout }
+          : { ms: timeout }
       );
       if (!ok) return data && typeof data === 'object' ? data : { success: false };
       return data || {};
@@ -737,6 +716,43 @@ export default function BattlePage() {
       if (e?.name === 'AbortError') return { success: false, message: 'Server lambat (timeout). Coba lagi.' };
       return { success: false, message: 'Tidak bisa menghubungi server.' };
     }
+  }
+
+  // P1.1: backoff lobby — gagal beruntun 3x -> jeda 60 dtk + tombol manual.
+  // Mencegah baris merah menumpuk saat network putus / server down.
+  const lobbyFail = useRef(0);
+  const [lobbyPaused, setLobbyPaused] = useState(false);
+  const lobbyPausedRef = useRef(false);
+  const lobbyResumeTimer = useRef(null);
+  useEffect(() => { lobbyPausedRef.current = lobbyPaused; }, [lobbyPaused]);
+  useEffect(() => () => { clearTimeout(lobbyResumeTimer.current); }, []);
+
+  function noteLobbySuccess() {
+    lobbyFail.current = 0;
+    if (lobbyPausedRef.current) {
+      clearTimeout(lobbyResumeTimer.current);
+      setLobbyPaused(false);
+    }
+  }
+
+  function noteLobbyFail() {
+    lobbyFail.current += 1;
+    if (lobbyFail.current >= 3 && !lobbyPausedRef.current) {
+      setLobbyPaused(true);
+      clearTimeout(lobbyResumeTimer.current);
+      lobbyResumeTimer.current = setTimeout(() => {
+        lobbyFail.current = 0;
+        setLobbyPaused(false);
+        fetchLobby(roomPageRef.current, roomQRef.current, false, true);
+      }, 60000);
+    }
+  }
+
+  function retryLobbyNow() {
+    lobbyFail.current = 0;
+    clearTimeout(lobbyResumeTimer.current);
+    setLobbyPaused(false);
+    fetchLobby(roomPageRef.current, roomQRef.current, false, true);
   }
 
   async function fetchRooms(page = roomPage, q = roomQ, initial = false) {
@@ -751,15 +767,18 @@ export default function BattlePage() {
     }
     try {
       const { ok, data } = await fetchJson(`/api/battle/rooms?q=${encodeURIComponent(q)}&page=${page}`, { ms: 8000 });
-      if (seq !== roomsSeq.current) return; // hasil basi -> buang, cegah flicker list
+      if (seq !== roomsSeq.current) return true; // hasil basi -> buang, cegah flicker list
       if (ok && data.success) {
         setRoomList(data.rooms || []);
         setRoomTotal(data.pagination?.total || 0);
         setRoomTotalPages(data.pagination?.totalPages || 1);
+        return true;
       }
       // Gagal/AbortError: pertahankan list lama (stale), jangan kosongkan -> no flicker.
+      return false;
     } catch {
       // silent: rooms pelengkap, error inline ditangani pemanggil bila perlu
+      return false;
     } finally {
       if (seq === roomsSeq.current) setRoomLoading(false);
     }
@@ -769,11 +788,16 @@ export default function BattlePage() {
     const seq = ++mineSeq.current;
     try {
       const { ok, data } = await fetchJson('/api/battle/mine', { ms: 8000 });
-      if (seq !== mineSeq.current) return;
-      if (ok && data.success) setMyRooms(data.rooms || []);
-      else if (!silent) setError('Gagal memuat room aktifmu.');
+      if (seq !== mineSeq.current) return true;
+      if (ok && data.success) {
+        setMyRooms(data.rooms || []);
+        return true;
+      }
+      if (!silent) setError('Gagal memuat room aktifmu.');
+      return false;
     } catch (e) {
       if (!silent && e?.name !== 'AbortError') setError('Gagal memuat room aktifmu.');
+      return false;
     }
   }
 
@@ -784,6 +808,93 @@ export default function BattlePage() {
     } catch { /* abaikan */ }
   }
 
+  // P2.2: cache kartu owned 5 menit (stale-while-revalidate). Buka-ulang instan,
+  // offline tetap tampil stale + tombol muat ulang. Helper di lib agar testable.
+  function applyCardsList(all) {
+    const owned = (all || []).filter((c) => c.owned ?? true);
+    setCards(owned);
+    setArts((prev) => {
+      const artMap = { ...prev };
+      for (const c of all || []) {
+        if (!c.imageUrl) continue;
+        const key = String(c.name || '').toLowerCase();
+        if (key && !artMap[key]) artMap[key] = c.imageUrl;
+      }
+      return artMap;
+    });
+  }
+  async function loadCards() {
+    let hadStale = false;
+    try {
+      const cached = readBattleCardsCache();
+      if (cached && cached.length) {
+        hadStale = true;
+        applyCardsList(cached);
+        setCardsLoading(false);
+      }
+    } catch { /* abaikan */ }
+    try {
+      const { ok, data } = await fetchJson('/api/cards?owned=1', { ms: 12000 });
+      if (ok && data.success) {
+        applyCardsList(data.cards || []);
+        writeBattleCardsCache(data.cards || []);
+        setCardsError('');
+      } else if (!hadStale) {
+        setCardsError('Gagal memuat kartu. Tekan muat ulang.');
+      } else {
+        setCardsError('Gagal memperbarui (offline). Menampilkan data tersimpan.');
+      }
+    } catch (e) {
+      if (hadStale) {
+        setCardsError('Gagal memperbarui (offline). Menampilkan data tersimpan.');
+      } else if (e?.name !== 'AbortError') {
+        setCardsError('Gagal memuat kartu (timeout). Tekan muat ulang.');
+      }
+    } finally {
+      setCardsLoading(false);
+    }
+  }
+
+  // P1.2: 1 request lobby (rooms + mine). Fallback ke 2 endpoint lama bila gagal.
+  // Return true bila salah satu sumber sukses (cukup untuk reset backoff).
+  async function fetchLobby(page = roomPage, q = roomQ, initial = false, force = false) {
+    if (lobbyPausedRef.current && !force) return false;
+    // Fencing: hasil lobby basi tidak boleh menimpa fetchRooms/fetchMine yang lebih baru.
+    roomsSeq.current += 1;
+    mineSeq.current += 1;
+    const roomsSeqNow = roomsSeq.current;
+    const mineSeqNow = mineSeq.current;
+    if (initial && roomListRef.current.length === 0) setRoomLoading(true);
+    else if (roomListRef.current.length === 0) setRoomLoading(true);
+    try {
+      const { ok, data } = await fetchJson(
+        `/api/battle/bootstrap?q=${encodeURIComponent(q)}&page=${page}`,
+        { ms: 8000 }
+      );
+      if (ok && data.success) {
+        if (roomsSeqNow === roomsSeq.current) {
+          setRoomList(data.rooms || []);
+          setRoomTotal(data.pagination?.total || 0);
+          setRoomTotalPages(data.pagination?.totalPages || 1);
+        }
+        if (mineSeqNow === mineSeq.current) setMyRooms(data.mine || []);
+        noteLobbySuccess();
+        return true;
+      }
+    } catch { /* fallback legacy di bawah */ } finally {
+      setRoomLoading(false);
+    }
+    // Fallback: endpoint lama (tetap dipertahankan agar tidak breaking).
+    const [rOk, mOk] = await Promise.all([
+      fetchRooms(page, q, initial),
+      fetchMine(true),
+    ]);
+    const okAny = Boolean(rOk || mOk);
+    if (okAny) noteLobbySuccess();
+    else noteLobbyFail();
+    return okAny;
+  }
+
   // Mirror page/q ke ref agar interval stabil (tidak recreate tiap ketik -> no refetch badai).
   const roomPageRef = useRef(roomPage);
   const roomQRef = useRef(roomQ);
@@ -792,21 +903,21 @@ export default function BattlePage() {
   useEffect(() => { roomQRef.current = roomQ; }, [roomQ]);
   useEffect(() => { roomListRef.current = roomList; }, [roomList]);
 
-  // Debounce search rooms 400ms: cegah request tiap tombol Cari dobel + race.
+  // Debounce search rooms: cegah request tiap tombol Cari dobel + race.
+  // Lewat fetchLobby (1 request) + hormati backoff pause.
   useEffect(() => {
-    if (loading || st) return;
-    const t = setTimeout(() => { fetchRooms(roomPage, roomQ); }, roomQ ? 150 : 0);
+    if (loading || st || lobbyPaused) return;
+    const t = setTimeout(() => { fetchLobby(roomPage, roomQ); }, roomQ ? 150 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, st, roomPage, roomQ]);
+  }, [loading, st, roomPage, roomQ, lobbyPaused]);
 
   useEffect(() => {
     if (loading || st) return;
-    // Polling lobby hemat: 15 dtk, pause saat hidden. Silent (tanpa spinner) anti kedip.
+    // Polling lobby hemat: 15 dtk, pause saat hidden / backoff. Silent anti kedip.
     const t = setInterval(() => {
-      if (document.hidden) return;
-      fetchRooms(roomPageRef.current, roomQRef.current);
-      fetchMine();
+      if (document.hidden || lobbyPausedRef.current) return;
+      fetchLobby(roomPageRef.current, roomQRef.current);
     }, 15000);
     // Countdown 1 dtk hanya bila ada yang perlu dihitung (waiting/ongoing) -> hemat render.
     const needTick = myRooms.length > 0 || roomList.length > 0 || (st && st.status !== 'finished' && !st.battle?.over);
@@ -849,7 +960,7 @@ export default function BattlePage() {
       if (!data.success) {
         setError(data.message || 'Gagal gabung room.');
         setMode('join');
-        fetchRooms(roomPageRef.current, roomQRef.current);
+        fetchLobby(roomPageRef.current, roomQRef.current, false, true);
         return;
       }
       seenLog.current = 0;
@@ -936,7 +1047,7 @@ export default function BattlePage() {
     const data = await api('/api/battle/room/join', { code: joinCode, team: orderedTeam() });
     if (!data.success) {
       setError(data.message || 'Gagal gabung room.');
-      fetchRooms(roomPageRef.current, roomQRef.current);
+      fetchLobby(roomPageRef.current, roomQRef.current, false, true);
       return;
     }
     seenLog.current = 0;
@@ -968,8 +1079,7 @@ export default function BattlePage() {
     setFx(null);
     setPending(null);
     // picked dipertahankan agar user tidak mengulang pilih 3 kartu (anti flicker/kerja ulang).
-    fetchMine();
-    fetchRooms(roomPageRef.current, roomQRef.current);
+    fetchLobby(roomPageRef.current, roomQRef.current, false, true);
   }
 
   async function surrenderBattle() {
@@ -1048,8 +1158,7 @@ export default function BattlePage() {
     setAutoBattle(false);
     setAutoExitIn(0);
     fighterRefs.current = {};
-    fetchMine();
-    fetchRooms(roomPageRef.current, roomQRef.current);
+    fetchLobby(roomPageRef.current, roomQRef.current, false, true);
     fetchHistory();
   }
 
@@ -1090,8 +1199,7 @@ export default function BattlePage() {
         clearMyRoom();
         setSt(null);
         setError(data.message || 'Room tidak tersedia lagi.');
-        fetchMine();
-        fetchRooms(roomPageRef.current, roomQRef.current);
+        fetchLobby(roomPageRef.current, roomQRef.current, false, true);
       } else if (!silent) {
         setError(data.message || 'Gagal sinkron battle.');
       }
@@ -1265,13 +1373,17 @@ export default function BattlePage() {
           {!st && myRooms.length > 0 ? (
             <div className="card" style={{ marginBottom: 16, borderColor: 'var(--link)' }}>
               <div className="section-title">Room aktifmu (bebas pindah page, auto masuk saat lawan gabung)</div>
-              {myRooms.map((r) => (
+              {myRooms.map((r) => {
+                // P4.3: badge lawan aktif dari data existing (tanpa query tambahan).
+                const foeActive = r.status !== 'waiting' && r.updatedAt && (nowTick - r.updatedAt < 30000);
+                return (
                 <div className="user-row" key={r.code}>
                   <span>
                     <span style={{ fontWeight: 800, letterSpacing: 2 }}>{r.code}</span>
                     <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--body)' }}>
                       {r.status === 'waiting' ? `menunggu... ${fmtSisa(r.expiresAt)}` : `vs @${r.yourSide === 'player' ? r.p2Username : r.p1Username} — giliran ${r.turn === me?.id ? 'kamu' : 'lawan'}`}
                     </span>
+                    {foeActive ? <span className="online-dot online" style={{ marginLeft: 8 }}>● lawan aktif</span> : null}
                   </span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
                     <button
@@ -1293,8 +1405,7 @@ export default function BattlePage() {
                           try {
                             await fetchJson(`/api/battle/room?code=${encodeURIComponent(r.code)}`, { method: 'DELETE', ms: 8000 });
                           } catch { /* abaikan */ }
-                          fetchMine();
-                          fetchRooms(roomPageRef.current, roomQRef.current);
+                          fetchLobby(roomPageRef.current, roomQRef.current, false, true);
                         }}
                       >
                         Batal
@@ -1302,7 +1413,8 @@ export default function BattlePage() {
                     ) : null}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : null}
 
@@ -1321,6 +1433,14 @@ export default function BattlePage() {
                 </button>
               </form>
               {roomLoading && roomList.length === 0 ? <div style={{ fontSize: 13 }}>Memuat...</div> : null}
+              {lobbyPaused ? (
+                <div className="trade-fair" role="status" style={{ marginBottom: 8 }}>
+                  Koneksi lobby lambat — auto-refresh dijeda 60 dtk.{' '}
+                  <button type="button" className="btn btn-ghost" style={{ width: 'auto', minHeight: 0, padding: '4px 12px' }} onClick={retryLobbyNow}>
+                    Coba sekarang
+                  </button>
+                </div>
+              ) : null}
               {!roomLoading && !roomsInitLoading && roomList.length === 0 ? (
                 <div style={{ fontSize: 13 }}>Belum ada battle ready.</div>
               ) : null}
@@ -1430,6 +1550,20 @@ export default function BattlePage() {
                   >
                     ⚡ Auto Tim
                   </button>
+                  {picked.length > 0 ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ width: 'auto', minHeight: 0, padding: '8px 14px' }}
+                      onClick={() => {
+                        setPicked([]);
+                        setVanguard('');
+                      }}
+                      title="Kosongkan pilihan tim"
+                    >
+                      Ganti tim
+                    </button>
+                  ) : null}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
                   <input className="input" style={{ flex: 1, minWidth: 140 }} placeholder="Cari kartu..." value={pickQ} onChange={(e) => setPickQ(e.target.value)} aria-label="Cari kartu battle" />
@@ -1624,6 +1758,7 @@ export default function BattlePage() {
                 alt="Menunggu lawan"
                 width={768}
                 height={429}
+                loading="lazy"
                 decoding="async"
               />
               <div className="trade-code-big">{st.code}</div>
