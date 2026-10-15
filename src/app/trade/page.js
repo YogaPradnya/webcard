@@ -281,6 +281,7 @@ export default function TradePage() {
                 value={tradeQInput}
                 onChange={(e) => setTradeQInput(e.target.value)}
                 aria-label="Cari trade"
+                style={{ flex: 1, minWidth: 0 }}
               />
               <button className="btn" type="submit" style={{ width: 'auto', padding: '0 20px' }}>
                 Cari

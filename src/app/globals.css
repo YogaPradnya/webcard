@@ -318,6 +318,19 @@ body {
   min-width: 160px;
 }
 
+/* Dua select filter berdampingan (bukan stacked penuh). */
+.book-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.book-filters .select {
+  flex: 1;
+  min-width: 0;
+}
+
 .chip-row {
   display: flex;
   gap: 8px;
