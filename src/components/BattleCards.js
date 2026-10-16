@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { optImg } from '@/lib/images';
+import { optImg, srcSetImg, IMG_SIZES_CARD } from '@/lib/images';
 
 export function CountUp({ value }) {
   const [n, setN] = useState(0);
@@ -28,9 +28,21 @@ export function CountUp({ value }) {
 export function HpBar({ hp, maxHp }) {
   const pct = Math.max(0, Math.round((hp / Math.max(1, maxHp)) * 100));
   const color = pct > 50 ? 'var(--role-heal)' : pct > 20 ? 'var(--link)' : 'var(--role-dmg)';
+  // Bar putih ala fighting game: tertinggal 0,6 dtk di belakang damage (heal langsung snap).
+  const [ghost, setGhost] = useState(pct);
+  useEffect(() => {
+    if (pct >= ghost) {
+      setGhost(pct);
+      return;
+    }
+    const t = setTimeout(() => setGhost(pct), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pct]);
   return (
-    <div style={{ background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.5s' }} />
+    <div style={{ position: 'relative', background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
+      <div className="hp-ghost" style={{ position: 'absolute', inset: 0, right: 'auto', width: `${ghost}%`, background: '#ffffff', opacity: 0.85, transition: 'width 0.3s' }} />
+      <div style={{ position: 'absolute', inset: 0, right: 'auto', width: `${pct}%`, background: color, transition: 'width 0.5s' }} />
     </div>
   );
 }
@@ -60,7 +72,7 @@ export function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTo
     >
       {art ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img className="fighter-img" src={optImg(art, 200)} alt={f.name} loading="lazy" decoding="async" />
+        <img className="fighter-img" src={optImg(art, 200)} srcSet={srcSetImg(art)} sizes={IMG_SIZES_CARD} alt={f.name} loading="lazy" decoding="async" />
       ) : (
         <div className="fighter-img" />
       )}

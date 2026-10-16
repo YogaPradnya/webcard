@@ -143,25 +143,15 @@ export default function ProfilePage() {
     setError('');
     try {
       const isDisplay = showcaseSource === 'display';
-      const { ok, data } = await fetchJson(
+      const { ok, data } = await postJson(
         isDisplay ? '/api/display/showcase' : '/api/cards/showcase',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
-            isDisplay ? { name: showcasePick, showcase: true } : { charName: showcasePick, showcase: true }
-          ),
-        }
+        isDisplay ? { name: showcasePick, showcase: true } : { charName: showcasePick, showcase: true }
       );
       if (!ok || !data.success) {
         setError(data.message || 'Gagal ganti pajangan.');
         return;
       }
-      const srcRes = await fetchJson('/api/profile/showcase-source', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: showcaseSource }),
-      });
+      const srcRes = await postJson('/api/profile/showcase-source', { source: showcaseSource });
       if (!srcRes.ok || !srcRes.data.success) {
         setError(srcRes.data.message || 'Pajangan tersimpan, tapi pilihan sumber gagal.');
         return;
@@ -176,11 +166,7 @@ export default function ProfilePage() {
     setBusy(`title:${title}`);
     setError('');
     try {
-      const { ok, data } = await fetchJson('/api/profile/title', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
+      const { ok, data } = await postJson('/api/profile/title', { title });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal pasang gelar.');
         return;
@@ -194,11 +180,7 @@ export default function ProfilePage() {
   async function removeTitle() {
     setBusy('title:');
     try {
-      await fetchJson('/api/profile/title', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: '' }),
-      });
+      await postJson('/api/profile/title', { title: '' });
       setProfile((p) => (p ? { ...p, title: '' } : p));
     } finally {
       setBusy('');

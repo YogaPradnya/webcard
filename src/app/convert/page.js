@@ -1,17 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
+import { postJson } from '@/lib/postJson';
+import { useMe } from '@/hooks/useMe';
 
 const RATES = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
 
 export default function ConvertPage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me } = useMe();
   const [cards, setCards] = useState([]);
   const [xp, setXp] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -25,12 +25,7 @@ export default function ConvertPage() {
   async function load() {
     setError('');
     try {
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-      if (!meOk || !meData.success) {
-        router.push('/login');
-        return;
-      }
-      setMe(meData);
+      if (!me) return; // useMe menendang ke /login bila belum login
       const [cardsData, gachaData] = await Promise.all([
         fetchLenient('/api/cards?owned=1'),
         fetchLenient('/api/gacha'),
@@ -45,9 +40,10 @@ export default function ConvertPage() {
   }
 
   useEffect(() => {
+    if (!me) return; // tunggu sesi
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [me]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,11 +79,7 @@ export default function ConvertPage() {
     setBusy(true);
     setError('');
     try {
-      const { ok, data } = await fetchJson('/api/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: lines.map((l) => ({ charName: l.charName, qty: l.qty })) }),
-      });
+      const { ok, data } = await postJson('/api/convert', { items: lines.map((l) => ({ charName: l.charName, qty: l.qty })) });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal konversi.');
         return;

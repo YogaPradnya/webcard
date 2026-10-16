@@ -19,6 +19,16 @@
   border: 1.5px solid var(--hairline-strong);
 }
 
+/* Denyut khusus badge giliranmu (transform saja, murah GPU) */
+.turn-badge.mine {
+  animation: turn-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes turn-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.07); }
+}
+
 .fighters {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -39,6 +49,23 @@
 .fighter.active {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px var(--primary);
+}
+
+/* Napas glow pada fighter aktif (hanya opacity yang dianimasikan) */
+.fighter.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 14px var(--primary);
+  opacity: 0.35;
+  animation: active-breathe 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes active-breathe {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.55; }
 }
 
 .fighter.ko {

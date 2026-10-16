@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
-import { optImg } from '@/lib/images';
+import { optImg, srcSetImg, IMG_SIZES_CARD } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
 import { useMe } from '@/hooks/useMe';
@@ -22,11 +22,11 @@ function revealMsFor(pull) {
   return REVEAL_MS_BY_RARITY[pull?.rarity] || 900;
 }
 
-function RevealCard({ pull, face }) {
+function RevealCard({ pull, face, anticipating, burst }) {
   const color = TIER_COLORS[pull.rarity] || '#9ca3af';
   if (face === 'back') {
     return (
-      <div className="gacha-card spinning" style={{ borderColor: color, boxShadow: '3px 3px 0 #0a0a0a' }}>
+      <div className={'gacha-card spinning' + (anticipating ? ' anticipating' : '')} style={{ borderColor: color, boxShadow: '3px 3px 0 #0a0a0a' }}>
         <div className="gacha-back" style={{ background: color }}>
           <span>?</span>
         </div>
@@ -35,11 +35,14 @@ function RevealCard({ pull, face }) {
   }
   return (
     <div className="gacha-card revealed" style={{ borderColor: color, boxShadow: '3px 3px 0 #0a0a0a' }}>
+      {burst ? (
+        <span className="gacha-burst" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></span>
+      ) : null}
       {pull.isNew ? <span className="gacha-new">BARU</span> : <span className="gacha-dupe">+1 stack</span>}
       <div className="framed-art">
         {pull.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={optImg(pull.imageUrl, 400)} alt={pull.charName} decoding="async" />
+          <img src={optImg(pull.imageUrl, 400)} srcSet={srcSetImg(pull.imageUrl)} sizes={IMG_SIZES_CARD} alt={pull.charName} decoding="async" fetchpriority="high" />
         ) : (
           <div className="framed-blank gacha-noart"><span>?</span></div>
         )}
@@ -63,6 +66,9 @@ export default function GachaPage() {
   const [pulls, setPulls] = useState([]);
   const [turn, setTurn] = useState(0); // index kartu yang sedang di-reveal
   const [face, setFace] = useState('back'); // 'back' (spin) | 'front' (terbuka)
+  const [anticipating, setAnticipating] = useState(false); // slow-mo 0,5 dtk khusus Epic+
+  const [burst, setBurst] = useState(-1); // index kartu yang meledak (Legendary/Mythic)
+  const [shake, setShake] = useState(false); // guncang panggung saat Legendary/Mythic
   const [finished, setFinished] = useState(false);
   const [instant, setInstant] = useState(() => {
     try {
@@ -109,16 +115,40 @@ export default function GachaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
+  const HOT_TIERS = ['Epic', 'Legendary', 'Mythic'];
+
+  function triggerShake() {
+    setShake(false);
+    requestAnimationFrame(() => requestAnimationFrame(() => setShake(true)));
+    timers.current.push(setTimeout(() => setShake(false), 500));
+  }
+
   function schedule(index) {
     // Kartu index: back spin dulu, front mengikuti timing rarity (M makin lama makin deg-degan).
-    const ms = revealMsFor(pullsRef.current[index]);
+    // Epic+: 0,5 dtk terakhir jadi slow-mo antisipasi; Legendary/Mythic: shake + burst saat terbuka.
+    const pull = pullsRef.current[index];
+    const ms = revealMsFor(pull);
+    const hot = HOT_TIERS.includes(pull?.rarity) && !instant;
+    const pre = hot ? Math.min(500, Math.floor(ms / 2)) : 0;
     setTurn(index);
     setFace('back');
-    timers.current.push(setTimeout(() => setFace('front'), ms));
+    setAnticipating(false);
+    setBurst(-1);
     timers.current.push(setTimeout(() => {
-      if (index + 1 < pullsRef.current.length) schedule(index + 1);
-      else setFinished(true);
-    }, ms + 450));
+      if (hot) setAnticipating(true);
+      timers.current.push(setTimeout(() => {
+        setFace('front');
+        setAnticipating(false);
+        if (pull && (pull.rarity === 'Legendary' || pull.rarity === 'Mythic')) {
+          setBurst(index);
+          triggerShake();
+        }
+        timers.current.push(setTimeout(() => {
+          if (index + 1 < pullsRef.current.length) schedule(index + 1);
+          else setFinished(true);
+        }, 450));
+      }, pre));
+    }, Math.max(0, ms - pre)));
   }
 
   const pullsRef = useRef([]);
@@ -131,6 +161,9 @@ export default function GachaPage() {
     setError('');
     setPulls([]);
     setFinished(false);
+    setAnticipating(false);
+    setBurst(-1);
+    setShake(false);
     try {
       const { ok, data } = await postJson('/api/gacha/pull', { count });
       if (!ok || !data.success) {
@@ -147,16 +180,7 @@ export default function GachaPage() {
         return;
       }
       // Mulai reveal dari kartu pertama (next tick agar state pulls ter-commit).
-      timers.current.push(setTimeout(() => {
-        const firstMs = revealMsFor((data.pulls || [])[0]);
-        setTurn(0);
-        setFace('back');
-        timers.current.push(setTimeout(() => setFace('front'), firstMs));
-        timers.current.push(setTimeout(() => {
-          if ((data.pulls || []).length > 1) scheduleRef.current(1);
-          else setFinished(true);
-        }, firstMs + 450));
-      }, 50));
+      timers.current.push(setTimeout(() => scheduleRef.current(0), 50));
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -171,6 +195,9 @@ export default function GachaPage() {
     clearTimers();
     setTurn(Math.max(0, pulls.length - 1));
     setFace('front');
+    setAnticipating(false);
+    setBurst(-1);
+    setShake(false);
     setFinished(true);
   }
 
@@ -251,10 +278,10 @@ export default function GachaPage() {
                   </button>
                 ) : null}
               </div>
-              <div className="gacha-grid">
+              <div className={'gacha-grid gacha-stage' + (shake ? ' shake' : '')}>
                 {pulls.map((p, i) => {
                   if (finished || i < turn) return <RevealCard key={i} pull={p} face="front" />;
-                  if (i === turn) return <RevealCard key={i} pull={p} face={face} />;
+                  if (i === turn) return <RevealCard key={i} pull={p} face={face} anticipating={anticipating} burst={burst === i} />;
                   return (
                     <div key={i} className="gacha-card waiting">
                       <div className="gacha-back dim"><span>{i + 1}</span></div>

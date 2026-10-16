@@ -1737,7 +1737,7 @@ export default function BattlePage() {
                 <div className="arena-side-title">
                   <span className="side-tag side-tag-me">KAMU</span>
                   Timmu
-                  {myTurn ? <span className="turn-badge">Giliranmu</span> : null}
+                  {myTurn ? <span className="turn-badge mine">Giliranmu</span> : null}
                 </div>
                 <div className="fighters">
                   {myTeam?.fighters.map((f, i) => {

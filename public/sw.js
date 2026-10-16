@@ -1,33 +1,20 @@
-// Service worker ini SENGAJA menonaktifkan diri sendiri.
-// Versi sebelumnya (cache-first chunk JS) pernah menyajikan kode basi selamanya
-// di browser yang sempat mendaftarkannya — file ini memastikan SW lama itu
-// ter-unregister sekali, lalu tidak ada SW lagi yang berjalan.
+// Service worker gambar: cache-first KHUSUS gambar Cloudinary.
+// Pelajaran insiden SW lama: JANGAN PERNAH cache JS/_next/dokumen/API di sini —
+// hanya gambar (URL stabil per kartu; art baru = URL baru = fetch segar otomatis).
+// File ini no-store di next.config.js agar update-nya langsung menyebar.
+const IMG_CACHE = 'animein-img-v1';
+const MAX_IMG_ENTRIES = 200;
+
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    (async () => {
-      try {
-        await self.registration.unregister();
-      } catch {
-        // abaikan
-      }
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    })(),
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       try {
-        await self.registration.unregister();
-      } catch {
-        // abaikan
-      }
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter((k) => k !== IMG_CACHE).map((k) => caches.delete(k)));
         await self.clients.claim();
       } catch {
         // abaikan
@@ -36,4 +23,47 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Tidak ada handler fetch: semua request langsung ke network.
+function isCacheableImage(url) {
+  return url.origin === 'https://res.cloudinary.com' && /\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url.pathname);
+}
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  if (request.method !== 'GET') return;
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch {
+    return;
+  }
+  if (!isCacheableImage(url)) return; // selain gambar Cloudinary: langsung network
+  event.respondWith(
+    (async () => {
+      try {
+        const cache = await caches.open(IMG_CACHE);
+        const hit = await cache.match(request);
+        if (hit) return hit;
+        const res = await fetch(request);
+        if (res && res.ok) {
+          try {
+            await cache.put(request, res.clone());
+            const keys = await cache.keys();
+            if (keys.length > MAX_IMG_ENTRIES) await cache.delete(keys[0]);
+          } catch {
+            // kuota penuh: pakai respons network apa adanya
+          }
+        }
+        return res;
+      } catch (err) {
+        try {
+          const cache = await caches.open(IMG_CACHE);
+          const hit = await cache.match(request);
+          if (hit) return hit;
+        } catch {
+          // abaikan
+        }
+        throw err;
+      }
+    })(),
+  );
+});

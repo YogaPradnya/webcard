@@ -433,6 +433,60 @@
   animation: gacha-pop 0.35s ease-out;
 }
 
+/* Antisipasi sinematik: 0,5 dtk sebelum kartu Epic+ terbuka (spin melambat + membesar) */
+.gacha-card.anticipating {
+  animation: gacha-spin 1.2s linear infinite, gacha-anticipate 0.5s ease-in-out infinite;
+}
+
+@keyframes gacha-anticipate {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+/* Guncangan panggung saat Legendary/Mythic terbuka */
+.gacha-stage.shake {
+  animation: gacha-shake 0.45s;
+}
+
+@keyframes gacha-shake {
+  20%, 60% { transform: translate(-6px, 2px); }
+  40%, 80% { transform: translate(6px, -2px); }
+}
+
+/* Ledakan partikel (transform + opacity saja, murah GPU) */
+.gacha-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.gacha-burst i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px;
+  border-radius: 9999px;
+  background: var(--lime);
+  animation: gacha-burst-fly 0.7s ease-out forwards;
+}
+
+.gacha-burst i:nth-child(2) { --r: 45deg; background: var(--pastel-yellow-bd); }
+.gacha-burst i:nth-child(3) { --r: 90deg; }
+.gacha-burst i:nth-child(4) { --r: 135deg; background: #ffffff; }
+.gacha-burst i:nth-child(5) { --r: 180deg; background: var(--pastel-yellow-bd); }
+.gacha-burst i:nth-child(6) { --r: 225deg; }
+.gacha-burst i:nth-child(7) { --r: 270deg; background: #ffffff; }
+.gacha-burst i:nth-child(8) { --r: 315deg; background: var(--pastel-yellow-bd); }
+.gacha-burst i:nth-child(1) { --r: 0deg; }
+
+@keyframes gacha-burst-fly {
+  from { transform: rotate(var(--r, 0deg)) translateX(12px) scale(1); opacity: 1; }
+  to { transform: rotate(var(--r, 0deg)) translateX(54px) scale(0.4); opacity: 0; }
+}
+
 @keyframes gacha-pop {
   from { transform: scale(0.92); }
   to { transform: scale(1); }
@@ -762,8 +816,14 @@
   .fighter.shielded,
   .gacha-card.spinning,
   .gacha-card.revealed,
+  .gacha-card.anticipating,
+  .gacha-stage.shake,
+  .gacha-burst i,
   .combo-badge,
   .hp-low,
+  .hp-ghost,
+  .turn-badge.mine,
+  .fighter.active::after,
   .fighter.targetable-foe,
   .fighter.targetable-ally,
   .waiting-art.pulse,

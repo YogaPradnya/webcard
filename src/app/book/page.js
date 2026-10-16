@@ -10,8 +10,9 @@ import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
-import { optImg } from '@/lib/images';
+import { optImg, srcSetImg, IMG_SIZES_CARD } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
+import { postJson } from '@/lib/postJson';
 import { TIER_COLORS } from '@/lib/tiers';
 import { displayBorderColor, displayCardStyle } from '@/lib/displayBorder';
 import { effectTone } from '@/lib/format';
@@ -159,11 +160,7 @@ export default function BookPage() {
     setShowcaseBusy(`evo:${c.name}`);
     setError('');
     try {
-      const { ok, data } = await fetchJson('/api/cards/evolve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ charName: c.name }),
-      });
+      const { ok, data } = await postJson('/api/cards/evolve', { charName: c.name });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal evolusi.');
         return;
@@ -183,20 +180,21 @@ export default function BookPage() {
     if (!c.owned || showcaseBusy) return;
     setShowcaseBusy(c.name);
     setError('');
+    // Optimistik: flip langsung, rollback bila server menolak.
+    const next = !c.showcase;
+    const prev = cards;
+    setCards((list) => list.map((x) => x.name === c.name
+      ? { ...x, showcase: next }
+      : (next ? { ...x, showcase: false } : x)));
     try {
-      const { ok, data } = await fetchJson('/api/cards/showcase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ charName: c.name, showcase: !c.showcase }),
-      });
+      const { ok, data } = await postJson('/api/cards/showcase', { charName: c.name, showcase: next });
       if (!ok || !data.success) {
+        setCards(prev);
         setError(data.message || 'Gagal atur pajangan.');
         return;
       }
-      setCards((prev) => prev.map((x) => x.name === c.name
-        ? { ...x, showcase: !c.showcase }
-        : (!c.showcase ? { ...x, showcase: false } : x)));
     } catch {
+      setCards(prev);
       setError('Tidak bisa menghubungi server.');
     } finally {
       setShowcaseBusy('');
@@ -258,13 +256,9 @@ export default function BookPage() {
     setError('');
     try {
       const isDisplay = editingSlot.kind === 'display';
-      const { ok, data } = await fetchJson(isDisplay ? '/api/display/customize' : '/api/shop/slot/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: isDisplay
-          ? JSON.stringify({ id: editingSlot.id, imageUrl: slotForm.imageUrl, borderType: slotForm.borderType, borderColor: slotForm.borderColor, description: slotForm.description })
-          : JSON.stringify({ slotId: editingSlot.id, ...slotForm }),
-      });
+      const { ok, data } = await postJson(isDisplay ? '/api/display/customize' : '/api/shop/slot/update', isDisplay
+        ? { id: editingSlot.id, imageUrl: slotForm.imageUrl, borderType: slotForm.borderType, borderColor: slotForm.borderColor, description: slotForm.description }
+        : { slotId: editingSlot.id, ...slotForm });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal simpan kartu.');
         return;
@@ -282,20 +276,21 @@ export default function BookPage() {
     if (showcaseBusy) return;
     setShowcaseBusy(`display:${c.name}`);
     setError('');
+    // Optimistik: flip langsung, rollback bila server menolak.
+    const next = !c.showcase;
+    const prev = displayCards;
+    setDisplayCards((list) => list.map((x) => x.name === c.name
+      ? { ...x, showcase: next }
+      : (next ? { ...x, showcase: false } : x)));
     try {
-      const { ok, data } = await fetchJson('/api/display/showcase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: c.name, showcase: !c.showcase }),
-      });
+      const { ok, data } = await postJson('/api/display/showcase', { name: c.name, showcase: next });
       if (!ok || !data.success) {
+        setDisplayCards(prev);
         setError(data.message || 'Gagal atur pajangan.');
         return;
       }
-      setDisplayCards((prev) => prev.map((x) => x.name === c.name
-        ? { ...x, showcase: !c.showcase }
-        : (!c.showcase ? { ...x, showcase: false } : x)));
     } catch {
+      setDisplayCards(prev);
       setError('Tidak bisa menghubungi server.');
     } finally {
       setShowcaseBusy('');
@@ -411,7 +406,7 @@ export default function BookPage() {
                             <div className="flip-front">
                               {c.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
-                                <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
+                                <img className="card-art" src={optImg(c.imageUrl, 300)} srcSet={srcSetImg(c.imageUrl)} sizes={IMG_SIZES_CARD} alt={c.name} loading="lazy" decoding="async" />
                               ) : (
                                 <div className="card-art" />
                               )}
@@ -566,7 +561,7 @@ export default function BookPage() {
       </div>
 
       <div className="book-grid" style={{ marginTop: 16 }}>
-        {pageItems.map((c) => (
+        {pageItems.map((c, idx) => (
           <div
             key={c.name}
             className={
@@ -589,7 +584,7 @@ export default function BookPage() {
                   <div className="framed-art">
                     {c.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
+                      <img src={optImg(c.imageUrl, 300)} srcSet={srcSetImg(c.imageUrl)} sizes={IMG_SIZES_CARD} alt={c.name} loading={idx < 3 ? 'eager' : 'lazy'} fetchpriority={idx < 3 ? 'high' : undefined} decoding="async" />
                     ) : (
                       <div className="framed-blank" />
                     )}
@@ -597,7 +592,7 @@ export default function BookPage() {
                   </div>
                 ) : c.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="card-art" src={optImg(c.imageUrl, 300)} alt={c.name} loading="lazy" decoding="async" />
+                  <img className="card-art" src={optImg(c.imageUrl, 300)} srcSet={srcSetImg(c.imageUrl)} sizes={IMG_SIZES_CARD} alt={c.name} loading={idx < 3 ? 'eager' : 'lazy'} fetchpriority={idx < 3 ? 'high' : undefined} decoding="async" />
                 ) : (
                   <div className="card-art" />
                 )}
