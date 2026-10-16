@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
@@ -10,6 +9,7 @@ import { optImg } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
 import { readBattleCardsCache, writeBattleCardsCache } from '@/lib/battleLobby';
 import { fmtClock, effectTone } from '@/lib/format';
+import { useMe } from '@/hooks/useMe';
 import { ConsPips, FighterCard, CountUp } from '@/components/BattleCards';
 
 const AUTO_TIER_SCORE = { Mythic: 50, Legendary: 40, Epic: 30, Rare: 20, Common: 10 };
@@ -60,8 +60,7 @@ function describeLog(ev) {
 }
 
 export default function BattlePage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me, loading: meLoading } = useMe();
   const [cards, setCards] = useState([]);
   const [arts, setArts] = useState({});
   const [loading, setLoading] = useState(true);
@@ -440,22 +439,11 @@ export default function BattlePage() {
   // Fase 2: cards/mine/history/rooms paralel non-blocking, masing-masing punya
   // state loading sendiri. AbortError = silent (tidak jadi error fatal).
   useEffect(() => {
+    if (meLoading) return;
+    if (!me) return; // useMe menendang ke /login bila belum login
+    setLoading(false); // shell langsung tampil (fase 1 instan via useMe)
     let cancelled = false;
     (async () => {
-      try {
-        const { ok: meOk, data: meData } = await fetchJson('/api/auth/me', { ms: 12000 });
-        if (cancelled) return;
-        if (!meOk || !meData.success) {
-          router.push('/login');
-          return;
-        }
-        setMe(meData);
-      } catch (e) {
-        if (!cancelled) setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Tekan Coba lagi.' : 'Tidak bisa menghubungi server.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-      if (cancelled) return;
       // Fase 2a: preset lokal (instan, tanpa flicker).
       try {
         const raw = localStorage.getItem(PRESET_KEY);
@@ -504,7 +492,7 @@ export default function BattlePage() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [meLoading, me]);
 
   // Soft retry tanpa reload page (anti fresh/flicker): dipakai ErrorRetry.
   async function retryBootstrap() {
@@ -513,8 +501,7 @@ export default function BattlePage() {
     setCardsLoading(true);
     setRoomsInitLoading(true);
     try {
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me', { ms: 12000 });
-      if (ok && meData.success) setMe(meData);
+      if (me) await fetchMine().catch(() => {});
     } catch { /* error ditangani per-seksi */ }
     setLoading(false);
     await Promise.allSettled([

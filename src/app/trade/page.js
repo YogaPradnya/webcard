@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
+import { useMe } from '@/hooks/useMe';
 import { bundleStats, MAX_TRADE_CARDS_PER_SIDE as MAX_BUNDLE } from '@/lib/tradeValue';
 
 function formatSisa(ms) {
@@ -137,8 +137,7 @@ function BundlePicker({ cards, value, onChange, maxTotal = MAX_BUNDLE }) {
 }
 
 export default function TradePage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me } = useMe();
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState('create');
   const [myCards, setMyCards] = useState([]);
@@ -165,15 +164,9 @@ export default function TradePage() {
   const [tradeLoading, setTradeLoading] = useState(false);
 
   useEffect(() => {
+    if (!me) return; // tunggu sesi (useMe menendang ke /login bila belum login)
     (async () => {
       try {
-        const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-        if (!meOk || !meData.success) {
-          router.push('/login');
-          return;
-        }
-        setMe(meData);
-
         const [cardsData, usersData, offersData] = await Promise.all([
           fetchLenient('/api/cards?owned=1'),
           fetchLenient('/api/trade/users'),
@@ -188,7 +181,7 @@ export default function TradePage() {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, [me]);
 
   async function onCreate(e) {
     e.preventDefault();

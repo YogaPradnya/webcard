@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMe } from '@/hooks/useMe';
+import { useShopEnabled } from '@/hooks/useShopEnabled';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
@@ -47,8 +49,8 @@ const SORTS = [
 ];
 
 export default function BookPage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me } = useMe();
+  const shopOn = useShopEnabled();
   const [cards, setCards] = useState([]);
   const [total, setTotal] = useState(0);
   const [ownedCount, setOwnedCount] = useState(0);
@@ -67,7 +69,6 @@ export default function BookPage() {
   const [displayCards, setDisplayCards] = useState([]);
   const [displayFlipped, setDisplayFlipped] = useState(null);
   const [customSlots, setCustomSlots] = useState([]);
-  const [shopOn, setShopOn] = useState(false);
   const [editingSlot, setEditingSlot] = useState(null); // { kind: 'slot'|'display', id }
   const [slotForm, setSlotForm] = useState({ name: '', imageUrl: '', borderType: 'classic', borderColor: '#a855f7', description: '' });
   const [savingSlot, setSavingSlot] = useState(false);
@@ -78,13 +79,7 @@ export default function BookPage() {
     setLoading(true);
     setError('');
     try {
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-      if (!meOk || !meData.success) {
-        router.push('/login');
-        return;
-      }
-      setMe(meData);
-
+      if (!me) return; // useMe menendang ke /login bila belum login
       const { ok: cardsOk, status: cardsStatus, data: cardsData } = await fetchJson('/api/cards');
       if (!cardsOk || !cardsData.success) {
         if (cardsStatus === 401) {
@@ -103,12 +98,8 @@ export default function BookPage() {
       const dispData = await fetchLenient('/api/display');
       if (dispData.success) setDisplayCards(dispData.cards || []);
       // Slot custom (beli di Shop): dikelola di tab Pajangan.
-      const [slotData, shopData] = await Promise.all([
-        fetchLenient('/api/shop/slots'),
-        fetchLenient('/api/shop/packages'),
-      ]);
+      const slotData = await fetchLenient('/api/shop/slots');
       if (slotData.success) setCustomSlots(slotData.slots || []);
-      if (shopData.success) setShopOn(Boolean(shopData.enabled));
     } catch (e) {
       setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server. Coba lagi.');
     } finally {
@@ -117,9 +108,10 @@ export default function BookPage() {
   }
 
   useEffect(() => {
+    if (!me) return; // tunggu sesi (useMe menendang ke /login bila belum login)
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [me]);
 
   useEffect(() => {
     setPage(1);

@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
+import { useMe } from '@/hooks/useMe';
 import { TIER_COLORS } from '@/lib/tiers';
 
 const REVEAL_MS_BY_RARITY = {
@@ -55,8 +55,7 @@ function RevealCard({ pull, face }) {
 }
 
 export default function GachaPage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me } = useMe();
   const [info, setInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -89,12 +88,7 @@ export default function GachaPage() {
   async function load() {
     setError('');
     try {
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-      if (!meOk || !meData.success) {
-        router.push('/login');
-        return;
-      }
-      setMe(meData);
+      if (!me) return; // useMe menendang ke /login bila belum login
       const { ok, data } = await fetchJson('/api/gacha');
       if (!ok || !data.success) {
         setError(data.message || 'Gagal memuat gacha.');
@@ -109,10 +103,11 @@ export default function GachaPage() {
   }
 
   useEffect(() => {
+    if (!me) return; // tunggu sesi
     load();
     return clearTimers;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [me]);
 
   function schedule(index) {
     // Kartu index: back spin dulu, front mengikuti timing rarity (M makin lama makin deg-degan).

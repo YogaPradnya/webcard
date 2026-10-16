@@ -1,6 +1,6 @@
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
-import { ensureQuantityColumn } from './cards.js';
+import { ensureQuantityColumn, invalidateBookCache } from './cards.js';
 import { MAX_CARD_COPIES } from './constants.js';
 import { randomDigits } from './codes.js';
 import { getUserCard as getCardOwner } from './userCardsRepo.js';
@@ -168,6 +168,8 @@ export async function executeBundleTrade(db, offer, accepterId, accepterUsername
     if (tx) tx.close();
   }
   if (!res.ok) return res;
+  invalidateBookCache(offer.ownerId);
+  invalidateBookCache(accepterId);
   // Misi: catat trade selesai untuk kedua pihak (di luar transaksi, non-kritis).
   try {
     const { recordEvent } = await import('./missions.js');

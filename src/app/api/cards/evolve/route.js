@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { ensureQuantityColumn } from '@/lib/cards';
+import { ensureQuantityColumn, invalidateBookCache } from '@/lib/cards';
 import { isDisplayOwned } from '@/lib/display';
 import { MAX_CARD_LEVEL, checkEvoCost, isEvoBlockedRarity } from '@/lib/evolve';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -51,6 +51,7 @@ async function POST_impl(req, _ctx, session) {
       sql: 'UPDATE user_cards SET level = ?, power = ?, quantity = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [newLevel, newPower, newQty, String(session.id), charName],
     });
+    invalidateBookCache(session.id);
     return jsonOk({
       charName: String(row.char_name),
       level: newLevel,

@@ -43,6 +43,7 @@ async function GET_impl(req, _ctx, session) {
     // ---- rooms publik (cache 10 dtk) ----
     let rooms;
     let pagination;
+    let mineRows = null;
     const cacheKey = `${q}|${page}`;
     const hit = _roomsCache.get(cacheKey);
     if (hit && now - hit.at < ROOMS_TTL_MS) {
@@ -55,23 +56,38 @@ async function GET_impl(req, _ctx, session) {
         isMine: String(r.p1_id) === String(session.id),
       }));
       pagination = hit.payload.pagination;
+      // Cache hit: tinggal mine (1 round-trip).
+      const only = await getDb().execute({
+        sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
+            FROM battle_rooms WHERE (p1_id = ? OR p2_id = ?) AND status IN ('waiting','ongoing')
+            ORDER BY updated_at DESC LIMIT 5`,
+        args: [String(session.id), String(session.id)],
+      });
+      mineRows = only.rows;
     } else {
+    // COUNT + SELECT + mine dalam 1 round-trip (dulu 3 sequential ke Tokyo).
       const like = `%${q}%`;
       const where = q
         ? `WHERE mode = 'pvp' AND status = 'waiting' AND created_at >= ? AND (p1_username LIKE ? OR code LIKE ?)`
         : `WHERE mode = 'pvp' AND status = 'waiting' AND created_at >= ?`;
       const args = q ? [minCreated, like, like] : [minCreated];
-      const countRes = await getDb().execute({
-        sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`,
-        args,
-      });
-      const total = Number(countRes.rows[0]?.total || 0);
-      const res = await getDb().execute({
-        sql: `SELECT code, p1_id, p1_username, created_at FROM battle_rooms ${where}
+      const [countRes, res, mineRes] = await getDb().batch([
+        { sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`, args },
+        {
+          sql: `SELECT code, p1_id, p1_username, created_at FROM battle_rooms ${where}
               ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-        args: [...args, PAGE_SIZE, offset],
-      });
+          args: [...args, PAGE_SIZE, offset],
+        },
+        {
+          sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
+            FROM battle_rooms WHERE (p1_id = ? OR p2_id = ?) AND status IN ('waiting','ongoing')
+            ORDER BY updated_at DESC LIMIT 5`,
+          args: [String(session.id), String(session.id)],
+        },
+      ]);
+      const total = Number(countRes.rows[0]?.total || 0);
       pagination = { page, limit: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
+      mineRows = mineRes.rows;
       _roomsCache.set(cacheKey, {
         at: Date.now(),
         payload: {
@@ -98,13 +114,8 @@ async function GET_impl(req, _ctx, session) {
     }
 
     // ---- mine (user-specific, tanpa cache) ----
-    const mineRes = await getDb().execute({
-      sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
-            FROM battle_rooms WHERE (p1_id = ? OR p2_id = ?) AND status IN ('waiting','ongoing')
-            ORDER BY updated_at DESC LIMIT 5`,
-      args: [String(session.id), String(session.id)],
-    });
-    const mine = mineRes.rows.map((r) => {
+    // Cache miss: mine sudah ikut dalam batch di atas (0 round-trip tambahan).
+    const mine = (mineRows || []).map((r) => {
       let battle = {};
       let result = null;
       try { battle = JSON.parse(r.state || '{}'); } catch { battle = {}; }

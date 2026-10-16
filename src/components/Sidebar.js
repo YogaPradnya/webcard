@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import ThemeToggle from './ThemeToggle';
 import { fetchJson } from '@/lib/fetchJson';
+import { useShopEnabled } from '@/hooks/useShopEnabled';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
@@ -12,7 +13,7 @@ export default function Sidebar({ username }) {
   const pathname = usePathname();
   const router = useRouter();
   const [activeBattle, setActiveBattle] = useState(0);
-  const [shopOn, setShopOn] = useState(false);
+  const shopOn = useShopEnabled();
 
   useEffect(() => {
     let alive = true;
@@ -26,10 +27,6 @@ export default function Sidebar({ username }) {
       } catch { /* abaikan */ }
     }
     (async () => {
-      try {
-        const { ok, data } = await fetchJson('/api/shop/packages', { ms: 10000 }).catch(() => ({ ok: false, data: {} }));
-        if (alive && ok && data.success) setShopOn(Boolean(data.enabled));
-      } catch { /* abaikan: shop tetap sembunyi */ }
       await pollMine();
     })();
     const t = setInterval(async () => {

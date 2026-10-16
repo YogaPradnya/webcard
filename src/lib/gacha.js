@@ -12,6 +12,7 @@ import { sanitizePoolInput } from './pool.js';
 import { clampInt, clampFloat } from './num.js';
 import { hashNameLower } from './hash.js';
 import { getUserCard, getUserXp, debitXp, creditXp } from './userCardsRepo.js';
+import { invalidateBookCache } from './cards.js';
 import { MAX_CARD_COPIES, GACHA_HISTORY_LIMIT } from './constants.js';
 
 export { calcLevel, jakartaDateKey };
@@ -426,6 +427,7 @@ export async function performWebPulls(userId, username, count, todayKey) {
     const { recordEvent } = await import('./missions.js');
     if (paidCount > 0) await recordEvent(userId, username, 'gacha', paidCount);
   } catch { /* misi non-kritis */ }
+  if (paidCount > 0) invalidateBookCache(userId);
   return { pulls, costTotal: paidTotal, xpBefore: curXp, xpAfter: newXp, ...next };
 }
 

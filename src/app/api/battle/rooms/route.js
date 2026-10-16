@@ -54,17 +54,16 @@ async function GET_impl(req, _ctx, session) {
       : `WHERE mode = 'pvp' AND status = 'waiting' AND created_at >= ?`;
     const args = q ? [minCreated, like, like] : [minCreated];
 
-    const countRes = await getDb().execute({
-      sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`,
-      args,
-    });
-    const total = Number(countRes.rows[0]?.total || 0);
-
-    const res = await getDb().execute({
-      sql: `SELECT code, p1_id, p1_username, created_at FROM battle_rooms ${where}
+    // 1 round-trip untuk COUNT + SELECT (dulu 2 sequential ke Tokyo).
+    const [countRes, res] = await getDb().batch([
+      { sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`, args },
+      {
+        sql: `SELECT code, p1_id, p1_username, created_at FROM battle_rooms ${where}
             ORDER BY created_at DESC LIMIT ? OFFSET ?`,
-      args: [...args, PAGE_SIZE, offset],
-    });
+        args: [...args, PAGE_SIZE, offset],
+      },
+    ]);
+    const total = Number(countRes.rows[0]?.total || 0);
     const pagination = { page, limit: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };
     // Cache mentah (tanpa countdown) agar angka sisa waktu tetap fresh.
     _roomsCache.set(cacheKey, {

@@ -173,7 +173,17 @@ export async function getUserCollection(userId) {
 
 // Gabungan pool + status milik user + stat battle. Unowned tidak membawa level/power.
 // Batch: 4 query total (pool, art, koleksi, stat), tanpa query per kartu.
+// Cache per user 30 dtk (koleksi 265 kartu jarang berubah antar detik);
+// mutasi (gacha/convert/evolve/trade) memanggil invalidateBookCache().
+const _bookCache = new Map(); // userId -> { at, payload }
+const BOOK_CACHE_TTL_MS = 30 * 1000;
+export function invalidateBookCache(userId) {
+  _bookCache.delete(String(userId));
+}
 export async function getBookCards(userId) {
+  const key = String(userId);
+  const hit = _bookCache.get(key);
+  if (hit && Date.now() - hit.at < BOOK_CACHE_TTL_MS) return hit.payload;
   const [pool, artOverrides, owned, statsMap] = await Promise.all([
     getEffectivePool(),
     getArtMap(),
@@ -202,5 +212,7 @@ export async function getBookCards(userId) {
       (RARITY_ORDER[b.tier] ?? 0) - (RARITY_ORDER[a.tier] ?? 0) || a.name.localeCompare(b.name),
   );
   const ownedCount = cards.filter((c) => c.owned).length;
-  return { cards, total: cards.length, ownedCount };
+  const out = { cards, total: cards.length, ownedCount };
+  _bookCache.set(key, { at: Date.now(), payload: out });
+  return out;
 }

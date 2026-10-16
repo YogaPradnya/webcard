@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
@@ -9,6 +8,8 @@ import MissionList from '@/components/MissionList';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
+import { useMe } from '@/hooks/useMe';
+import { useShopEnabled } from '@/hooks/useShopEnabled';
 import { displayBorderColor } from '@/lib/displayBorder';
 import { hashNameLower } from '@/lib/hash';
 
@@ -22,8 +23,8 @@ function displayShowcaseStyle(c) {
 }
 
 export default function ProfilePage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me } = useMe();
+  const shopOn = useShopEnabled();
   const [profile, setProfile] = useState(null);
   const [lbMini, setLbMini] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,6 @@ export default function ProfilePage() {
   const [busy, setBusy] = useState('');
   const [displayCards, setDisplayCards] = useState([]);
   const [customSlots, setCustomSlots] = useState([]);
-  const [shopOn, setShopOn] = useState(false);
   const [dailyMissions, setDailyMissions] = useState([]);
   const [weeklyMissions, setWeeklyMissions] = useState([]);
   const [missionClaiming, setMissionClaiming] = useState('');
@@ -45,21 +45,15 @@ export default function ProfilePage() {
     setLoading(true);
     setError('');
     try {
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-      if (!meOk || !meData.success) {
-        router.push('/login');
-        return;
-      }
-      setMe(meData);
+      if (!me) return; // useMe menendang ke /login bila belum login
       // Profil wajib; sisanya pelengkap (timeout -> halaman tetap tampil).
-      const [pRes, cData, lbData, dData, srcData, slotData, shopData, mData] = await Promise.all([
+      const [pRes, cData, lbData, dData, srcData, slotData, mData] = await Promise.all([
         fetchJson('/api/profile'),
         fetchLenient('/api/cards'),
         fetchLenient('/api/battle/leaderboard?tab=pvp'),
         fetchLenient('/api/display'),
         fetchLenient('/api/profile/showcase-source'),
         fetchLenient('/api/shop/slots'),
-        fetchLenient('/api/shop/packages'),
         fetchLenient('/api/missions'),
       ]);
       const pData = pRes.data;
@@ -90,7 +84,6 @@ export default function ProfilePage() {
       else setShowcasePick('');
       if (lbData.success) setLbMini((lbData.leaderboard || []).slice(0, 5));
       if (slotData.success) setCustomSlots(slotData.slots || []);
-      if (shopData.success) setShopOn(Boolean(shopData.enabled));
       if (mData.success) {
         setDailyMissions(mData.daily || []);
         setWeeklyMissions(mData.weekly || []);
@@ -103,9 +96,10 @@ export default function ProfilePage() {
   }
 
   useEffect(() => {
+    if (!me) return; // tunggu sesi (useMe menendang ke /login bila belum login)
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [me]);
 
   async function onClaimMission(period, missionId) {
     setMissionClaiming(`${period}:${missionId}`);

@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { ensureQuantityColumn, getUserCollection } from '@/lib/cards';
+import { ensureQuantityColumn, getUserCollection, invalidateBookCache } from '@/lib/cards';
 import { isDisplayOwned } from '@/lib/display';
 import { CONVERT_XP_REWARD, calcLevel } from '@/lib/gacha';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -67,6 +67,7 @@ async function POST_impl(req, _ctx, session) {
             ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level, username = excluded.username`,
       args: [String(session.id), curName, newXp, calcLevel(newXp)],
     });
+    invalidateBookCache(session.id);
     return jsonOk({ converted, totalXp, xpBefore: curXp, xpAfter: newXp, level: calcLevel(newXp) });
   } catch (e) {
     console.error('[CONVERT]', e.message);

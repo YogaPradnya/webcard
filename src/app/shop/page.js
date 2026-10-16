@@ -1,17 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
+import { useMe } from '@/hooks/useMe';
 import { idr, paymentLabel, fmtDate, loadSnapJs } from '@/lib/money';
 
 export default function ShopPage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me } = useMe(false); // katalog publik; data user hanya bila login
   const [catalog, setCatalog] = useState(null);
   const [slots, setSlots] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -68,9 +67,7 @@ export default function ShopPage() {
     try {
       const catData = await fetchLenient('/api/shop/packages');
       if (catData.success) setCatalog(catData);
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-      if (meOk && meData.success) {
-        setMe(meData);
+      if (me) {
         const [sData, oData, pData] = await Promise.all([fetchLenient('/api/shop/slots'), fetchLenient('/api/shop/orders'), fetchLenient('/api/profile')]);
         if (sData.success) setSlots(sData.slots || []);
         if (oData.success) setOrders(oData.orders || []);
@@ -86,7 +83,7 @@ export default function ShopPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [me]);
 
   async function payAgain(order) {
     if (paying || !me || !order?.snapToken) return;
