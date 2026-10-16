@@ -1,28 +1,32 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { claimMission } from '@/lib/missions';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { getDb } from '@/lib/db';
+import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
+import { getIdempotencyKey, ensureIdempotencyTable, checkIdempotency, saveIdempotency } from '@/lib/idempotency';
+import { NextResponse } from 'next/server';
 
 // POST /api/missions/claim { period: 'daily'|'weekly', missionId }
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+async function POST_impl(req, _ctx, session) {
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const period = String(body.period || 'daily') === 'weekly' ? 'weekly' : 'daily';
   try {
+    await ensureIdempotencyTable();
+    const db = getDb();
+    const idemKey = getIdempotencyKey(req);
+    if (idemKey) {
+      const replay = await checkIdempotency(db, idemKey, session.id, 'missions/claim');
+      if (replay.hit) return NextResponse.json(replay.body, { status: replay.status });
+    }
     const r = await claimMission(session.id, session.username, period, body.missionId);
-    if (!r.ok) return NextResponse.json({ success: false, message: r.error }, { status: 400 });
-    return NextResponse.json({ success: true, xp: r.xp, newXp: r.newXp });
+    if (!r.ok) return jsonFail(r.error, 400);
+    const out = { success: true, xp: r.xp, newXp: r.newXp };
+    if (idemKey) await saveIdempotency(db, idemKey, session.id, 'missions/claim', 200, out);
+    return jsonOk({ xp: r.xp, newXp: r.newXp });
   } catch (e) {
     console.error('[MISSION CLAIM]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal klaim misi.' }, { status: 500 });
+    return jsonFail('Gagal klaim misi.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/missions/claim/route.js');
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/missions/claim/route.js' });

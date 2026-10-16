@@ -1,39 +1,31 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, surrender, finishIfOver, sideOf } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
 // POST /api/battle/room/forfeit { code } — menyerah manual, game langsung berakhir.
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+async function POST_impl(req, _ctx, session) {
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const code = String(body.code || '').replace(/[^0-9]/g, '');
-  if (!code) return NextResponse.json({ success: false, message: 'Kode wajib diisi.' }, { status: 400 });
+  if (!code) return jsonFail('Kode wajib diisi.', 400);
   try {
     await ensureBattleRooms();
     const room = await getRoomCached(code);
-    if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
+    if (!room) return jsonFail('Room tidak ada.', 404);
     if (!sideOf(room, session.id)) {
-      return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
+      return jsonFail('Bukan room kamu.', 403);
     }
     const res = surrender(room, session.id);
-    if (!res) return NextResponse.json({ success: false, message: 'Battle sudah selesai.' }, { status: 400 });
+    if (!res) return jsonFail('Battle sudah selesai.', 400);
     await finishIfOver(room);
     await saveRoom(room);
     bumpRoom(code);
-    return NextResponse.json({ success: true, battle: room.battle, result: room.result, winner: room.winner });
+    return jsonOk({ battle: room.battle, result: room.result, winner: room.winner });
   } catch (e) {
     console.error('[BATTLE FORFEIT]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal menyerah.' }, { status: 500 });
+    return jsonFail('Gagal menyerah.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/forfeit/route.js');
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/battle/room/forfeit/route.js' });

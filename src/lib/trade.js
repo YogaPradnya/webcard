@@ -1,102 +1,29 @@
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
 import { ensureQuantityColumn } from './cards.js';
+import { MAX_CARD_COPIES } from './constants.js';
+import { randomDigits } from './codes.js';
+import { getUserCard as getCardOwner } from './userCardsRepo.js';
+import {
+  TRADE_TIER_ORDER,
+  TRADE_POINT,
+  MAX_TRADE_CARDS_PER_SIDE,
+  bundleStats,
+  normalizeBundleItems,
+  checkBundleRule,
+} from './tradeValue.js';
 
-export const MAX_CARD_COPIES = 999;
+export { MAX_CARD_COPIES, getCardOwner, TRADE_TIER_ORDER, TRADE_POINT, MAX_TRADE_CARDS_PER_SIDE, bundleStats, normalizeBundleItems, checkBundleRule };
 
 export const TRADE_CODE_LENGTH = 6;
 export const TRADE_TTL_MS = 10 * 60 * 1000;
 export const MAX_ACTIVE_TRADES_PER_USER = 10;
 
 // Urutan tier untuk aturan trade.
-export const TRADE_TIER_ORDER = { Common: 0, Rare: 1, Epic: 2, Legendary: 3, Mythic: 4 };
-
-// Nilai tukar per tier (2x per tingkat). Total kedua sisi harus SAMA,
-// kecuali semua kartu satu tier (bebas, seperti aturan lama).
-export const TRADE_POINT = { Common: 1, Rare: 2, Epic: 4, Legendary: 8, Mythic: 16 };
-
-// Maksimal kartu per sisi dalam 1 penawaran (total copy).
-export const MAX_TRADE_CARDS_PER_SIDE = 10;
-
-/**
- * Aturan nilai trade bundle (multi-kartu, maks 10 per sisi):
- * - Tiap sisi wajib 1..10 kartu (total copy), tiap item qty >= 1.
- * - Tidak boleh ada kartu yang sama di kedua sisi.
- * - Semua kartu satu tier (kedua sisi): bebas.
- * - Selain itu: total nilai kedua sisi harus sama.
- *   Contoh: 2 Rare (2x2=4) untuk 1 Epic (4) -> adil.
- * Return { ok:true, giveValue, takeValue, giveCount, takeCount }
- * atau { ok:false, message, ... }.
- */
-export function checkBundleRule(giveItems, takeItems) {
-  const g = bundleStats(giveItems);
-  const t = bundleStats(takeItems);
-  const base = { giveValue: g.value, takeValue: t.value, giveCount: g.count, takeCount: t.count };
-  if (!Array.isArray(giveItems) || giveItems.length === 0 || !Array.isArray(takeItems) || takeItems.length === 0) {
-    return { ok: false, message: 'Masing-masing sisi wajib ada kartu.', ...base };
-  }
-  if (g.count < 1 || t.count < 1) {
-    return { ok: false, message: 'Masing-masing sisi wajib ada kartu.', ...base };
-  }
-  if (g.count > MAX_TRADE_CARDS_PER_SIDE || t.count > MAX_TRADE_CARDS_PER_SIDE) {
-    return { ok: false, message: `Maksimal ${MAX_TRADE_CARDS_PER_SIDE} kartu per sisi.`, ...base };
-  }
-  const takeNames = new Set(takeItems.map((i) => String(i.charName || i.name || '').toLowerCase()));
-  if (giveItems.some((i) => takeNames.has(String(i.charName || i.name || '').toLowerCase()))) {
-    return { ok: false, message: 'Ada kartu yang sama di kedua sisi, tidak perlu tukar.', ...base };
-  }
-  const allTiers = new Set([...g.tiers, ...t.tiers]);
-  if (allTiers.size === 1) return { ok: true, ...base };
-  if (g.value === t.value) return { ok: true, ...base };
-  return {
-    ok: false,
-    message: `Nilai tidak seimbang (${g.value} vs ${t.value}). Samakan total: C1 R2 E4 L8 M16 per kartu.`,
-    ...base,
-  };
-}
-
-export function bundleStats(items) {
-  let count = 0;
-  let value = 0;
-  const tiers = new Set();
-  for (const it of items || []) {
-    const qty = Math.max(0, Math.floor(Number(it.amount ?? it.qty) || 0));
-    if (qty < 1) continue;
-    const rar = String(it.rarity || it.tier || 'Common');
-    count += qty;
-    value += (TRADE_POINT[rar] ?? 0) * qty;
-    tiers.add(rar);
-  }
-  return { count, value, tiers: [...tiers] };
-}
-
-// Normalisasi bundle dari input: gabung duplikat (nama sama), buang qty < 1 / nama kosong.
-export function normalizeBundleItems(raw) {
-  const map = new Map();
-  for (const it of raw || []) {
-    const name = String(it.charName || it.name || '').trim();
-    if (!name) continue;
-    const qty = Math.floor(Number(it.amount ?? it.qty) || 0);
-    if (qty < 1) continue;
-    const key = name.toLowerCase();
-    const prev = map.get(key);
-    if (prev) {
-      prev.amount += qty;
-      if (it.rarity || it.tier) prev.rarity = String(it.rarity || it.tier);
-    } else {
-      map.set(key, { charName: name, rarity: String(it.rarity || it.tier || 'Common'), amount: qty });
-    }
-  }
-  return [...map.values()];
-}
 
 // Kode trade hanya angka (keypad numerik di HP).
 export function generateTradeCode() {
-  let code = '';
-  for (let i = 0; i < TRADE_CODE_LENGTH; i++) {
-    code += String(Math.floor(Math.random() * 10));
-  }
-  return code;
+  return randomDigits(TRADE_CODE_LENGTH);
 }
 
 export function normalizeTradeCode(value) {
@@ -195,31 +122,15 @@ export async function getOffer(db, code) {
   };
 }
 
-export async function getCardOwner(db, userId, charName) {
-  const res = await db.execute({
-    sql: 'SELECT char_name, anime, rarity, level, power, image_url, is_showcase, quantity FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-    args: [String(userId), String(charName)],
-  });
-  if (res.rows.length === 0) return null;
-  const r = res.rows[0];
-  return {
-    charName: String(r.char_name),
-    anime: String(r.anime || ''),
-    rarity: String(r.rarity || 'Common'),
-    level: Number(r.level) || 1,
-    power: Number(r.power) || 0,
-    imageUrl: r.image_url || null,
-    showcase: Number(r.is_showcase) === 1,
-    quantity: Math.max(1, Number(r.quantity) || 1),
-  };
-}
-
 // Catatan: konversi kartu -> XP pindah ke fitur Konversi (rate di lib/gacha.js).
 
 // Tukar bundle multi-kartu antar user (maks 10 kartu per sisi).
 // - offer.items (sisi penawar) pindah ke penerima; takerItems (sisi penerima) pindah ke penawar.
 // - Tiap kartu menumpuk bila sudah punya; baris quantity 0 dihapus.
 // - Return { ok, received[], given[] } atau { ok:false, message }.
+// - Bila db mendukung transaction(), baca+validasi+tulis jalan atomik
+//   (all-or-nothing); bila tidak, fallback jalur lama. BUSY (penulis lain)
+//   → pesan coba-lagi agar klien bisa retry (aman bareng idempotency-key).
 export async function executeBundleTrade(db, offer, accepterId, accepterUsername, takerItemsRaw) {
   if (String(offer.ownerId) === String(accepterId)) {
     return { ok: false, message: 'Tidak bisa tukar dengan diri sendiri.' };
@@ -230,10 +141,50 @@ export async function executeBundleTrade(db, offer, accepterId, accepterUsername
       : [{ charName: offer.charName, rarity: offer.rarity, amount: offer.amount }],
   );
   const takeReq = normalizeBundleItems(takerItemsRaw);
+  let tx = null;
+  if (typeof db.transaction === 'function') {
+    try {
+      tx = await db.transaction('write');
+    } catch (e) {
+      console.error('[TRADE TX]', e.message);
+      return { ok: false, message: 'Server sibuk. Coba lagi.' };
+    }
+  }
+  const conn = tx || db;
+  let res;
+  try {
+    res = await runBundleTrade(conn, offer, accepterId, accepterUsername, giveReq, takeReq);
+    if (tx) {
+      if (res.ok) await tx.commit();
+      else await tx.rollback();
+    }
+  } catch (e) {
+    if (tx) {
+      try { await tx.rollback(); } catch { /* abaikan */ }
+    }
+    console.error('[TRADE GRANT]', e.message);
+    res = { ok: false, message: 'Gagal memindahkan kartu. Coba lagi.' };
+  } finally {
+    if (tx) tx.close();
+  }
+  if (!res.ok) return res;
+  // Misi: catat trade selesai untuk kedua pihak (di luar transaksi, non-kritis).
+  try {
+    const { recordEvent } = await import('./missions.js');
+    await recordEvent(offer.ownerId, offer.ownerUsername, 'trade', 1);
+    await recordEvent(accepterId, accepterUsername, 'trade', 1);
+  } catch { /* misi non-kritis */ }
+  return res;
+}
+
+// Inti tukar-bundle: validasi baca + tulis, jalan di atas conn (bisa transaksi).
+// Return { ok, received[], given[] } / { ok:false, message }. Throw hanya untuk
+// error DB tak terduga (pemanggil me-rollback).
+async function runBundleTrade(conn, offer, accepterId, accepterUsername, giveReq, takeReq) {
   // Ambil data live (rarity ikut kartu saat ini) + cek kepemilikan.
   const giveCards = [];
   for (const it of giveReq) {
-    const c = await getCardOwner(db, offer.ownerId, it.charName);
+    const c = await getCardOwner(conn, offer.ownerId, it.charName);
     if (!c) return { ok: false, message: `Kartu penawar ${it.charName} sudah tidak ada.` };
     if (c.quantity < it.amount) {
       return { ok: false, message: `Penawar hanya punya ${c.quantity} copy ${c.charName}.` };
@@ -242,7 +193,7 @@ export async function executeBundleTrade(db, offer, accepterId, accepterUsername
   }
   const takeCards = [];
   for (const it of takeReq) {
-    const c = await getCardOwner(db, accepterId, it.charName);
+    const c = await getCardOwner(conn, accepterId, it.charName);
     if (!c) return { ok: false, message: `Kamu tidak punya kartu ${it.charName}.` };
     if (c.quantity < it.amount) {
       return { ok: false, message: `Kamu hanya punya ${c.quantity} copy ${c.charName}.` };
@@ -253,13 +204,13 @@ export async function executeBundleTrade(db, offer, accepterId, accepterUsername
   if (!rule.ok) return { ok: false, message: rule.message };
   // Cap tumpukan 999: penerima tidak boleh melewatinya.
   for (const g of giveCards) {
-    const has = await getCardOwner(db, accepterId, g.charName);
+    const has = await getCardOwner(conn, accepterId, g.charName);
     if (has && has.quantity + g.amount > MAX_CARD_COPIES) {
       return { ok: false, message: `${g.charName} milikmu akan melebihi ${MAX_CARD_COPIES} copy.` };
     }
   }
   for (const t of takeCards) {
-    const has = await getCardOwner(db, offer.ownerId, t.charName);
+    const has = await getCardOwner(conn, offer.ownerId, t.charName);
     if (has && has.quantity + t.amount > MAX_CARD_COPIES) {
       return { ok: false, message: `${t.charName} milik penawar akan melebihi ${MAX_CARD_COPIES} copy.` };
     }
@@ -268,12 +219,12 @@ export async function executeBundleTrade(db, offer, accepterId, accepterUsername
   // Kurangi pengirim (hapus baris bila habis).
   for (const g of giveCards) {
     if (g.quantity === g.amount) {
-      await db.execute({
+      await conn.execute({
         sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
         args: [String(offer.ownerId), g.charName],
       });
     } else {
-      await db.execute({
+      await conn.execute({
         sql: 'UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
         args: [g.amount, String(offer.ownerId), g.charName],
       });
@@ -281,35 +232,24 @@ export async function executeBundleTrade(db, offer, accepterId, accepterUsername
   }
   for (const t of takeCards) {
     if (t.quantity === t.amount) {
-      await db.execute({
+      await conn.execute({
         sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
         args: [String(accepterId), t.charName],
       });
     } else {
-      await db.execute({
+      await conn.execute({
         sql: 'UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
         args: [t.amount, String(accepterId), t.charName],
       });
     }
   }
 
-  // Tambahkan ke penerima (menumpuk) — gagal di satu sisi = gagal semua (lempar error).
-  try {
-    for (const g of giveCards) await grantCopies(db, accepterId, accepterUsername, g, g.amount);
-    for (const t of takeCards) await grantCopies(db, offer.ownerId, offer.ownerUsername, t, t.amount);
-  } catch (e) {
-    console.error('[TRADE GRANT]', e.message);
-    return { ok: false, message: 'Gagal memindahkan kartu. Coba lagi.' };
-  }
+  // Tambahkan ke penerima (menumpuk). Throw → pemanggil rollback (all-or-nothing).
+  for (const g of giveCards) await grantCopies(conn, accepterId, accepterUsername, g, g.amount);
+  for (const t of takeCards) await grantCopies(conn, offer.ownerId, offer.ownerUsername, t, t.amount);
 
-  await db.execute({ sql: 'DELETE FROM trade_offer_items WHERE code = ?', args: [offer.code] });
-  await db.execute({ sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] });
-  // Misi: catat trade selesai untuk kedua pihak.
-  try {
-    const { recordEvent } = await import('./missions.js');
-    await recordEvent(offer.ownerId, offer.ownerUsername, 'trade', 1);
-    await recordEvent(accepterId, accepterUsername, 'trade', 1);
-  } catch { /* misi non-kritis */ }
+  await conn.execute({ sql: 'DELETE FROM trade_offer_items WHERE code = ?', args: [offer.code] });
+  await conn.execute({ sql: 'DELETE FROM trade_offers WHERE code = ?', args: [offer.code] });
   const slim = (c) => ({ charName: c.charName, rarity: c.rarity, amount: c.amount });
   return { ok: true, received: giveCards.map(slim), given: takeCards.map(slim) };
 }

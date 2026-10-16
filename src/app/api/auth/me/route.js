@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/auth/me — username otomatis dari sesi pairing (database bot).
 // Tanpa request ke API Animein.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
 
   let username = session.username || null;
   try {
@@ -19,8 +21,8 @@ async function GET_impl(req) {
   } catch {
     // fallback ke username saat pairing
   }
-  return NextResponse.json({ success: true, id: session.id, username });
+  return jsonOk({ id: session.id, username });
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/auth/me/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/auth/me/route.js' });

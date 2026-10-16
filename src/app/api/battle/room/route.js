@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
@@ -20,7 +18,13 @@ import {
   cleanupExpiredWaitingRooms,
 } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { apiHandler, jsonOk, jsonFail, parseJson, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 async function validateTeam(db, userId, team) {
   if (!Array.isArray(team) || team.length !== 3) return 'Pilih 3 kartu berbeda.';
@@ -73,16 +77,9 @@ async function teamLevels(db, userId, team) {
 }
 
 // POST /api/battle/room { mode: 'ai' | 'pvp', team: [3 nama] } — buat room + kode angka.
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
-
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+async function POST_impl(req, _ctx, session) {
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const mode = body.mode === 'pvp' ? 'pvp' : 'ai';
   const difficulty = ['easy', 'normal', 'hard'].includes(body.difficulty) ? body.difficulty : 'normal';
 
@@ -91,7 +88,7 @@ async function POST_impl(req) {
     await cleanupExpiredWaitingRooms(Date.now());
     const db = getDb();
     const err = await validateTeam(db, session.id, body.team);
-    if (err) return NextResponse.json({ success: false, message: err }, { status: 400 });
+    if (err) return jsonFail(err, 400);
 
     const statsMap = await getCardStatsMap();
     const withName = (key, fallback) => {
@@ -106,7 +103,7 @@ async function POST_impl(req) {
     };
     const p1Stats = body.team.map((n) => withName(n, n)).filter(Boolean);
     if (p1Stats.length !== 3) {
-      return NextResponse.json({ success: false, message: 'Stat kartu tidak lengkap.' }, { status: 500 });
+      return jsonFail('Stat kartu tidak lengkap.', 500);
     }
 
     let code = '';
@@ -117,7 +114,7 @@ async function POST_impl(req) {
         break;
       }
     }
-    if (!code) return NextResponse.json({ success: false, message: 'Gagal buat room.' }, { status: 500 });
+    if (!code) return jsonFail('Gagal buat room.', 500);
 
     const now = Date.now();
     if (mode === 'ai') {
@@ -128,7 +125,7 @@ async function POST_impl(req) {
         .map((k) => scaleEnemy(withName(k, k)))
         .filter(Boolean);
       if (enemyStats.length !== 3) {
-        return NextResponse.json({ success: false, message: 'Gagal susun tim AI.' }, { status: 500 });
+        return jsonFail('Gagal susun tim AI.', 500);
       }
       const first = Math.random() < 0.5 ? 'player' : 'enemy';
       const battle = createBattle(
@@ -160,7 +157,7 @@ async function POST_impl(req) {
           JSON.stringify(battle), room.turn, room.status, now, now],
       });
       const saved = await getRoom(code);
-      return NextResponse.json({ success: true, state: publicState(saved, session.id) });
+      return jsonOk({ state: publicState(saved, session.id) });
     }
 
     // PvP: tunggu lawan join.
@@ -172,29 +169,27 @@ async function POST_impl(req) {
     });
     const saved = await getRoom(code);
     bumpRoom(code);
-    return NextResponse.json({ success: true, state: publicState(saved, session.id) });
+    return jsonOk({ state: publicState(saved, session.id) });
   } catch (e) {
     console.error('[BATTLE ROOM]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal buat room.' }, { status: 500 });
+    return jsonFail('Gagal buat room.', 500);
   }
 }
 
 // GET /api/battle/room?code=123456 — state terbaru (polling).
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   const code = new URL(req.url).searchParams.get('code') || '';
 
   try {
     await ensureBattleRooms();
     const room = await getRoomCached(code);
-    if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
+    if (!room) return jsonFail('Room tidak ada.', 404);
     if (isWaitingExpired(room)) {
       await deleteRoom(room.code);
-      return NextResponse.json({ success: false, message: 'Kode hangus (5 menit). Buat room baru.' }, { status: 410 });
+      return jsonFail('Kode hangus (5 menit). Buat room baru.', 410);
     }
     if (!sideOf(room, session.id)) {
-      return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
+      return jsonFail('Bukan room kamu.', 403);
     }
     let changed = false;
     if (applyTimeout(room, Date.now())) changed = true;
@@ -202,37 +197,35 @@ async function GET_impl(req) {
     const fin = await finishIfOver(room);
     if (fin.finished && !room.result) changed = true;
     if (changed || fin.finished) await saveRoom(room);
-    return NextResponse.json({ success: true, state: publicState(room, session.id) });
+    return jsonOk({ state: publicState(room, session.id) });
   } catch (e) {
     console.error('[BATTLE STATE]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat room.' }, { status: 500 });
+    return jsonFail('Gagal memuat room.', 500);
   }
 }
 
 // DELETE /api/battle/room?code=123456 — batalkan room waiting milik sendiri.
-async function DELETE_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function DELETE_impl(req, _ctx, session) {
   const code = new URL(req.url).searchParams.get('code') || '';
   try {
     await ensureBattleRooms();
     const room = await getRoom(code);
-    if (!room) return NextResponse.json({ success: true });
+    if (!room) return jsonOk();
     if (String(room.p1Id) !== String(session.id)) {
-      return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
+      return jsonFail('Bukan room kamu.', 403);
     }
     if (room.status !== 'waiting') {
-      return NextResponse.json({ success: false, message: 'Battle sudah mulai, tidak bisa dibatalkan.' }, { status: 400 });
+      return jsonFail('Battle sudah mulai, tidak bisa dibatalkan.', 400);
     }
     await deleteRoom(room.code);
-    return NextResponse.json({ success: true });
+    return jsonOk();
   } catch (e) {
     console.error('[BATTLE CANCEL]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal membatalkan room.' }, { status: 500 });
+    return jsonFail('Gagal membatalkan room.', 500);
   }
 }
 
-// Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/route.js');
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/room/route.js');
-export const DELETE = withTimeout(DELETE_impl, READ_TIMEOUT_MS, 'src/app/api/battle/room/route.js');
+// Auth + batas hang server via apiHandler (penjaga Turso menggantung).
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/battle/room/route.js' });
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/room/route.js' });
+export const DELETE = apiHandler(DELETE_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/room/route.js' });

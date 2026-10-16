@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { ensureBattleRooms } from '@/lib/rooms';
 import { getDb } from '@/lib/db';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/battle/history?limit=10 — riwayat battle milik sendiri.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   const params = new URL(req.url).searchParams;
   const limit = Math.min(30, Math.max(1, parseInt(params.get('limit'), 10) || 10));
   try {
@@ -31,12 +33,12 @@ async function GET_impl(req) {
         createdAt: Number(r.created_at) || 0,
       };
     });
-    return NextResponse.json({ success: true, history });
+    return jsonOk({ history });
   } catch (e) {
     console.error('[BATTLE HISTORY]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat riwayat.' }, { status: 500 });
+    return jsonFail('Gagal memuat riwayat.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/history/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/history/route.js' });

@@ -1,4 +1,4 @@
-# DESIGN.md — Brainfish Landing Page
+# DESIGN.md — Design System Book Kartu Animein (diadaptasi dari Brainfish)
 
 Dokumen ini dirangkum dari screenshot halaman utama (home) Brainfish. Nilai warna diambil langsung dari piksel gambar; ukuran, radius, dan font adalah estimasi visual, jadi sesuaikan jika ada akses ke kode aslinya.
 

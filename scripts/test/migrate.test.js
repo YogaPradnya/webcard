@@ -14,14 +14,15 @@ const EXPECTED_TABLES = [
   'user_display_cards',
   'mission_progress', 'mission_claims',
   'web_login_codes', 'user_profile_prefs', 'web_rate_limits', 'web_rate_counts',
+  'idempotency_keys',
 ];
 
 describe('migrasi skema', () => {
-  it('8 file versioned berurutan tanpa lompat', () => {
+  it('9 file versioned berurutan tanpa lompat', () => {
     const all = loadMigrations();
-    assert.equal(all.length, 8);
-    assert.deepEqual(all.map((m) => m.version), [1, 2, 3, 4, 5, 6, 7, 8]);
-    assert.equal(getExpectedVersion(), 8);
+    assert.equal(all.length, 9);
+    assert.deepEqual(all.map((m) => m.version), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.equal(getExpectedVersion(), 9);
   });
   it('apply di DB kosong membuat semua tabel + idempoten', async () => {
     const db = createClient({ url: ':memory:' });
@@ -29,7 +30,7 @@ describe('migrasi skema', () => {
     await db.execute('CREATE TABLE user_cards (user_id TEXT, char_name TEXT)');
     await db.execute('CREATE TABLE user_stats (user_id TEXT PRIMARY KEY, username TEXT)');
     const first = await applyMigrations(db);
-    assert.equal(first.length, 8);
+    assert.equal(first.length, 9);
     const tables = await db.execute({ sql: "SELECT name FROM sqlite_master WHERE type = 'table'", args: [] });
     const names = new Set(tables.rows.map((r) => String(r.name)));
     for (const t of [...EXPECTED_TABLES, 'schema_version']) assert.ok(names.has(t), `hilang: ${t}`);
@@ -39,7 +40,7 @@ describe('migrasi skema', () => {
     // Rerun: tidak ada yang di-apply lagi.
     const second = await applyMigrations(db);
     assert.equal(second.length, 0);
-    assert.equal(await getAppliedVersion(db), 8);
+    assert.equal(await getAppliedVersion(db), 9);
     const ok = await assertSchemaReady(db);
     assert.equal(ok.ok, true);
   });
@@ -85,8 +86,8 @@ describe('migrasi skema', () => {
     await db.execute({ sql: 'INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (7, ?)', args: [Date.now()] });
     // Inilah yang meledak di produksi: sekarang harus tuntas tanpa throw.
     const applied = await applyMigrations(db);
-    assert.deepEqual(applied, [8]);
-    assert.equal(await getAppliedVersion(db), 8);
+    assert.deepEqual(applied, [8, 9]);
+    assert.equal(await getAppliedVersion(db), 9);
     await assertSchemaReady(db);
   });
 });

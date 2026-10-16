@@ -1,5 +1,9 @@
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
+import { calcLevel } from './level.js';
+import { jakartaDateKey, jakartaWeekKey } from './jakartaTime.js';
+
+export { jakartaDateKey, jakartaWeekKey, calcLevel };
 
 // Misi harian (reset 00:00 WIB) & mingguan (reset Senin 00:00 WIB).
 // Progres dicatat otomatis dari event game; klaim manual via tombol (XP masuk user_stats).
@@ -20,32 +24,6 @@ export const WEEKLY_MISSIONS = [
   { id: 'pvp_win_5', label: 'Menang vs teman 5x', target: 5, xp: 1000, event: 'pvp_win' },
   { id: 'trade_5', label: 'Trade 5x', target: 5, xp: 500, event: 'trade' },
 ];
-
-export function jakartaDateKey(d = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(d);
-  const get = (t) => parts.find((p) => p.type === t)?.value;
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
-
-// Kunci minggu: tanggal Senin (WIB) minggu berjalan.
-export function jakartaWeekKey(d = new Date()) {
-  const wib = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-  const day = wib.getDay(); // 0=Min .. 6=Sab
-  const diff = (day + 6) % 7; // hari sejak Senin
-  wib.setDate(wib.getDate() - diff);
-  const y = wib.getFullYear();
-  const m = String(wib.getMonth() + 1).padStart(2, '0');
-  const dd = String(wib.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
-}
-
-function calcLevel(xp) {
-  let lv = 1;
-  while (xp >= Math.floor(20 * Math.pow(lv, 3))) lv++;
-  return lv;
-}
 
 export async function ensureMissionTables() {
   if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
@@ -149,6 +127,7 @@ export async function getMissionStatus(userId) {
 }
 
 // Klaim XP misi yang sudah selesai & belum diklaim.
+// INSERT claims dulu sebagai mutex (cegah double-click), baru tambah XP.
 export async function claimMission(userId, username, periodKind, missionId) {
   const list = periodKind === 'weekly' ? WEEKLY_MISSIONS : DAILY_MISSIONS;
   const m = list.find((x) => x.id === String(missionId));
@@ -162,22 +141,21 @@ export async function claimMission(userId, username, periodKind, missionId) {
   });
   const count = progRes.rows.length > 0 ? Number(progRes.rows[0].count) || 0 : 0;
   if (count < m.target) return { ok: false, error: `Belum selesai (${count}/${m.target}).` };
-  const claimRes = await db.execute({
-    sql: 'SELECT mission_id FROM mission_claims WHERE user_id = ? AND period = ? AND mission_id = ?',
-    args: [String(userId), period, m.id],
-  });
-  if (claimRes.rows.length > 0) return { ok: false, error: 'Sudah diklaim.' };
-  const xpRes = await db.execute({ sql: 'SELECT xp FROM user_stats WHERE user_id = ?', args: [String(userId)] });
-  const curXp = xpRes.rows.length > 0 ? Number(xpRes.rows[0].xp) || 0 : 0;
+  try {
+    await db.execute({
+      sql: 'INSERT INTO mission_claims (user_id, period, mission_id, xp, claimed_at) VALUES (?, ?, ?, ?, ?)',
+      args: [String(userId), period, m.id, m.xp, Date.now()],
+    });
+  } catch {
+    return { ok: false, error: 'Sudah diklaim.' };
+  }
+  const { getUserXp } = await import('./userCardsRepo.js');
+  const curXp = await getUserXp(db, userId);
   const newXp = curXp + m.xp;
   await db.execute({
     sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
           ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level, username = excluded.username`,
     args: [String(userId), String(username || ''), newXp, calcLevel(newXp)],
-  });
-  await db.execute({
-    sql: 'INSERT INTO mission_claims (user_id, period, mission_id, xp, claimed_at) VALUES (?, ?, ?, ?, ?)',
-    args: [String(userId), period, m.id, m.xp, Date.now()],
   });
   return { ok: true, xp: m.xp, newXp };
 }

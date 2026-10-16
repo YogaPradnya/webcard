@@ -1,0 +1,351 @@
+/* ===== Book galeri ===== */
+.book-toolbar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 16px 0 20px;
+}
+
+.book-toolbar .input {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* Dua select filter berdampingan (bukan stacked penuh). */
+.book-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.book-filters .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.chip {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--hairline-strong);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--body);
+}
+
+.chip.active {
+  background: var(--accent-grad);
+  color: var(--on-primary);
+  border-color: var(--hairline-strong);
+  box-shadow: 2px 2px 0 var(--hairline-strong);
+}
+
+/* Dot warna role untuk filter chip */
+.role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.dot-Damage { background: #e5484d; }
+.dot-Tank { background: #9a6a3b; }
+.dot-Support { background: #16a34a; }
+.dot-Assist { background: #2c67e9; }
+
+.tier-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 24px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tier-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.card-item {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: visible;
+  background: var(--surface);
+  border: 2px solid var(--hairline-strong);
+  transition: transform 0.18s ease-out, box-shadow 0.25s;
+}
+
+/* Kartu milik sendiri: border tebal + glow warna rarity */
+.card-item.owned {
+  border-width: 3px;
+  cursor: pointer;
+}
+
+.card-item.owned:hover {
+  transform: translateY(-4px) scale(1.02);
+  z-index: 3;
+}
+
+/* Utilitas rarity: pakai sebagai class tambahan (rar-Common dst.) */
+.rar-Common { border-color: var(--rar-common) !important; box-shadow: none; }
+.rar-Rare { border-color: var(--rar-rare) !important; box-shadow: none; }
+.rar-Epic { border-color: var(--rar-epic) !important; box-shadow: none; }
+.rar-Legendary { border-color: var(--rar-legendary) !important; box-shadow: none; }
+.rar-Mythic { border-color: var(--rar-mythic) !important; box-shadow: none; }
+
+/* Flip kartu milik sendiri: ketuk untuk lihat stat di baliknya */
+.flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+}
+
+.card-item.flipped .flip-inner {
+  transform: rotateY(180deg);
+}
+
+.flip-front,
+.flip-back {
+  width: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+.flip-stat {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.flip-stat b {
+  font-weight: 800;
+}
+
+.flip-role {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: var(--r-pill);
+  color: var(--on-primary);
+  background: var(--accent-grad);
+  border: 1.5px solid var(--hairline-strong);
+}
+
+/* ===== Role & status: chip pastel (terang) / deep (gelap) ===== */
+.pick-role,
+.flip-role {
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.role-Damage {
+  background: var(--pastel-red) !important;
+  border-color: var(--pastel-red-bd) !important;
+  color: var(--ink) !important;
+}
+
+.role-Tank {
+  background: var(--pastel-orange) !important;
+  border-color: var(--role-tank) !important;
+  color: var(--ink) !important;
+}
+
+.role-Support {
+  background: var(--pastel-green) !important;
+  border-color: var(--pastel-green-bd) !important;
+  color: var(--ink) !important;
+}
+
+.role-Assist {
+  background: var(--pastel-blue) !important;
+  border-color: var(--pastel-blue-bd) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme='dark'] .role-Damage { background: #4a1626 !important; border-color: #ff7a9c !important; color: #ffd9e2 !important; }
+[data-theme='dark'] .role-Tank { background: #3d2a12 !important; border-color: #d9a86c !important; color: #f5e3c8 !important; }
+[data-theme='dark'] .role-Support { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
+[data-theme='dark'] .role-Assist { background: #16295e !important; border-color: #7fb0ec !important; color: #d9e7ff !important; }
+
+/* ===== Status badge bernada pastel ===== */
+.status-badge {
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.st-shield {
+  background: var(--pastel-orange) !important;
+  border-color: var(--role-tank) !important;
+  color: var(--ink) !important;
+}
+
+.st-heal {
+  background: var(--pastel-green) !important;
+  border-color: var(--pastel-green-bd) !important;
+  color: var(--ink) !important;
+}
+
+.st-burn {
+  background: var(--pastel-orange) !important;
+  border-color: var(--fx-burn) !important;
+  color: var(--ink) !important;
+}
+
+.st-stun {
+  background: var(--pastel-purple) !important;
+  border-color: var(--fx-stun) !important;
+  color: var(--ink) !important;
+}
+
+.st-focus {
+  background: var(--pastel-lime) !important;
+  border-color: var(--pastel-lime-bd) !important;
+  color: var(--ink) !important;
+}
+
+[data-theme='dark'] .st-shield { background: #3d2a12 !important; border-color: #d9a86c !important; color: #f5e3c8 !important; }
+[data-theme='dark'] .st-heal { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
+[data-theme='dark'] .st-burn { background: #3d1f0e !important; border-color: #f59e5e !important; color: #ffe3c8 !important; }
+[data-theme='dark'] .st-stun { background: #2a1f5e !important; border-color: #b39dff !important; color: #e6defc !important; }
+[data-theme='dark'] .st-focus { background: #2a3a10 !important; border-color: #a3e636 !important; color: #eefbcf !important; }
+
+/* ===== Efek skill bernada di detail kartu ===== */
+.fx-heal { color: var(--success); font-weight: 800; }
+.fx-shield { color: var(--role-tank-deep); font-weight: 800; }
+.fx-dmg { color: #c81e3a; font-weight: 800; }
+.fx-assist { color: var(--link); font-weight: 800; }
+[data-theme='dark'] .fx-heal { color: #4ade80; }
+[data-theme='dark'] .fx-shield { color: #d9a86c; }
+[data-theme='dark'] .fx-dmg { color: #ff7a9c; }
+[data-theme='dark'] .fx-assist { color: #9dbcff; }
+
+.card-art {
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+  background: var(--hairline-soft);
+}
+
+/* Pita tier di atas cover kartu (warna via inline style / var(--tier)) */
+.tier-ribbon {
+  display: block;
+  height: 5px;
+  background: var(--tier, var(--muted-soft));
+  box-shadow: none;
+}
+
+/* Belum punya: abu-abu */
+.card-item.locked .card-art {
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+
+.card-meta {
+  padding: 8px 10px 10px;
+}
+
+.card-name {
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-anime {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.card-stats {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.stat-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  color: var(--on-primary);
+  background: var(--accent-grad);
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.stat-tag.power {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--hairline-strong);
+}
+
+.stat-tag.showcase {
+  background: var(--pastel-blue);
+  color: var(--ink);
+  border-color: var(--pastel-blue-bd);
+}
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--hairline-soft);
+  border: 1.5px solid var(--hairline-strong);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent-grad);
+  border-radius: var(--r-pill);
+  transition: width 0.3s;
+}
+

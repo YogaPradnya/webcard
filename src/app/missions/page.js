@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import MissionList from '@/components/MissionList';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
+import { postJson } from '@/lib/postJson';
+import { useMe } from '@/hooks/useMe';
 
 export default function MissionsPage() {
-  const router = useRouter();
-  const [me, setMe] = useState(null);
+  const { me, loading: meLoading } = useMe();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,12 +18,6 @@ export default function MissionsPage() {
 
   async function load() {
     try {
-      const { ok: meOk, data: meData } = await fetchJson('/api/auth/me');
-      if (!meOk || !meData.success) {
-        router.push('/login');
-        return;
-      }
-      setMe(meData);
       const { ok, data: d } = await fetchJson('/api/missions');
       if (!ok || !d.success) {
         setError(d.message || 'Gagal memuat misi.');
@@ -38,20 +32,18 @@ export default function MissionsPage() {
   }
 
   useEffect(() => {
+    if (meLoading) return;
+    if (!me) return; // useMe sudah tendang ke /login
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [meLoading]);
 
   async function onClaim(period, missionId) {
     setClaiming(`${period}:${missionId}`);
     setError('');
     setToast('');
     try {
-      const { ok, data: d } = await fetchJson('/api/missions/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period, missionId }),
-      });
+      const { ok, data: d } = await postJson('/api/missions/claim', { period, missionId });
       if (!ok || !d.success) {
         setError(d.message || 'Gagal klaim.');
         return;

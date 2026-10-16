@@ -6,6 +6,8 @@ import Sidebar from '@/components/Sidebar';
 import { PageSkeleton } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
+import { postJson } from '@/lib/postJson';
+import { bundleStats, MAX_TRADE_CARDS_PER_SIDE as MAX_BUNDLE } from '@/lib/tradeValue';
 
 function formatSisa(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -18,16 +20,14 @@ function formatSisa(ms) {
   return `${s} dtk lagi`;
 }
 
-// Nilai tukar per tier (samakan dengan server lib/trade.js).
-const TRADE_POINT = { Common: 1, Rare: 2, Epic: 4, Legendary: 8, Mythic: 16 };
-const MAX_BUNDLE = 10;
+// Nilai tukar: sumber tunggal di lib/tradeValue.js (sama dengan server).
 
 function bundleValue(items) {
-  return (items || []).reduce((n, i) => n + (TRADE_POINT[i.rarity || i.tier] || 0) * (Number(i.amount) || 0), 0);
+  return bundleStats(items).value;
 }
 
 function bundleCount(items) {
-  return (items || []).reduce((n, i) => n + (Number(i.amount) || 0), 0);
+  return bundleStats(items).count;
 }
 
 function bundleText(items) {
@@ -198,11 +198,7 @@ export default function TradePage() {
       setError('Pilih kartumu dulu (maks 10).');
       return;
     }
-    const { ok, data } = await fetchJson('/api/trade/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: pickItems.map((v) => ({ charName: v.name, amount: v.amount })) }),
-    });
+    const { ok, data } = await postJson('/api/trade/create', { items: pickItems.map((v) => ({ charName: v.name, amount: v.amount })) });
     if (!ok || !data.success) {
       setError(data.message || 'Gagal buat kode.');
       return;
@@ -313,11 +309,7 @@ export default function TradePage() {
       setError('Pilih kartumu dulu (maks 10).');
       return;
     }
-    const { ok, data } = await fetchJson('/api/trade/offer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: inCode, myItems: giveItems.map((v) => ({ charName: v.name, amount: v.amount })) }),
-    });
+    const { ok, data } = await postJson('/api/trade/offer', { code: inCode, myItems: giveItems.map((v) => ({ charName: v.name, amount: v.amount })) });
     if (!ok || !data.success) {
       setError(data.message || 'Gagal tukar kartu.');
       return;

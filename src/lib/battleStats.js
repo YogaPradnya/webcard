@@ -1,5 +1,8 @@
 // Stat battle per kartu. Deterministik dari nama+tier: sama di semua user, permanen.
 // Disimpan di Turso (card_battle_stats); generator dipakai untuk seed + fallback.
+import { hashNameLower as hashName } from './hash.js';
+
+export { hashName };
 
 export const ROLES = ['Damage', 'Tank', 'Support', 'Assist'];
 
@@ -46,14 +49,6 @@ export const SKILL_EFFECTS = {
   ],
 };
 
-export function hashName(name) {
-  const s = String(name || '').trim().toLowerCase();
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h * 31 + s.charCodeAt(i)) >>> 0);
-  return h;
-}
-
-// Role: Damage 35% / Tank 30% / Support 20% / Assist 15%.
 export function roleForCard(name) {
   const r = hashName(name) % 20;
   if (r <= 6) return 'Damage';

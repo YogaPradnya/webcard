@@ -1,6 +1,9 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
+import { calcLevel } from './level.js';
+import { cleanHex } from './color.js';
+import { DISPLAY_BORDERS } from './constants.js';
 
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
 // Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Midtrans.
@@ -27,7 +30,7 @@ export const ORDER_PENDING_TTL_MS = 15 * 60 * 1000;
 // Tiap slot = 1 kartu pajangan custom dengan 3x jatah ubah (tiap Simpan makan 1).
 export const MAX_EDITS_PER_SLOT = 3;
 
-export const SLOT_BORDER_TYPES = ['gold', 'rainbow', 'neon', 'sakura', 'shadow', 'classic', 'custom'];
+export const SLOT_BORDER_TYPES = DISPLAY_BORDERS;
 
 export function findPack(packId) {
   return XP_PACKS.find((p) => p.id === String(packId || '')) || null;
@@ -137,14 +140,8 @@ export async function syncOrderFromMidtrans(orderId) {
 }
 
 export function genMerchantOrderId() {
-  const rand = Math.floor(100000 + Math.random() * 900000);
+  const rand = 100000 + randomInt(900000);
   return `ANIMEIN-${Date.now()}-${rand}`;
-}
-
-function calcLevel(xp) {
-  let lv = 1;
-  while (xp >= Math.floor(20 * Math.pow(lv, 3))) lv++;
-  return lv;
 }
 
 export async function ensureShopTables() {
@@ -335,15 +332,6 @@ export async function listUserSlots(userId) {
     editsUsed: Number(r.edits_used) || 0,
     editsLeft: editsLeft({ edits_used: r.edits_used }),
   }));
-}
-
-function cleanHex(v) {
-  const s = String(v || '').trim();
-  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
-  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
-    return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
-  }
-  return '';
 }
 
 // Update kartu 1 slot: tiap Simpan makan 1 jatah (maks 3). Return { ok } / { ok:false, error }.

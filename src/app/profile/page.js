@@ -8,28 +8,13 @@ import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import MissionList from '@/components/MissionList';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
+import { postJson } from '@/lib/postJson';
+import { displayBorderColor } from '@/lib/displayBorder';
+import { hashNameLower } from '@/lib/hash';
 
 function avatarColor(name) {
   const pastels = ['#f7eafc', '#dbeafd', '#d7f2e3', '#fffaea', '#e9e3fb', '#ffedd7'];
-  const s = String(name || '?');
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % pastels.length;
-  return pastels[h];
-}
-
-const DISPLAY_BORDER_FALLBACK = {
-  gold: '#eab308',
-  rainbow: '#a855f7',
-  neon: '#22d3ee',
-  sakura: '#f9a8d4',
-  shadow: '#111827',
-  classic: '#9aa3b2',
-};
-
-function displayBorderColor(c) {
-  if (!c) return '#9aa3b2';
-  if (c.borderType === 'custom' && c.borderColor) return c.borderColor;
-  return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9aa3b2';
+  return pastels[hashNameLower(name || '?') % pastels.length];
 }
 
 function displayShowcaseStyle(c) {
@@ -126,11 +111,7 @@ export default function ProfilePage() {
     setMissionClaiming(`${period}:${missionId}`);
     setMissionToast('');
     try {
-      const { ok, data } = await fetchJson('/api/missions/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period, missionId }),
-      });
+      const { ok, data } = await postJson('/api/missions/claim', { period, missionId });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal klaim misi.');
         return;

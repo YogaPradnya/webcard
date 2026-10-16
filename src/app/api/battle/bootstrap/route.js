@@ -1,5 +1,4 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import {
   ensureBattleRooms,
@@ -8,7 +7,12 @@ import {
   forfeitMsLeft,
   cleanupExpiredWaitingRooms,
 } from '@/lib/rooms';
-import { withTimeout, READ_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 const PAGE_SIZE = 10;
 
@@ -21,9 +25,7 @@ let _lastCleanupAt = 0;
 const CLEANUP_MIN_GAP_MS = 60 * 1000;
 
 // GET /api/battle/bootstrap?q=&page= — { rooms, pagination, q, mine }.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   const params = new URL(req.url).searchParams;
   const q = String(params.get('q') || '').trim().slice(0, 50);
   const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
@@ -132,12 +134,12 @@ async function GET_impl(req) {
       };
     });
 
-    return NextResponse.json({ success: true, rooms, pagination, q, mine });
+    return jsonOk({ rooms, pagination, q, mine });
   } catch (e) {
     console.error('[BATTLE BOOTSTRAP]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat lobby battle.' }, { status: 500 });
+    return jsonFail('Gagal memuat lobby battle.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/bootstrap/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/bootstrap/route.js' });

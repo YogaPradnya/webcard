@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { getGachaSettings, tenCost, ensureGachaHistory, stockSummary } from '@/lib/gacha';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/gacha — info gacha web: cost 1x/10x (diskon 10%), rate, stok, XP, riwayat.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   try {
     const db = getDb();
     await ensureGachaHistory();
@@ -19,8 +21,7 @@ async function GET_impl(req) {
     ]);
     const xp = xpRes.rows.length > 0 ? Number(xpRes.rows[0].xp) || 0 : 0;
     const stocks = await stockSummary(pool, config.stocks);
-    return NextResponse.json({
-      success: true,
+    return jsonOk({
       cost: config.cost,
       cost10: tenCost(config.cost),
       rates: config.rates,
@@ -37,9 +38,9 @@ async function GET_impl(req) {
     });
   } catch (e) {
     console.error('[GACHA INFO]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat gacha.' }, { status: 500 });
+    return jsonFail('Gagal memuat gacha.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/gacha/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/gacha/route.js' });

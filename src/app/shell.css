@@ -1,0 +1,160 @@
+/* ===== Sidebar + layout (desktop) ===== */
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  border-right: 1.5px solid var(--hairline-strong);
+  background: var(--surface);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.sidebar-brand {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+}
+
+[data-theme='light'] .brand h1,
+[data-theme='light'] .sidebar-brand {
+  color: var(--ink);
+}
+
+/* ===== Role & status: chip pastel + outline gelap + teks ink ===== */
+:root,
+[data-theme='dark'],
+[data-theme='light'] {
+  --role-dmg: #e5484d;
+  --role-dmg-deep: #e11d48;
+  --role-tank: #9a6a3b;
+  --role-tank-deep: #7c5227;
+  --role-heal: #16a34a;
+  --role-heal-deep: #15803d;
+  --role-assist: #2c67e9;
+  --role-assist-deep: #2648b6;
+  --fx-burn: #ea580c;
+  --fx-stun: #7c5cd6;
+}
+
+.sidebar-user {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--link);
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.nav-item {
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--body);
+  text-decoration: none;
+  text-align: center;
+  border: 1.5px solid transparent;
+}
+
+.nav-item:hover {
+  background: var(--hairline-soft);
+}
+
+.nav-item.active {
+  background: var(--accent-grad);
+  color: var(--on-primary);
+  border-color: var(--hairline-strong);
+  box-shadow: 2px 2px 0 var(--hairline-strong);
+}
+
+.sidebar-logout {
+  width: 100%;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layout-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Topbar + bottomnav hanya tampil di mobile */
+.topbar,
+.bottomnav {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-bottom: 1.5px solid var(--hairline-strong);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  .topbar-spacer {
+    flex: 1;
+  }
+
+  .topbar-logout {
+    width: auto;
+    min-height: 0;
+    padding: 8px 14px;
+  }
+
+  .bottomnav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: var(--surface);
+    border-top: 1.5px solid var(--hairline-strong);
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    gap: 8px;
+  }
+
+  .bottomnav .nav-item {
+    flex: 1;
+  }
+
+  .layout-main {
+    padding-bottom: 76px;
+  }
+}
+
+/* Dark mode: alert error tetap terbaca */

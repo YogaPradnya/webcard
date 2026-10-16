@@ -1,25 +1,22 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { getBookCards } from '@/lib/cards';
 import { getDisplayCards } from '@/lib/display';
 import { computeTitles, ensureWebTitleColumn, allWebTitles } from '@/lib/titles';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { calcLevel } from '@/lib/level';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 function xpForLevel(lv) {
   return Math.floor(20 * Math.pow(lv, 3));
 }
 
-function calcLevel(xp) {
-  let lv = 1;
-  while (xp >= xpForLevel(lv)) lv++;
-  return lv;
-}
-
 // GET /api/profile — ringkasan profil: nama, xp/sisa, koleksi, battle, showcase, gelar.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   try {
     const db = getDb();
     await ensureWebTitleColumn();
@@ -65,8 +62,7 @@ async function GET_impl(req) {
       total: (titles.totalByTier[t] || 0),
     }));
 
-    return NextResponse.json({
-      success: true,
+    return jsonOk({
       profile: {
         id: String(session.id),
         username,
@@ -99,9 +95,9 @@ async function GET_impl(req) {
     });
   } catch (e) {
     console.error('[PROFILE]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat profil.' }, { status: 500 });
+    return jsonFail('Gagal memuat profil.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/profile/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/profile/route.js' });

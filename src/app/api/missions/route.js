@@ -1,22 +1,24 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getMissionStatus, recordEvent } from '@/lib/missions';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/missions — status progres + klaim. Sekaligus mencatat misi
 // "buka web hari ini" (login harian).
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   try {
     await recordEvent(session.id, session.username, 'login', 1);
     const status = await getMissionStatus(session.id);
-    return NextResponse.json({ success: true, ...status });
+    return jsonOk({ ...status });
   } catch (e) {
     console.error('[MISSIONS]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat misi.' }, { status: 500 });
+    return jsonFail('Gagal memuat misi.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/missions/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/missions/route.js' });

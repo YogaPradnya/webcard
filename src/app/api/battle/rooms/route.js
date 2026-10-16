@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms, WAITING_TTL_MS, cleanupExpiredWaitingRooms } from '@/lib/rooms';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 const PAGE_SIZE = 10;
 
@@ -15,9 +19,7 @@ const CLEANUP_MIN_GAP_MS = 60 * 1000;
 
 // GET /api/battle/rooms?q=&page= — list room PvP waiting yang masih hidup (10/page).
 // Hanya usn + kode + sisa waktu. Search cocok ke username dan kode.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   const params = new URL(req.url).searchParams;
   const q = String(params.get('q') || '').trim().slice(0, 50);
   const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
@@ -37,7 +39,7 @@ async function GET_impl(req) {
         secondsLeft: Math.max(0, Math.ceil((r.createdAt + WAITING_TTL_MS - t) / 1000)),
         isMine: String(r.p1_id) === String(session.id),
       }));
-      return NextResponse.json({ success: true, rooms, pagination: hit.payload.pagination, q });
+      return jsonOk({ rooms, pagination: hit.payload.pagination, q });
     }
     const now = Date.now();
     if (now - _lastCleanupAt > CLEANUP_MIN_GAP_MS) {
@@ -89,17 +91,16 @@ async function GET_impl(req) {
         isMine: String(r.p1_id) === String(session.id),
       };
     });
-    return NextResponse.json({
-      success: true,
+    return jsonOk({
       rooms,
       pagination,
       q,
     });
   } catch (e) {
     console.error('[BATTLE ROOMS]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat battle ready.' }, { status: 500 });
+    return jsonFail('Gagal memuat battle ready.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/rooms/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/rooms/route.js' });

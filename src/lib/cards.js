@@ -1,4 +1,4 @@
-import { WAIFU_POOL, VALID_TIERS } from '../data/waifuPool.js';
+import { WAIFU_POOL } from '../data/waifuPool.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 // JSON via require agar bisa dipakai plain Node (test) maupun Next.
@@ -7,6 +7,7 @@ const cloudArt = require('../data/cardArtCloud.json');
 import { getDb, readSetting } from './db.js';
 import { isSchemaReady } from './schema.js';
 import { genCardStats, genSecondSkill } from './battleStats.js';
+import { sanitizePoolInput } from './pool.js';
 
 export const RARITY_ORDER = { Common: 0, Rare: 1, Epic: 2, Legendary: 3, Mythic: 4 };
 export const RARITY_LIST = ['Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
@@ -19,23 +20,6 @@ export const RARITY_COLORS = {
   Rare: '#2c67e9',
   Common: '#9aa3b2',
 };
-
-function sanitizePoolInput(pool) {
-  if (!Array.isArray(pool) || pool.length === 0 || pool.length > 500) return null;
-  const seen = new Set();
-  const clean = [];
-  for (const entry of pool) {
-    const name = String(entry?.name || '').trim().slice(0, 80);
-    const anime = String(entry?.anime || '').trim().slice(0, 80);
-    const tier = String(entry?.tier || '').trim();
-    if (!name || !anime || !VALID_TIERS.includes(tier)) return null;
-    const key = name.toLowerCase();
-    if (seen.has(key)) return null;
-    seen.add(key);
-    clean.push({ name, anime, tier });
-  }
-  return clean;
-}
 
 // Pool efektif: override dashboard (settings.gacha_pool) atau default 265 kartu.
 // Di-cache 60 detik: sebelumnya tiap /api/cards = 1 round-trip ke Tokyo.

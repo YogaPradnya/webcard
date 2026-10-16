@@ -1,7 +1,9 @@
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
+import { DISPLAY_BORDERS, MAX_DISPLAY_EDITS } from './constants.js';
+import { cleanHex } from './color.js';
 
-export const DISPLAY_BORDERS = ['gold', 'rainbow', 'neon', 'sakura', 'shadow', 'classic', 'custom'];
+export { DISPLAY_BORDERS, MAX_DISPLAY_EDITS };
 
 export const DISPLAY_BORDER_COLORS = {
   gold: '#eab308',
@@ -39,7 +41,6 @@ export async function ensureDisplayTable() {
 }
 
 // Aturan jatah ubah kartu pajangan (admin maupun custom): maks 3x per kartu.
-export const MAX_DISPLAY_EDITS = 3;
 
 export function displayEditsLeft(editsUsed) {
   return Math.max(0, MAX_DISPLAY_EDITS - (Number(editsUsed) || 0));
@@ -80,15 +81,6 @@ export async function countDisplayCards(userId) {
     args: [String(userId)],
   });
   return Number(res.rows[0]?.c || 0);
-}
-
-function cleanHex(v) {
-  const s = String(v || '').trim();
-  if (/^#[0-9a-fA-F]{6}$/.test(s)) return s.toLowerCase();
-  if (/^#[0-9a-fA-F]{3}$/.test(s)) {
-    return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
-  }
-  return '';
 }
 
 // Custom kartu admin milik sendiri: gambar, border, deskripsi (nama dikunci).

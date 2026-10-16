@@ -1,14 +1,18 @@
-import { NextResponse } from 'next/server';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { apiHandler, jsonOk, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import {
+
+
   XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT,
   SLOT_BORDER_TYPES, ORDER_PENDING_TTL_MS, isShopEnabled, snapJsUrl, isMidtransConfigured,
 } from '@/lib/shop';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
 // GET /api/shop/packages — katalog publik (buat reviewer Midtrans juga).
 async function GET_impl() {
-  return NextResponse.json({
-    success: true,
+  return jsonOk({
     enabled: isShopEnabled(),
     xpPacks: XP_PACKS.map((p) => ({
       ...p,
@@ -31,5 +35,5 @@ async function GET_impl() {
   });
 }
 
-// Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/shop/packages/route.js');
+// Tanpa auth; batas hang server via apiHandler (penjaga Turso menggantung).
+export const GET = apiHandler(GET_impl, { auth: false, timeout: READ_TIMEOUT_MS, tag: 'src/app/api/shop/packages/route.js' });

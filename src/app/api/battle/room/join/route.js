@@ -1,32 +1,24 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
 import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
 import { checkRateCount } from '@/lib/rateLimit';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
 // POST /api/battle/room/join { code, team: [3 nama] } — gabung room PvP.
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function POST_impl(req, _ctx, session) {
 
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const code = String(body.code || '').replace(/[^0-9]/g, '');
   const team = Array.isArray(body.team) ? body.team.map((n) => String(n || '').trim()).filter(Boolean) : [];
   if (!code || team.length !== 3 || new Set(team.map((n) => n.toLowerCase())).size !== 3) {
-    return NextResponse.json({ success: false, message: 'Kode dan 3 kartumu wajib diisi.' }, { status: 400 });
+    return jsonFail('Kode dan 3 kartumu wajib diisi.', 400);
   }
   const attempt = await checkRateCount(`join:${session.id}`, 20, 60 * 1000);
   if (!attempt.ok) {
-    return NextResponse.json({ success: false, message: 'Terlalu banyak percobaan. Tunggu sebentar.' }, { status: 429 });
+    return jsonFail('Terlalu banyak percobaan. Tunggu sebentar.', 429);
   }
 
   try {
@@ -35,14 +27,14 @@ async function POST_impl(req) {
     const db = getDb();
     const room = await getRoomCached(code);
     if (!room || room.mode !== 'pvp' || room.status !== 'waiting') {
-      return NextResponse.json({ success: false, message: 'Room tidak tersedia.' }, { status: 404 });
+      return jsonFail('Room tidak tersedia.', 404);
     }
     if (isWaitingExpired(room)) {
       await deleteRoom(room.code);
-      return NextResponse.json({ success: false, message: 'Kode hangus (5 menit). Minta lawan buat baru.' }, { status: 410 });
+      return jsonFail('Kode hangus (5 menit). Minta lawan buat baru.', 410);
     }
     if (String(room.p1Id) === String(session.id)) {
-      return NextResponse.json({ success: false, message: 'Tidak bisa gabung room sendiri.' }, { status: 400 });
+      return jsonFail('Tidak bisa gabung room sendiri.', 400);
     }
 
     const ownedRes = await db.execute({
@@ -52,7 +44,7 @@ async function POST_impl(req) {
     const ownedSet = new Set(ownedRes.rows.map((r) => String(r.char_name || '').toLowerCase()));
     for (const n of team) {
       if (!ownedSet.has(n.toLowerCase())) {
-        return NextResponse.json({ success: false, message: `Kamu tidak punya ${n}.` }, { status: 400 });
+        return jsonFail(`Kamu tidak punya ${n}.`, 400);
       }
     }
 
@@ -65,7 +57,7 @@ async function POST_impl(req) {
     const p1Stats = room.p1Team.map((s) => ({ ...s }));
     const p2Stats = team.map((n) => withName(n, n)).filter(Boolean);
     if (p1Stats.length !== 3 || p2Stats.length !== 3) {
-      return NextResponse.json({ success: false, message: 'Stat kartu tidak lengkap.' }, { status: 500 });
+      return jsonFail('Stat kartu tidak lengkap.', 500);
     }
 
     const first = Math.random() < 0.5 ? 'player' : 'enemy';
@@ -78,8 +70,7 @@ async function POST_impl(req) {
     bumpRoom(code);
 
     const saved = await getRoomCached(code);
-    return NextResponse.json({
-      success: true,
+    return jsonOk({
       state: {
         code: saved.code,
         mode: saved.mode,
@@ -99,9 +90,9 @@ async function POST_impl(req) {
     });
   } catch (e) {
     console.error('[BATTLE JOIN]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal gabung room.' }, { status: 500 });
+    return jsonFail('Gagal gabung room.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/join/route.js');
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/battle/room/join/route.js' });

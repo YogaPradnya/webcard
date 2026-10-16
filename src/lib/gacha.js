@@ -1,11 +1,20 @@
 import { getDb, readSetting } from './db.js';
 import { isSchemaReady } from './schema.js';
-import { WAIFU_POOL, VALID_TIERS } from '../data/waifuPool.js';
+import { WAIFU_POOL } from '../data/waifuPool.js';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const staticArt = require('../data/cardArt.json');
 const cloudArt = require('../data/cardArtCloud.json');
 import { ensureQuantityColumn } from './cards.js';
+import { calcLevel } from './level.js';
+import { jakartaDateKey } from './jakartaTime.js';
+import { sanitizePoolInput } from './pool.js';
+import { clampInt, clampFloat } from './num.js';
+import { hashNameLower } from './hash.js';
+import { getUserCard, getUserXp, debitXp, creditXp } from './userCardsRepo.js';
+import { MAX_CARD_COPIES, GACHA_HISTORY_LIMIT } from './constants.js';
+
+export { calcLevel, jakartaDateKey };
 
 // Engine gacha web — port setia logika bot (src/database/cardsRepo.js) dengan aturan web:
 // - Mythic UNIK per user (tidak bisa duplikat, downgrade seperti bot).
@@ -19,7 +28,8 @@ export const DEFAULT_RATES = { Common: 70, Rare: 25, Epic: 4.89, Legendary: 0.1,
 export const GACHA_COST = 500;
 export const MAX_CARD_LEVEL = 5;
 // Maksimal tumpukan copy per kartu per user (evo full manual, sama seperti bot).
-export const MAX_CARD_COPIES = 999;
+// (dipindah ke constants.js, re-export agar import lama tetap jalan)
+export { MAX_CARD_COPIES };
 export const TEN_DISCOUNT_NUM = 9; // 10x bayar 9x harga satuan (diskon 10%)
 
 // Nilai konversi kartu -> XP (sama seperti bonus Limit Break bot).
@@ -42,35 +52,6 @@ const RARITY_DOWNGRADE = { Mythic: 'Legendary', Legendary: 'Epic', Epic: 'Rare',
 // Web: hanya Mythic yang unik per user (Epic/Legendary boleh menumpuk).
 function isUniqueRarityWeb(rarity) {
   return rarity === 'Mythic';
-}
-
-function clampInt(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, Math.floor(n)));
-}
-
-function clampFloat(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, n));
-}
-
-function sanitizePoolInput(pool) {
-  if (!Array.isArray(pool) || pool.length === 0 || pool.length > 500) return null;
-  const seen = new Set();
-  const clean = [];
-  for (const entry of pool) {
-    const name = String(entry?.name || '').trim().slice(0, 80);
-    const anime = String(entry?.anime || '').trim().slice(0, 80);
-    const tier = String(entry?.tier || '').trim();
-    if (!name || !anime || !VALID_TIERS.includes(tier)) return null;
-    const key = name.toLowerCase();
-    if (seen.has(key)) return null;
-    seen.add(key);
-    clean.push({ name, anime, tier });
-  }
-  return clean;
 }
 
 function groupPoolByTier(list) {
@@ -164,22 +145,13 @@ function rollRarity(rng, rates) {
 }
 
 function hashCardName(name) {
-  const s = String(name || '').trim().toLowerCase();
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = ((h * 31 + s.charCodeAt(i)) >>> 0);
-  return h;
+  return hashNameLower(name);
 }
 
 export function calcPower(rarity, level, charName = '') {
   const base = BASE_POWER[rarity] || 40;
   const variance = String(charName || '').trim() ? hashCardName(charName) % 10 : Math.floor(Math.random() * 10);
   return base + Number(level || 1) * 10 + variance;
-}
-
-export function calcLevel(xp) {
-  let lv = 1;
-  while (xp >= Math.floor(20 * Math.pow(lv, 3))) lv++;
-  return lv;
 }
 
 async function countCardOwners(db, charName) {
@@ -196,22 +168,7 @@ async function countCardOwners(db, charName) {
 }
 
 async function getCard(db, userId, charName) {
-  const res = await db.execute({
-    sql: 'SELECT char_name, anime, rarity, level, power, image_url, is_showcase, quantity FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-    args: [String(userId), String(charName)],
-  });
-  if (res.rows.length === 0) return null;
-  const r = res.rows[0];
-  return {
-    charName: String(r.char_name),
-    anime: String(r.anime || ''),
-    rarity: String(r.rarity || 'Common'),
-    level: Number(r.level) || 1,
-    power: Number(r.power) || 0,
-    imageUrl: r.image_url || null,
-    showcase: Number(r.is_showcase) === 1,
-    quantity: Math.max(1, Number(r.quantity) || 1),
-  };
+  return getUserCard(db, userId, charName);
 }
 
 // Pilih kartu tersedia: lewati milik sendiri bila unik (L/M) + stok global habis.
@@ -244,14 +201,6 @@ async function pickAvailableCard(db, userId, startRarity, pools, rng, stockLimit
     r = RARITY_DOWNGRADE[r];
   }
   return null;
-}
-
-function jakartaDateKey(d = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(d);
-  const get = (t) => parts.find((p) => p.type === t)?.value;
-  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
 async function getPityState(db, userId) {
@@ -317,9 +266,9 @@ export async function performWebPulls(userId, username, count, todayKey) {
   const stockLimits = { ...STOCK_LIMITS, ...(config.stocks || {}) };
   const costTotal = n === 10 ? tenCost(config.cost) : config.cost;
 
-  const xpRes = await db.execute({ sql: 'SELECT xp FROM user_stats WHERE user_id = ?', args: [String(userId)] });
-  const curXp = xpRes.rows.length > 0 ? Number(xpRes.rows[0].xp) || 0 : 0;
-  if (curXp < costTotal) {
+  // Debit atomik di depan (anti double-spend): 1 statement, gagal = NO_XP.
+  const { ok: debitOk, xpBefore: curXp } = await debitXp(db, userId, costTotal);
+  if (!debitOk) {
     return { error: 'NO_XP', xp: curXp, costTotal, cost: config.cost };
   }
 
@@ -430,12 +379,16 @@ export async function performWebPulls(userId, username, count, todayKey) {
 
   // Bayar proporsional bila pull berhenti dini (SOLD_OUT): cost per pull dibulatkan.
   // XP hiburan (cap penuh) ditambahkan setelah bayar.
+  // Debit SUDAH terjadi atomik di depan; di sini hanya refund selisih + bonus
+  // via kredit relatif (tidak pernah menimpa XP milik penulis lain).
   const paidCount = pulls.length;
   const paidTotal = n === 10 && paidCount === 10 ? costTotal : Math.ceil((costTotal / n) * paidCount);
-  const newXp = Math.max(0, curXp - paidTotal) + consolationTotal;
+  const refund = Math.max(0, costTotal - paidTotal) + consolationTotal;
+  await creditXp(db, userId, refund);
+  const newXp = await getUserXp(db, userId);
   await db.execute({
     sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level, username = excluded.username`,
+          ON CONFLICT(user_id) DO UPDATE SET level = excluded.level, username = excluded.username`,
     args: [String(userId), String(username || ''), newXp, calcLevel(newXp)],
   });
   const next = {
@@ -460,11 +413,11 @@ export async function performWebPulls(userId, username, count, todayKey) {
       });
     } catch { /* non-kritis */ }
   }
-  // Retensi: simpan maksimal 50 riwayat per user.
+  // Retensi: simpan maksimal GACHA_HISTORY_LIMIT riwayat per user.
   try {
     await db.execute({
       sql: `DELETE FROM web_gacha_history WHERE user_id = ? AND id NOT IN
-            (SELECT id FROM web_gacha_history WHERE user_id = ? ORDER BY id DESC LIMIT 50)`,
+            (SELECT id FROM web_gacha_history WHERE user_id = ? ORDER BY id DESC LIMIT ${GACHA_HISTORY_LIMIT})`,
       args: [String(userId), String(userId)],
     });
   } catch { /* non-kritis */ }

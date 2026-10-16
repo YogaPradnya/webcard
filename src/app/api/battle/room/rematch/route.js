@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import {
@@ -11,41 +9,35 @@ import {
   sideTeamNames,
 } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
 // POST /api/battle/room/rematch { code } — tantang rematch dari room PvP yang selesai.
 // Membuat room waiting baru (penantang = p1 + tim lamanya), lalu bump room lama
 // dengan tawaran { code } agar lawan menerima via SSE. Lawan gabung dengan
 // endpoint join biasa (boleh ganti tim).
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function POST_impl(req, _ctx, session) {
 
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const code = String(body.code || '').replace(/[^0-9]/g, '');
-  if (!code) return NextResponse.json({ success: false, message: 'Kode wajib diisi.' }, { status: 400 });
+  if (!code) return jsonFail('Kode wajib diisi.', 400);
 
   try {
     await ensureBattleRooms();
     const room = await getRoomCached(code);
-    if (!room) return NextResponse.json({ success: false, message: 'Room tidak ada.' }, { status: 404 });
+    if (!room) return jsonFail('Room tidak ada.', 404);
     if (room.mode !== 'pvp') {
-      return NextResponse.json({ success: false, message: 'Rematch hanya untuk PvP.' }, { status: 400 });
+      return jsonFail('Rematch hanya untuk PvP.', 400);
     }
     if (!sideOf(room, session.id)) {
-      return NextResponse.json({ success: false, message: 'Bukan room kamu.' }, { status: 403 });
+      return jsonFail('Bukan room kamu.', 403);
     }
     if (room.status !== 'finished' && !room.battle?.over) {
-      return NextResponse.json({ success: false, message: 'Battle belum selesai.' }, { status: 400 });
+      return jsonFail('Battle belum selesai.', 400);
     }
     const team = sideTeamNames(room, session.id);
     if (team.length !== 3) {
-      return NextResponse.json({ success: false, message: 'Tim lama tidak lengkap.' }, { status: 400 });
+      return jsonFail('Tim lama tidak lengkap.', 400);
     }
 
     const db = getDb();
@@ -67,16 +59,16 @@ async function POST_impl(req) {
     for (const n of team) {
       const owned = ownedMap[n.toLowerCase()];
       if (!owned) {
-        return NextResponse.json({ success: false, message: `Kartu ${n} sudah tidak kamu miliki.` }, { status: 400 });
+        return jsonFail(`Kartu ${n} sudah tidak kamu miliki.`, 400);
       }
       const st = statsMap[n.toLowerCase()];
       if (!st) {
-        return NextResponse.json({ success: false, message: `Stat ${n} tidak lengkap.` }, { status: 500 });
+        return jsonFail(`Stat ${n} tidak lengkap.`, 500);
       }
       p1Stats.push({ ...st, name: st.name || n, tier: owned.tier, level: owned.level });
     }
     if (p1Stats.length !== 3) {
-      return NextResponse.json({ success: false, message: 'Tim lama tidak lengkap.' }, { status: 500 });
+      return jsonFail('Tim lama tidak lengkap.', 500);
     }
 
     let newCode = '';
@@ -87,7 +79,7 @@ async function POST_impl(req) {
         break;
       }
     }
-    if (!newCode) return NextResponse.json({ success: false, message: 'Gagal buat room.' }, { status: 500 });
+    if (!newCode) return jsonFail('Gagal buat room.', 500);
 
     const now = Date.now();
     await db.execute({
@@ -98,12 +90,12 @@ async function POST_impl(req) {
     });
     bumpRoom(newCode);
     bumpRoom(code, { rematch: { code: newCode, from: String(session.username || ''), at: now } });
-    return NextResponse.json({ success: true, code: newCode });
+    return jsonOk({ code: newCode });
   } catch (e) {
     console.error('[BATTLE REMATCH]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal membuat rematch.' }, { status: 500 });
+    return jsonFail('Gagal membuat rematch.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/battle/room/rematch/route.js');
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/battle/room/rematch/route.js' });

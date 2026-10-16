@@ -1,4 +1,8 @@
-import './globals.css';
+import './tokens.css';
+import './book.css';
+import './shell.css';
+import './battle.css';
+import './components.css';
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google';
 
 const bodyFont = Plus_Jakarta_Sans({

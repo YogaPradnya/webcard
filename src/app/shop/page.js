@@ -6,36 +6,8 @@ import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
-
-function idr(n) {
-  return `Rp${Number(n || 0).toLocaleString('id-ID')}`;
-}
-
-function paymentLabel(t) {
-  const map = { qris: 'QRIS', gopay: 'GoPay', shopeepay: 'ShopeePay', bank_transfer: 'Virtual Account', echannel: 'Mandiri Bill', credit_card: 'Kartu Kredit', cstore: 'Gerai Retail' };
-  return map[String(t || '')] || (t ? String(t).toUpperCase() : '-');
-}
-
-function fmtDate(ts) {
-  if (!ts) return '-';
-  try {
-    return new Date(Number(ts)).toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '-';
-  }
-}
-
-function loadSnapJs(src, clientKey) {
-  return new Promise((resolve, reject) => {
-    if (typeof window !== 'undefined' && window.snap) return resolve();
-    const s = document.createElement('script');
-    s.src = src;
-    s.setAttribute('data-client-key', clientKey);
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('Gagal memuat Snap.js'));
-    document.body.appendChild(s);
-  });
-}
+import { postJson } from '@/lib/postJson';
+import { idr, paymentLabel, fmtDate, loadSnapJs } from '@/lib/money';
 
 export default function ShopPage() {
   const router = useRouter();
@@ -147,11 +119,7 @@ export default function ShopPage() {
     setPaying(label);
     setError('');
     try {
-      const { ok, data } = await fetchJson('/api/shop/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const { ok, data } = await postJson('/api/shop/order', body);
       if (!ok || !data.success) {
         setError(data.message || 'Gagal membuat pembayaran.');
         return;

@@ -1,6 +1,6 @@
 # Book Kartu Animein
 
-Galeri book 200 kartu Animein. Login tanpa password: tekan **Dapatkan Kode**
+Galeri book 265 kartu Animein (gacha/trade/battle PvP, shop, misi). Login tanpa password: tekan **Dapatkan Kode**
 di web, ketik `.login KODE` di chat Animein dari akunmu, web langsung masuk.
 ID yang dipakai identik dengan `user_id` di database bot, jadi status kartu
 milik/belum otomatis nyambung dengan hasil `.gacha` di chat.

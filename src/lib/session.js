@@ -65,10 +65,22 @@ export { COOKIE_NAME };
 // Ambil sesi dari header Cookie request. Return { id, key, username } atau null.
 export function getSessionFromRequest(req) {
   const header = req.headers.get('cookie') || '';
-  const parts = header.split(';').map((p) => p.trim().split('='));
-  const jar = Object.fromEntries(parts.filter((p) => p.length === 2));
+  const jar = {};
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx < 0) continue;
+    const k = part.slice(0, idx).trim();
+    const v = part.slice(idx + 1).trim();
+    if (k && !(k in jar)) {
+      try {
+        jar[k] = decodeURIComponent(v);
+      } catch {
+        jar[k] = v;
+      }
+    }
+  }
   if (!jar[COOKIE_NAME]) return null;
-  return unsealSession(decodeURIComponent(jar[COOKIE_NAME]));
+  return unsealSession(jar[COOKIE_NAME]);
 }
 
 // Hash tampilan untuk log tanpa membocorkan key_client.

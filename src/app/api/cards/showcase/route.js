@@ -1,22 +1,14 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { getEffectiveArt } from '@/lib/cards';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
 // POST /api/cards/showcase { charName, showcase: boolean } — atur kartu pajangan dari web.
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+async function POST_impl(req, _ctx, session) {
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const charName = String(body.charName || '').trim();
   const showcase = Boolean(body.showcase);
-  if (!charName) return NextResponse.json({ success: false, message: 'Nama kartu wajib diisi.' }, { status: 400 });
+  if (!charName) return jsonFail('Nama kartu wajib diisi.', 400);
   try {
     const db = getDb();
     const check = await db.execute({
@@ -24,7 +16,7 @@ async function POST_impl(req) {
       args: [String(session.id), charName],
     });
     if (check.rows.length === 0) {
-      return NextResponse.json({ success: false, message: 'Kamu tidak punya kartu itu.' }, { status: 400 });
+      return jsonFail('Kamu tidak punya kartu itu.', 400);
     }
     if (showcase) {
       // Satu pajangan aktif: matikan yang lain dulu (maks 1 showcase seperti bot).
@@ -50,12 +42,12 @@ async function POST_impl(req) {
       sql: 'UPDATE user_cards SET is_showcase = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [showcase ? 1 : 0, String(session.id), charName],
     });
-    return NextResponse.json({ success: true, charName, showcase });
+    return jsonOk({ charName, showcase });
   } catch (e) {
     console.error('[SHOWCASE]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal atur pajangan.' }, { status: 500 });
+    return jsonFail('Gagal atur pajangan.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/cards/showcase/route.js');
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/cards/showcase/route.js' });

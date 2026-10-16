@@ -1,6 +1,10 @@
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
 import { createBattle, act as engineAct, aiChoose } from './engine.js';
+import { calcLevel } from './level.js';
+import { jakartaDateKey } from './jakartaTime.js';
+import { randomDigits } from './codes.js';
+import { getUserXp } from './userCardsRepo.js';
 
 export const TURN_TIMEOUT_MS = 60 * 1000;
 // Forfeit: 2 menit tanpa aksi manual dianggap menyerah (permintaan user).
@@ -41,9 +45,7 @@ async function readBattleRewards() {
 }
 
 export function genRoomCode() {
-  let code = '';
-  for (let i = 0; i < 6; i++) code += String(Math.floor(Math.random() * 10));
-  return code;
+  return randomDigits(6);
 }
 
 export function normalizeRoomCode(value) {
@@ -117,21 +119,15 @@ export async function ensureBattleRooms() {
   }
 }
 
-function jakartaDateKey(d = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(d);
-  const get = (t) => parts.find((p) => p.type === t)?.value;
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
-
-function calcLevel(xp) {
-  let lv = 1;
-  while (xp >= Math.floor(20 * Math.pow(lv, 3))) lv++;
-  return lv;
-}
-
 export function parseRoom(row) {
+  const safeJson = (v, fb) => {
+    try {
+      const p = JSON.parse(v ?? '');
+      return p ?? fb;
+    } catch {
+      return fb;
+    }
+  };
   return {
     code: String(row.code),
     mode: String(row.mode || 'ai'),
@@ -139,12 +135,12 @@ export function parseRoom(row) {
     p1Username: String(row.p1_username || ''),
     p2Id: row.p2_id ? String(row.p2_id) : null,
     p2Username: String(row.p2_username || ''),
-    p1Team: JSON.parse(row.p1_team || '[]'),
-    battle: JSON.parse(row.state || '{}'),
+    p1Team: safeJson(row.p1_team, []),
+    battle: safeJson(row.state, {}),
     turn: row.turn ? String(row.turn) : null,
     status: String(row.status || 'waiting'),
     winner: row.winner ? String(row.winner) : null,
-    result: row.result ? JSON.parse(row.result) : null,
+    result: row.result ? safeJson(row.result, null) : null,
     xpPaid: Number(row.xp_paid) === 1,
     createdAt: Number(row.created_at) || 0,
     updatedAt: Number(row.updated_at) || 0,
@@ -394,8 +390,7 @@ async function awardXpFor(db, userId, username, won, rewards) {
           ON CONFLICT(user_id, day_key) DO UPDATE SET plays = plays + 1`,
     args: [String(userId), dayKey],
   });
-  const xpRes = await db.execute({ sql: 'SELECT xp FROM user_stats WHERE user_id = ?', args: [String(userId)] });
-  const curXp = xpRes.rows.length > 0 ? Number(xpRes.rows[0].xp) || 0 : 0;
+  const curXp = await getUserXp(db, userId);
   const newXp = curXp + gain;
   await db.execute({
     sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)

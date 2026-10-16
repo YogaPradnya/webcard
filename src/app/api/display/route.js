@@ -1,20 +1,22 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDisplayCards } from '@/lib/display';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/display — koleksi kartu pajangan (display-only) milik user login.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   try {
     const data = await getDisplayCards(session.id);
-    return NextResponse.json({ success: true, ...data });
+    return jsonOk({ ...data });
   } catch (e) {
     console.error('[DISPLAY]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat kartu pajangan.' }, { status: 500 });
+    return jsonFail('Gagal memuat kartu pajangan.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/display/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/display/route.js' });

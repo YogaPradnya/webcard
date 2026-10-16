@@ -1,0 +1,307 @@
+/* ===== Brainfish playful neo-brutalist (terang default, + dark mode) ===== */
+:root,
+[data-theme='light'] {
+  --ink: #0a0a0a;
+  --white: #ffffff;
+  --cream: #fffff6;
+  --lime: #a3e636;
+  --lime-deep: #65a30d;
+  --sky-top: #8ce4f0;
+  --sky-bottom: #b9f0f5;
+  --mint: #abebd1;
+  --mint-deep: #69d6b6;
+  --blue-bright: #2c67e9;
+  --blue-deep: #2648b6;
+  --navy: #173080;
+  --pastel-pink: #f7eafc;
+  --pastel-pink-bd: #d8a7e8;
+  --pastel-yellow: #fffaea;
+  --pastel-yellow-bd: #e0bd55;
+  --pastel-green: #d7f2e3;
+  --pastel-green-bd: #5fbf92;
+  --pastel-lime: #fbffea;
+  --pastel-lime-bd: #a9c93f;
+  --pastel-blue: #dbeafd;
+  --pastel-blue-bd: #6ea3e8;
+  --pastel-orange: #ffedd7;
+  --pastel-orange-bd: #df9850;
+  --pastel-purple: #e9e3fb;
+  --pastel-purple-bd: #9d86e8;
+  --pastel-red: #ffe4e8;
+  --pastel-red-bd: #e5484d;
+  --canvas: #ffffff;
+  --canvas-soft: #fffff6;
+  --surface: #ffffff;
+  --surface-soft: #fffff6;
+  --body: #0a0a0a;
+  --muted: #5b6472;
+  --muted-soft: #9aa3b2;
+  --hairline: #e0e4ea;
+  --hairline-soft: #f0f3f7;
+  --hairline-strong: #0a0a0a;
+  --primary: #a3e636;
+  --primary-active: #8fd41f;
+  --on-primary: #0a0a0a;
+  --accent-grad: #a3e636;
+  --link: #2648b6;
+  --success: #15803d;
+  --error: #e5484d;
+  --crit: #65a30d;
+  --focus-ring: #0a0a0a;
+  --r-md: 8px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+  --border: 1.5px solid #0a0a0a;
+  --shadow: 3px 3px 0 #0a0a0a;
+  --shadow-lg: 5px 6px 0 #0a0a0a;
+/* Rarity: warna solid */
+  --rar-common: #9aa3b2;
+  --rar-rare: #2c67e9;
+  --rar-epic: #a855f7;
+  --rar-legendary: #eab308;
+  --rar-mythic: #e5484d;
+}
+
+/* ===== Dark mode baru: navy dalam + outline krem + bayangan lime ===== */
+[data-theme='dark'] {
+  --ink: #fffff6;
+  --white: #fffff6;
+  --cream: #fffff6;
+  --lime: #a3e636;
+  --lime-deep: #a3e636;
+  --sky-top: #1b2a6b;
+  --sky-bottom: #101a45;
+  --mint: #101a45;
+  --mint-deep: #1b2a6b;
+  --blue-bright: #7fb0ec;
+  --blue-deep: #9dbcff;
+  --navy: #0a0a0a;
+  --pastel-pink: #3d1f47;
+  --pastel-pink-bd: #e3a7f5;
+  --pastel-yellow: #3a2f10;
+  --pastel-yellow-bd: #e8c95a;
+  --pastel-green: #0e3b24;
+  --pastel-green-bd: #4ade80;
+  --pastel-lime: #2a3a10;
+  --pastel-lime-bd: #a3e636;
+  --pastel-blue: #16295e;
+  --pastel-blue-bd: #7fb0ec;
+  --pastel-orange: #3d2410;
+  --pastel-orange-bd: #f0a95e;
+  --pastel-purple: #2a1f5e;
+  --pastel-purple-bd: #b39dff;
+  --pastel-red: #4a1626;
+  --pastel-red-bd: #ff7a9c;
+  --canvas: #0a0a0a;
+  --canvas-soft: #101a45;
+  --surface: #182257;
+  --surface-soft: #101a45;
+  --body: #d7dcf0;
+  --muted: #9aa3c7;
+  --muted-soft: #4a5590;
+  --hairline: #2c3770;
+  --hairline-soft: #1b2560;
+  --hairline-strong: #fffff6;
+  --primary: #a3e636;
+  --primary-active: #b8f04a;
+  --on-primary: #0a0a0a;
+  --accent-grad: #a3e636;
+  --link: #9dbcff;
+  --success: #4ade80;
+  --error: #ff7a9c;
+  --crit: #a3e636;
+  --focus-ring: #a3e636;
+  --r-md: 8px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+  --border: 1.5px solid #fffff6;
+  --shadow: 3px 3px 0 #a3e636;
+  --shadow-lg: 5px 6px 0 #a3e636;
+  --rar-common: #9aa3b2;
+  --rar-rare: #7fb0ec;
+  --rar-epic: #c084fc;
+  --rar-legendary: #eab308;
+  --rar-mythic: #ff7a9c;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--sky-bottom);
+  background-image: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 32%, var(--mint) 68%, var(--mint-deep) 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+[data-theme='light'] body,
+[data-theme='light'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] body,
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 48px 64px;
+}
+
+[data-theme='dark'] body {
+  background-color: #0a0a0a;
+  background-image: linear-gradient(to bottom, #1b2a6b 0%, #101a45 42%, #0a0a0a 100%);
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 20px 14px 64px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  .brand {
+    margin-bottom: 16px;
+  }
+
+  /* Input/select boleh menyusut di baris flex (anti meluber horizontal). */
+  .input,
+  .select {
+    min-width: 0;
+  }
+
+  /* Label bottomnav tidak boleh memaksa overflow. */
+  .bottomnav .nav-item {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Tombol "?" flip tidak menutupi nama/tier kartu. */
+  .card-item .card-meta {
+    padding-right: 34px;
+  }
+
+  /* Kode room waiting muat di layar kecil. */
+  .trade-code-big {
+    font-size: 32px;
+    letter-spacing: 4px;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.brand h1 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: var(--ink);
+}
+
+.card {
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+
+.btn {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 18px;
+  background: var(--accent-grad);
+  color: var(--on-primary);
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: var(--shadow);
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--hairline-strong);
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1.5px solid var(--hairline-strong);
+  box-shadow: none;
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  border: 1.5px solid var(--hairline-strong);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.input:focus, .select:focus {
+  border-color: var(--hairline-strong);
+  box-shadow: none;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.alert-error {
+  background: var(--pastel-red);
+  border: 1.5px solid var(--pastel-red-bd);
+  color: var(--ink);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+

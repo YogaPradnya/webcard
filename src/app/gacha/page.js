@@ -7,14 +7,8 @@ import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
-
-const TIER_COLORS = {
-  Mythic: '#e5484d',
-  Legendary: '#eab308',
-  Epic: '#a855f7',
-  Rare: '#2c67e9',
-  Common: '#9aa3b2',
-};
+import { postJson } from '@/lib/postJson';
+import { TIER_COLORS } from '@/lib/tiers';
 
 const REVEAL_MS_BY_RARITY = {
   Common: 400,
@@ -143,11 +137,7 @@ export default function GachaPage() {
     setPulls([]);
     setFinished(false);
     try {
-      const { ok, data } = await fetchJson('/api/gacha/pull', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count }),
-      });
+      const { ok, data } = await postJson('/api/gacha/pull', { count });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal gacha.');
         return;

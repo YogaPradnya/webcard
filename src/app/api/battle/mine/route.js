@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms, WAITING_TTL_MS, FORFEIT_TIMEOUT_MS, forfeitMsLeft, cleanupExpiredWaitingRooms, parseRoom } from '@/lib/rooms';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/battle/mine — room aktif milik user (waiting + ongoing) untuk auto-restore.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   try {
     await ensureBattleRooms();
     const now = Date.now();
@@ -47,12 +49,12 @@ async function GET_impl(req) {
         secondsLeft: Math.max(0, Math.ceil((createdAt + WAITING_TTL_MS - now) / 1000)),
       };
     });
-    return NextResponse.json({ success: true, rooms });
+    return jsonOk({ rooms });
   } catch (e) {
     console.error('[BATTLE MINE]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat room aktif.' }, { status: 500 });
+    return jsonFail('Gagal memuat room aktif.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/mine/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/mine/route.js' });

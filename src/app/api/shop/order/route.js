@@ -1,5 +1,3 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
 import { getDb } from '@/lib/db';
 import { checkRateCount } from '@/lib/rateLimit';
 import {
@@ -7,29 +5,32 @@ import {
   createSnapTransaction, countUserSlots, ensureShopTables, isShopEnabled,
 } from '@/lib/shop';
 import { countDisplayCards } from '@/lib/display';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
+import { getIdempotencyKey, ensureIdempotencyTable, checkIdempotency, saveIdempotency } from '@/lib/idempotency';
+import { NextResponse } from 'next/server';
 
 // POST /api/shop/order { kind: 'xp', packId } | { kind: 'slot', qty }
 // Return { orderId, snapToken } untuk dibuka via Snap.js.
-async function POST_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function POST_impl(req, _ctx, session) {
   if (!isShopEnabled()) {
-    return NextResponse.json({ success: false, message: 'Shop belum dibuka.' }, { status: 403 });
+    return jsonFail('Shop belum dibuka.', 403);
   }
-  let body = {};
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ success: false, message: 'Body JSON tidak valid.' }, { status: 400 });
-  }
+  const { body, error: bodyErr } = await parseJson(req);
+  if (bodyErr) return bodyErr;
   const kind = String(body.kind || '');
   const attempt = await checkRateCount(`shoporder:${session.id}`, 10, 60 * 1000);
   if (!attempt.ok) {
-    return NextResponse.json({ success: false, message: 'Terlalu sering bikin order. Tunggu sebentar.' }, { status: 429 });
+    return jsonFail('Terlalu sering bikin order. Tunggu sebentar.', 429);
   }
   try {
     await ensureShopTables();
+    await ensureIdempotencyTable();
+    const db = getDb();
+    const idemKey = getIdempotencyKey(req);
+    if (idemKey) {
+      const replay = await checkIdempotency(db, idemKey, session.id, 'shop/order');
+      if (replay.hit) return NextResponse.json(replay.body, { status: replay.status });
+    }
     let amountIdr = 0;
     let xpAmount = 0;
     let qty = 1;
@@ -37,7 +38,7 @@ async function POST_impl(req) {
     let itemName = '';
     if (kind === 'xp') {
       const pack = findPack(body.packId);
-      if (!pack) return NextResponse.json({ success: false, message: 'Paket tidak dikenal.' }, { status: 400 });
+      if (!pack) return jsonFail('Paket tidak dikenal.', 400);
       amountIdr = pack.priceIdr;
       xpAmount = pack.xp;
       ref = pack.id;
@@ -47,13 +48,13 @@ async function POST_impl(req) {
       // Kuota gabungan: slot custom + kartu admin, maks 50 total.
       const have = (await countUserSlots(session.id)) + (await countDisplayCards(session.id));
       if (have + qty > MAX_SLOTS_PER_USER) {
-        return NextResponse.json({ success: false, message: `Maksimal ${MAX_SLOTS_PER_USER} kartu pajangan per user (punya ${have}: custom + admin).` }, { status: 400 });
+        return jsonFail(`Maksimal ${MAX_SLOTS_PER_USER} kartu pajangan per user (punya ${have}: custom + admin).`, 400);
       }
       amountIdr = SLOT_PRICE_IDR * qty;
       ref = 'display-slot';
       itemName = `Slot Kartu Pajangan x${qty} Animein`;
     } else {
-      return NextResponse.json({ success: false, message: 'Jenis order tidak dikenal.' }, { status: 400 });
+      return jsonFail('Jenis order tidak dikenal.', 400);
     }
     // order_id Midtrans = order_id kita (dipakai verifikasi webhook).
     const orderId = genMerchantOrderId();
@@ -69,15 +70,17 @@ async function POST_impl(req) {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
       args: [orderId, String(session.id), String(session.username || ''), kind, ref, qty, amountIdr, xpAmount, token, now, now],
     });
-    return NextResponse.json({ success: true, orderId, snapToken: token });
+    const out = { success: true, orderId, snapToken: token };
+    if (idemKey) await saveIdempotency(db, idemKey, session.id, 'shop/order', 200, out);
+    return jsonOk({ orderId, snapToken: token });
   } catch (e) {
     console.error('[SHOP ORDER]', e.message);
     const msg = /MIDTRANS_SERVER_KEY/.test(e.message)
       ? 'Pembayaran belum dikonfigurasi. Hubungi admin.'
       : 'Gagal membuat pembayaran. Coba lagi.';
-    return NextResponse.json({ success: false, message: msg }, { status: 500 });
+    return jsonFail(msg, 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const POST = withTimeout(POST_impl, WRITE_TIMEOUT_MS, 'src/app/api/shop/order/route.js');
+export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/shop/order/route.js' });

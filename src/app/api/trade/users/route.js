@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/trade/users — daftar user + jumlah kartu (untuk cari lawan trade).
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
 
   try {
     const res = await getDb().execute({
@@ -20,12 +22,12 @@ async function GET_impl(req) {
       owned: Number(r.owned) || 0,
       isMe: String(r.user_id) === String(session.id),
     }));
-    return NextResponse.json({ success: true, users });
+    return jsonOk({ users });
   } catch (e) {
     console.error('[TRADE USERS]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat user.' }, { status: 500 });
+    return jsonFail('Gagal memuat user.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/trade/users/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/trade/users/route.js' });

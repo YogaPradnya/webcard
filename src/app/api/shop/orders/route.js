@@ -1,22 +1,24 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { listUserOrders, ensureShopTables, expireStalePendingOrders } from '@/lib/shop';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/shop/orders — 10 order terakhir milik user.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   try {
     await ensureShopTables();
     await expireStalePendingOrders(session.id);
     const orders = await listUserOrders(session.id, 10);
-    return NextResponse.json({ success: true, orders });
+    return jsonOk({ orders });
   } catch (e) {
     console.error('[SHOP ORDERS]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat order.' }, { status: 500 });
+    return jsonFail('Gagal memuat order.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/shop/orders/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/shop/orders/route.js' });

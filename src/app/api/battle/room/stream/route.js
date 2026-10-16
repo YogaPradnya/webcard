@@ -23,6 +23,8 @@ import {
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+
+
 // GET /api/battle/room/stream?code=123456 — SSE: state terbaru + presence.
 // Menggantikan polling 2.5 dtk untuk room PvP. Fallback klien ke polling
 // bila EventSource gagal. Cek-DB berkala (5 dtk) sebagai jaring pengaman

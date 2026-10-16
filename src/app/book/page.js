@@ -10,36 +10,12 @@ import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
+import { TIER_COLORS } from '@/lib/tiers';
+import { displayBorderColor, displayCardStyle } from '@/lib/displayBorder';
+import { effectTone } from '@/lib/format';
 
 const TIERS = ['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
 const PAGE_SIZE = 24;
-
-const TIER_COLORS = {
-  Mythic: '#e5484d',
-  Legendary: '#eab308',
-  Epic: '#a855f7',
-  Rare: '#2c67e9',
-  Common: '#9aa3b2',
-};
-
-const DISPLAY_BORDER_FALLBACK = {
-  gold: '#eab308',
-  rainbow: '#a855f7',
-  neon: '#22d3ee',
-  sakura: '#f9a8d4',
-  shadow: '#111827',
-  classic: '#9aa3b2',
-};
-
-function displayBorderColor(c) {
-  if (!c) return '#9aa3b2';
-  if (c.borderType === 'custom' && c.borderColor) return c.borderColor;
-  return DISPLAY_BORDER_FALLBACK[c.borderType] || '#9aa3b2';
-}
-
-function displayCardStyle(c) {
-  return { borderColor: displayBorderColor(c) };
-}
 
 function shortName(name) {
   const s = String(name || '');
@@ -69,15 +45,6 @@ const SORTS = [
   ['power', 'Power tertinggi'],
   ['level', 'Level tertinggi'],
 ];
-
-function effectTone(effect) {
-  const e = String(effect || 'none');
-  if (['heal', 'regen', 'energize'].includes(e)) return 'fx-heal';
-  if (['shield', 'bulwark'].includes(e)) return 'fx-shield';
-  if (['surge', 'focus'].includes(e)) return 'fx-assist';
-  if (e === 'none') return '';
-  return 'fx-dmg';
-}
 
 export default function BookPage() {
   const router = useRouter();

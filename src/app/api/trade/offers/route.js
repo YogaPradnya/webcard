@@ -1,16 +1,18 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { ensureTradeTable, cleanupTradeOffers, bundleStats } from '@/lib/trade';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 const PAGE_SIZE = 10;
 
 // GET /api/trade/offers?q=&page= — list global penawaran aktif (10/page).
 // Search cocok ke username pemilik, nama kartu, dan kode.
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   const params = new URL(req.url).searchParams;
   const q = String(params.get('q') || '').trim().slice(0, 50);
   const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
@@ -78,17 +80,16 @@ async function GET_impl(req) {
         totalValue: stats.value,
       };
     });
-    return NextResponse.json({
-      success: true,
+    return jsonOk({
       offers,
       pagination: { page, limit: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) },
       q,
     });
   } catch (e) {
     console.error('[TRADE OFFERS]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat trade ready.' }, { status: 500 });
+    return jsonFail('Gagal memuat trade ready.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/trade/offers/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/trade/offers/route.js' });

@@ -1,17 +1,19 @@
-import { NextResponse } from 'next/server';
-import { getSessionFromRequest } from '@/lib/session';
+import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms } from '@/lib/rooms';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiTimeout';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+
+
 
 // GET /api/battle/leaderboard?tab=pvp|collector|xp — klasemen PvP, kolektor, XP.
 // Publik & sama untuk semua user -> cache memori 60 dtk (0 query saat hit).
 const _lbCache = new Map(); // tab -> { at, payload }
 const LB_TTL_MS = 60 * 1000;
 
-async function GET_impl(req) {
-  const session = getSessionFromRequest(req);
-  if (!session) return NextResponse.json({ success: false, message: 'Belum login.' }, { status: 401 });
+async function GET_impl(req, _ctx, session) {
   const tab = String(new URL(req.url).searchParams.get('tab') || 'pvp');
   const hit = _lbCache.get(tab);
   if (hit && Date.now() - hit.at < LB_TTL_MS) {
@@ -19,7 +21,7 @@ async function GET_impl(req) {
       const { user_id, ...pub } = r;
       return { ...pub, isMe: String(user_id) === String(session.id) };
     });
-    return NextResponse.json({ success: true, tab: hit.tab, leaderboard: rows });
+    return jsonOk({ tab: hit.tab, leaderboard: rows });
   }
 
   try {
@@ -38,7 +40,7 @@ async function GET_impl(req) {
         owned: Number(r.owned) || 0,
       }));
       _lbCache.set('collector', { at: Date.now(), tab: 'collector', payload: rows });
-      return NextResponse.json({ success: true, tab, leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
+      return jsonOk({ tab, leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
     }
     if (tab === 'xp') {
       const res = await db.execute({
@@ -52,7 +54,7 @@ async function GET_impl(req) {
         level: Number(r.level) || 1,
       }));
       _lbCache.set('xp', { at: Date.now(), tab: 'xp', payload: rows });
-      return NextResponse.json({ success: true, tab, leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
+      return jsonOk({ tab, leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
     }
     const res = await db.execute({
       sql: 'SELECT user_id, username, wins, losses, updated_at FROM battle_leaderboard ORDER BY wins DESC, losses ASC LIMIT 20',
@@ -71,12 +73,12 @@ async function GET_impl(req) {
       };
     });
     _lbCache.set('pvp', { at: Date.now(), tab: 'pvp', payload: rows });
-    return NextResponse.json({ success: true, tab: 'pvp', leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
+    return jsonOk({ tab: 'pvp', leaderboard: rows.map((r) => { const { user_id, ...pub } = r; return { ...pub, isMe: user_id === String(session.id) }; }) });
   } catch (e) {
     console.error('[BATTLE LB]', e.message);
-    return NextResponse.json({ success: false, message: 'Gagal memuat leaderboard.' }, { status: 500 });
+    return jsonFail('Gagal memuat leaderboard.', 500);
   }
 }
 
 // Batas hang server (penjaga Turso menggantung).
-export const GET = withTimeout(GET_impl, READ_TIMEOUT_MS, 'src/app/api/battle/leaderboard/route.js');
+export const GET = apiHandler(GET_impl, { timeout: READ_TIMEOUT_MS, tag: 'src/app/api/battle/leaderboard/route.js' });
