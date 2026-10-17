@@ -9,6 +9,7 @@
     "start": "next start",
     "test": "node --test --import ./scripts/test/register.mjs scripts/test/",
     "migrate": "node scripts/migrate.mjs",
+    "smoke": "node scripts/smoke.mjs",
     "seed:battle": "node scripts/seed-battle-stats.mjs"
   },
   "dependencies": {
