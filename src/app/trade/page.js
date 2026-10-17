@@ -440,11 +440,8 @@ export default function TradePage() {
           {mode === 'create' ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="section-title">Buat kode trade ({myOffers.length}/10)</div>
-              <form onSubmit={onCreate}>
+              <form onSubmit={onCreate} id="createTradeForm">
                 <BundlePicker cards={myCards} value={pickItems} onChange={setPickItems} />
-                <button className="btn" type="submit" disabled={myOffers.length >= 10 || !pickItems.length}>
-                  Buat Kode Angka
-                </button>
               </form>
               {created ? (
                 <div>
@@ -598,6 +595,23 @@ export default function TradePage() {
             ))}
             {users.length === 0 ? <div style={{ fontSize: 13 }}>Belum ada user.</div> : null}
           </div>
+
+          {mode === 'create' ? (
+            <>
+              {/* Ruang agar konten terakhir tidak tertutup bar mengambang */}
+              <div style={{ height: 150 }} />
+              <div className="floating-bar">
+                <button
+                  className="btn"
+                  type="submit"
+                  form="createTradeForm"
+                  disabled={myOffers.length >= 10 || !pickItems.length}
+                >
+                  Buat Kode Angka
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
