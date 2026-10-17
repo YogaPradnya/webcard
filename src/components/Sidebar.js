@@ -86,6 +86,9 @@ export default function Sidebar({ username }) {
         <span className="topbar-title">Animein</span>
         <span className="topbar-spacer" />
         <span className="topbar-toggle"><ThemeToggle /></span>
+        <button className="btn btn-ghost topbar-logout" onClick={onLogout}>
+          Keluar
+        </button>
       </header>
 
       <nav className="bottomnav">{mobileLinks}</nav>
