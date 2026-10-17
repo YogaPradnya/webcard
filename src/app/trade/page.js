@@ -204,7 +204,7 @@ export default function TradePage() {
   async function fetchTradeReady(page = tradePage, q = tradeQ) {
     setTradeLoading(true);
     try {
-      const { data } = await fetchJson(`/api/trade/offers?q=${encodeURIComponent(q)}&page=${page}`, { ms: 8000 }).catch(() => ({ data: {} }));
+      const { data } = await fetchJson(`/api/trade/offers?q=${encodeURIComponent(q)}&page=${page}`, { ms: 12000 }).catch(() => ({ data: {} }));
       if (data.success) {
         setTradeList(data.offers || []);
         setTradeTotal(data.pagination?.total || 0);
@@ -223,7 +223,7 @@ export default function TradePage() {
   }, [loading, tradePage, tradeQ]);
 
   async function refreshOffers() {
-    const { data } = await fetchJson('/api/trade/create', { ms: 8000 }).catch(() => ({ data: {} }));
+    const { data } = await fetchJson('/api/trade/create', { ms: 12000 }).catch(() => ({ data: {} }));
     if (data.success) setMyOffers(data.offers || []);
     fetchTradeReady(tradePage, tradeQ);
   }
@@ -239,7 +239,7 @@ export default function TradePage() {
   }
 
   async function onCancel(code) {
-    await fetchJson(`/api/trade/create?code=${encodeURIComponent(code)}`, { method: 'DELETE', ms: 8000 }).catch(() => ({}));
+    await fetchJson(`/api/trade/create?code=${encodeURIComponent(code)}`, { method: 'DELETE', ms: 12000 }).catch(() => ({}));
     refreshOffers();
   }
 
@@ -250,7 +250,7 @@ export default function TradePage() {
     setCheck(null);
     setGiveItems([]);
     setInCode(code);
-    const { ok, data } = await fetchJson(`/api/trade/offer?code=${encodeURIComponent(code)}`, { ms: 8000 }).catch(() => ({ ok: false, data: {} }));
+    const { ok, data } = await fetchJson(`/api/trade/offer?code=${encodeURIComponent(code)}`, { ms: 12000 }).catch(() => ({ ok: false, data: {} }));
     if (!ok || !data.success) {
       setError(data.message || 'Kode tidak ditemukan.');
       return;
@@ -282,7 +282,7 @@ export default function TradePage() {
         const myItems = encodeURIComponent(JSON.stringify(giveItems.map((v) => ({ charName: v.name, amount: v.amount }))));
         const { data } = await fetchJson(
           `/api/trade/offer?code=${encodeURIComponent(inCode)}&myItems=${myItems}`,
-          { ms: 8000 },
+          { ms: 12000 },
         ).catch(() => ({ data: {} }));
         if (data.success) {
           setPreview(data);

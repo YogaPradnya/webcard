@@ -21,6 +21,9 @@ export function useMe(requireLogin = true) {
           return;
         }
         if (alive) setMe(data);
+      } catch {
+        // Gagal jaringan/abort: anggap belum login (anti skeleton nyangkut).
+        if (requireLogin) router.push('/login');
       } finally {
         if (alive) setLoading(false);
       }

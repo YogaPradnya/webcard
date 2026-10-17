@@ -27,7 +27,8 @@ export function warmWriteTxOnce() {
       await tx.commit();
       console.log('[DB] warm-up write tx selesai');
     } catch (e) {
-      console.error('[DB] warm-up write tx gagal (abaikan):', String(e?.message || e));
+      console.error('[DB] warm-up write tx gagal (akan dicoba lagi):', String(e?.message || e));
+      _warmPromise = null; // jangan cache kegagalan — panggilan berikutnya retry
     }
   })();
   return _warmPromise;

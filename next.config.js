@@ -4,7 +4,7 @@ const nextConfig = {
     // Agar src/instrumentation.js jalan sekali saat boot (init skema DB).
     instrumentationHook: true,
   },  // Anti data basi (pelajaran dari insiden SW): API tidak boleh di-cache
-  // browser/proxy dalam kondisi apa pun; sw.js sisa penonaktifan juga no-cache.
+  // browser/proxy dalam kondisi apa pun; sw.js (cache gambar Cloudinary) juga no-cache.
   // Aset /_next/static/* sudah ber-hash per build (aman di-cache lama, default Next).
   async headers() {
     return [

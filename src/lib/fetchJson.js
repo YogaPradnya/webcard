@@ -18,7 +18,7 @@ export async function fetchJson(path, { ms = 12000, ...init } = {}) {
 // GET JSON dengan toleransi gagal: return {} bila timeout/abort.
 // Untuk data pelengkap (leaderboard mini, slot, dsb) agar halaman utama
 // tetap tampil walau 1 API mati.
-export async function fetchLenient(path, ms = 8000) {
+export async function fetchLenient(path, ms = 10000) {
   try {
     const { ok, data } = await fetchJson(path, { ms });
     return ok ? data : {};

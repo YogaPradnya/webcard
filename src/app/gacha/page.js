@@ -185,7 +185,23 @@ export default function GachaPage() {
         return;
       }
       setPulls(data.pulls || []);
-      setInfo((prev) => prev ? { ...prev, xp: data.xpAfter, totalPulls: data.total_pulls, pullsToday: data.pulls_today } : prev);
+      setInfo((prev) => prev ? {
+        ...prev,
+        xp: data.xpAfter,
+        totalPulls: data.total_pulls,
+        pullsToday: data.pulls_today,
+        // Riwayat ikut diperbarui tanpa reload: pull terakhir = paling baru,
+        // jadi urutkan balik lalu tempel di depan (maks 10 seperti server).
+        history: [
+          ...(data.pulls || []).slice().reverse().map((p) => ({
+            charName: p.charName,
+            rarity: p.rarity,
+            isNew: !!p.isNew,
+            createdAt: Date.now(),
+          })),
+          ...(prev.history || []),
+        ].slice(0, 10),
+      } : prev);
       if (instant) {
         // Mode langsung: semua terbuka sekaligus, tanpa animasi 1-1.
         setTurn(Math.max(0, (data.pulls || []).length - 1));

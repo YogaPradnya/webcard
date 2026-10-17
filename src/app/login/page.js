@@ -67,7 +67,7 @@ export default function LoginPage() {
     } catch { /* abaikan */ }
     (async () => {
       try {
-        const { data } = await fetchJson('/api/auth/code/status', { ms: 8000 }).catch(() => ({ data: {} }));
+        const { data } = await fetchJson('/api/auth/code/status', { ms: 10000 }).catch(() => ({ data: {} }));
         if (data.status === 'claimed') {
           router.push('/book');
           return;
@@ -94,22 +94,29 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!code) return;
-    pollTimer.current = setInterval(async () => {
+    let stopped = false;
+    // Poll rekursif: request berikutnya baru dijadwalkan SETELAH respons datang,
+    // jadi tidak ada tumpukan request saat server lambat (dulu setInterval 2 dtk).
+    const poll = async () => {
       try {
-        const { data } = await fetchJson('/api/auth/code/status', { ms: 8000 }).catch(() => ({ data: {} }));
+        const { data } = await fetchJson('/api/auth/code/status', { ms: 10000 }).catch(() => ({ data: {} }));
+        if (stopped) return;
         if (data.status === 'claimed') {
-          clearInterval(pollTimer.current);
           router.push('/book');
-        } else if (data.status === 'expired') {
-          clearInterval(pollTimer.current);
+          return;
+        }
+        if (data.status === 'expired') {
           setCode('');
           setError('Kode kedaluwarsa. Buat kode baru.');
+          return;
         }
       } catch {
-        // coba lagi interval berikut
+        // coba lagi setelah jeda berikut
       }
-    }, 2000);
-    return () => clearInterval(pollTimer.current);
+      if (!stopped) pollTimer.current = setTimeout(poll, 2000);
+    };
+    pollTimer.current = setTimeout(poll, 2000);
+    return () => { stopped = true; clearTimeout(pollTimer.current); };
   }, [code, router]);
 
   return (

@@ -8,7 +8,6 @@ import { fetchJson } from '@/lib/fetchJson';
 import { useShopEnabled } from '@/hooks/useShopEnabled';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
-// Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 export default function Sidebar({ username }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -37,7 +36,7 @@ export default function Sidebar({ username }) {
   }, [pathname]);
 
   async function onLogout() {
-    await fetchJson('/api/auth/logout', { method: 'POST', ms: 8000 }).catch(() => ({}));
+    await fetchJson('/api/auth/logout', { method: 'POST', ms: 10000 }).catch(() => ({}));
     router.push('/login');
   }
 

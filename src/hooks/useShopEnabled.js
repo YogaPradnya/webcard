@@ -15,7 +15,12 @@ export function useShopEnabled() {
     if (!_promise) {
       _promise = fetchLenient('/api/shop/packages')
         .then((d) => {
-          _cached = Boolean(d && d.success && d.enabled);
+          if (!d || !d.success) {
+            // Gagal sementara (timeout/503): jangan di-cache — mount berikutnya retry.
+            _promise = null;
+            return false;
+          }
+          _cached = Boolean(d.enabled);
           return _cached;
         })
         .catch(() => {

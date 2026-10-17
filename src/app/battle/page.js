@@ -454,14 +454,14 @@ export default function BattlePage() {
         loadCards(),
         (async () => {
           try {
-            const { ok, data } = await fetchJson('/api/battle/history?limit=10', { ms: 8000 });
+            const { ok, data } = await fetchJson('/api/battle/history?limit=10', { ms: 12000 });
             if (!cancelled && ok && data.success) setHistory(data.history || []);
           } catch { /* silent: history pelengkap */ } 
         })(),
         (async () => {
           const seq = ++mineSeq.current;
           try {
-            const { ok, data } = await fetchJson('/api/battle/mine', { ms: 8000 });
+            const { ok, data } = await fetchJson('/api/battle/mine', { ms: 12000 });
             if (cancelled || seq !== mineSeq.current) return;
             if (ok && data.success && data.rooms?.length) {
               setMyRooms(data.rooms);
@@ -500,9 +500,6 @@ export default function BattlePage() {
     setCardsError('');
     setCardsLoading(true);
     setRoomsInitLoading(true);
-    try {
-      if (me) await fetchMine().catch(() => {});
-    } catch { /* error ditangani per-seksi */ }
     setLoading(false);
     await Promise.allSettled([
       loadCards(),
@@ -643,7 +640,7 @@ export default function BattlePage() {
       setRoomLoading(true);
     }
     try {
-      const { ok, data } = await fetchJson(`/api/battle/rooms?q=${encodeURIComponent(q)}&page=${page}`, { ms: 8000 });
+      const { ok, data } = await fetchJson(`/api/battle/rooms?q=${encodeURIComponent(q)}&page=${page}`, { ms: 12000 });
       if (seq !== roomsSeq.current) return true; // hasil basi -> buang, cegah flicker list
       if (ok && data.success) {
         setRoomList(data.rooms || []);
@@ -664,7 +661,7 @@ export default function BattlePage() {
   async function fetchMine(silent = true) {
     const seq = ++mineSeq.current;
     try {
-      const { ok, data } = await fetchJson('/api/battle/mine', { ms: 8000 });
+      const { ok, data } = await fetchJson('/api/battle/mine', { ms: 12000 });
       if (seq !== mineSeq.current) return true;
       if (ok && data.success) {
         setMyRooms(data.rooms || []);
@@ -680,7 +677,7 @@ export default function BattlePage() {
 
   async function fetchHistory() {
     try {
-      const { ok, data } = await fetchJson('/api/battle/history?limit=10', { ms: 8000 });
+      const { ok, data } = await fetchJson('/api/battle/history?limit=10', { ms: 12000 });
       if (ok && data.success) setHistory(data.history || []);
     } catch { /* abaikan */ }
   }
@@ -746,7 +743,7 @@ export default function BattlePage() {
     try {
       const { ok, data } = await fetchJson(
         `/api/battle/bootstrap?q=${encodeURIComponent(q)}&page=${page}`,
-        { ms: 8000 }
+        { ms: 12000 }
       );
       if (ok && data.success) {
         if (roomsSeqNow === roomsSeq.current) {
@@ -947,7 +944,7 @@ export default function BattlePage() {
     setRematchOffer(null);
     setOnline([]);
     try {
-      await fetchJson(`/api/battle/room?code=${encodeURIComponent(cur.code)}`, { method: 'DELETE', ms: 8000 });
+      await fetchJson(`/api/battle/room?code=${encodeURIComponent(cur.code)}`, { method: 'DELETE', ms: 12000 });
     } catch {
       // abaikan, tetap keluar
     }
@@ -1280,7 +1277,7 @@ export default function BattlePage() {
                         style={{ width: 'auto', minHeight: 0, padding: '6px 12px' }}
                         onClick={async () => {
                           try {
-                            await fetchJson(`/api/battle/room?code=${encodeURIComponent(r.code)}`, { method: 'DELETE', ms: 8000 });
+                            await fetchJson(`/api/battle/room?code=${encodeURIComponent(r.code)}`, { method: 'DELETE', ms: 12000 });
                           } catch { /* abaikan */ }
                           fetchLobby(roomPageRef.current, roomQRef.current, false, true);
                         }}
