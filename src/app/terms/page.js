@@ -29,7 +29,7 @@ const SECTIONS = [
   },
   {
     title: '7. Harga dan Pembayaran',
-    body: 'Seluruh harga tercantum dalam Rupiah (IDR) di halaman Shop dan sudah termasuk biaya layanan pembayaran. Pembayaran diproses aman melalui Midtrans dan hanya tersedia via QRIS. Pesanan yang tidak dibayar hingga batas waktu yang ditentukan akan otomatis dibatalkan oleh sistem dan tidak ada dana yang ditarik.',
+    body: 'Seluruh harga tercantum dalam Rupiah (IDR) di halaman Shop dan sudah termasuk biaya layanan pembayaran. Pembayaran diproses aman melalui PayDisini dan hanya tersedia via QRIS. Pesanan yang tidak dibayar hingga batas waktu yang ditentukan akan otomatis dibatalkan oleh sistem dan tidak ada dana yang ditarik.',
   },
   {
     title: '8. Pengiriman dan Penyelesaian Pesanan',
@@ -49,7 +49,7 @@ const SECTIONS = [
   },
   {
     title: '12. Kebijakan Privasi',
-    body: 'Informasi Anda aman bersama kami. Animein memahami bahwa privasi sangat penting bagi pelanggan. Data yang Anda berikan (username, riwayat pesanan, dan bukti pembayaran) tidak akan disalahgunakan, disalahgunakan, atau dijual kepada pihak lain mana pun. Kami hanya menggunakan informasi pribadi Anda untuk menyelesaikan pesanan Anda. Data pembayaran kartu/bank Anda diproses langsung oleh Midtrans dan tidak kami simpan.',
+    body: 'Informasi Anda aman bersama kami. Animein memahami bahwa privasi sangat penting bagi pelanggan. Data yang Anda berikan (username, riwayat pesanan, dan bukti pembayaran) tidak akan disalahgunakan, disalahgunakan, atau dijual kepada pihak lain mana pun. Kami hanya menggunakan informasi pribadi Anda untuk menyelesaikan pesanan Anda. Data pembayaran kartu/bank Anda diproses langsung oleh PayDisini dan tidak kami simpan.',
   },
   {
     title: '13. Ganti Rugi',
@@ -78,7 +78,7 @@ export default function TermsPage() {
           <div className="brand"><h1>Syarat & Ketentuan</h1></div>
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, color: 'var(--body)' }}>
-              Terakhir diperbarui: 13 Oktober 2026. Halaman ini mengatur penggunaan Situs Book Kartu Animein
+              Terakhir diperbarui: 17 Oktober 2026. Halaman ini mengatur penggunaan Situs Book Kartu Animein
               (<strong>https://kartu.yogaa.web.id</strong>) beserta pembelian produk digital
               Top-Up XP dan Custom Kartu Pajangan. Dengan menggunakan Situs ini, Anda menyetujui seluruh ketentuan di bawah ini.
             </div>

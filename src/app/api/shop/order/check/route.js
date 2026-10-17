@@ -1,10 +1,10 @@
-import { getOrder, syncOrderFromMidtrans } from '@/lib/shop';
+import { getOrder, syncOrderFromPaydisini } from '@/lib/shop';
 import { checkRateCount } from '@/lib/rateLimit';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
-// POST /api/shop/order/check { orderId } — tanya status ke Midtrans langsung.
+// POST /api/shop/order/check { orderId } — tanya status ke PayDisini langsung.
 // Dipakai tombol "Cek Status" + auto-cek (penting untuk localhost yang
-// tak terjangkau webhook, dan cadangan bila webhook gagal di production).
+// tak terjangkau callback, dan cadangan bila callback gagal di production).
 async function POST_impl(req, _ctx, session) {
   const { body, error: bodyErr } = await parseJson(req);
   if (bodyErr) return bodyErr;
@@ -19,7 +19,7 @@ async function POST_impl(req, _ctx, session) {
     if (!order || String(order.userId) !== String(session.id)) {
       return jsonFail('Order tidak ditemukan.', 404);
     }
-    const r = await syncOrderFromMidtrans(orderId);
+    const r = await syncOrderFromPaydisini(orderId);
     return jsonOk({ status: r.status, reason: r.reason || null });
   } catch (e) {
     console.error('[SHOP CHECK]', e.message);

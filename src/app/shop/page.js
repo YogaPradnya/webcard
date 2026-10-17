@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
 import { useMe } from '@/hooks/useMe';
-import { idr, paymentLabel, fmtDate, loadSnapJs } from '@/lib/money';
+import { idr, paymentLabel, fmtDate } from '@/lib/money';
 
 export default function ShopPage() {
   const { me } = useMe(false); // katalog publik; data user hanya bila login
@@ -23,7 +23,7 @@ export default function ShopPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [myXp, setMyXp] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
-  const snapReady = useRef(false);
+  const [qrOrder, setQrOrder] = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 1000);
@@ -35,10 +35,36 @@ export default function ShopPage() {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  async function checkOrder(orderId) {
-    if (!orderId) return;
-    setChecking(orderId);
+  // Buka panel QR dari data order (hasil buat order baru / baris order lama).
+  function openQr({ orderId, qrUrl, qrContent, checkoutUrl, channel, amountIdr, label, createdAt }) {
+    setError('');
     setSuccessMsg('');
+    setQrOrder({
+      orderId,
+      qrUrl: qrUrl || '',
+      qrContent: qrContent || '',
+      checkoutUrl: checkoutUrl || '',
+      channel: channel || 'QRIS',
+      amountIdr: Number(amountIdr) || 0,
+      label: label || 'Pembelian',
+      createdAt: Number(createdAt) || Date.now(),
+    });
+  }
+
+  function orderLabel(o) {
+    return o.kind === 'xp'
+      ? `Top-Up ${Number(o.xpAmount || 0).toLocaleString('id-ID')} XP`
+      : `Slot Pajangan x${o.qty || 1}`;
+  }
+
+  async function checkOrder(orderId, opts = {}) {
+    if (!orderId) return;
+    const quiet = Boolean(opts.quiet);
+    if (!quiet) {
+      setChecking(orderId);
+      setSuccessMsg('');
+    }
+    let paidFound = false;
     try {
       const { data } = await fetchJson('/api/shop/order/check', {
         method: 'POST',
@@ -46,24 +72,34 @@ export default function ShopPage() {
         body: JSON.stringify({ orderId }),
       });
       if (!data.success && data.message) {
-        setError(data.message);
+        if (!quiet) setError(data.message);
       } else if (data.status === 'paid') {
+        paidFound = true;
         const o = orders.find((x) => x.orderId === orderId);
-        const what = o
-          ? (o.kind === 'xp' ? `+${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `+${o.qty} slot pajangan`)
-          : 'pembayaran';
+        const what = o ? (o.kind === 'xp' ? `+${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `+${o.qty} slot pajangan`) : (qrOrder?.label || 'pembayaran');
         setSuccessMsg(`Pembayaran lunas! ${what} sudah masuk. 🎉`);
+        setQrOrder(null);
       }
     } catch {
       // abaikan, user bisa tekan tombol Cek manual
     } finally {
-      setChecking('');
-      await load();
+      if (!quiet) setChecking('');
+    }
+    if (paidFound) {
+      await load({ quiet: true });
+    } else if (quiet) {
+      // Auto-cek: cukup segarkan daftar order (hemat request).
+      try {
+        const oData = await fetchLenient('/api/shop/orders');
+        if (oData.success) setOrders(oData.orders || []);
+      } catch { /* abaikan */ }
+    } else {
+      await load({ quiet: true });
     }
   }
 
-  async function load() {
-    setError('');
+  async function load(opts = {}) {
+    if (!opts.quiet) setError('');
     try {
       const catData = await fetchLenient('/api/shop/packages');
       if (catData.success) setCatalog(catData);
@@ -74,7 +110,7 @@ export default function ShopPage() {
         if (pData.success && Number.isFinite(Number(pData.profile?.xp))) setMyXp(Number(pData.profile.xp));
       }
     } catch {
-      setError('Tidak bisa menghubungi server.');
+      if (!opts.quiet) setError('Tidak bisa menghubungi server.');
     } finally {
       setLoading(false);
     }
@@ -85,26 +121,27 @@ export default function ShopPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
-  async function payAgain(order) {
-    if (paying || !me || !order?.snapToken) return;
-    setPaying(order.orderId);
-    setError('');
-    setSuccessMsg('');
-    try {
-      if (!snapReady.current) {
-        await loadSnapJs(catalog.payment.snapJsUrl, catalog.payment.clientKey);
-        snapReady.current = true;
-      }
-      window.snap.pay(order.snapToken, {
-        onSuccess: () => checkOrder(order.orderId),
-        onPending: () => checkOrder(order.orderId),
-        onClose: () => checkOrder(order.orderId),
-      });
-    } catch {
-      setError('Tidak bisa membuka pembayaran.');
-    } finally {
-      setPaying('');
-    }
+  // Auto-cek berkala selama panel QR terbuka (callback tak menjangkau localhost).
+  useEffect(() => {
+    if (!qrOrder?.orderId) return;
+    const t = setInterval(() => { checkOrder(qrOrder.orderId, { quiet: true }); }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qrOrder?.orderId]);
+
+  function payAgain(order) {
+    if (!me || !order) return;
+    if (!order.qrUrl && !order.checkoutUrl) return;
+    openQr({
+      orderId: order.orderId,
+      qrUrl: order.qrUrl,
+      qrContent: order.qrContent,
+      checkoutUrl: order.checkoutUrl,
+      channel: order.payChannel,
+      amountIdr: order.amountIdr,
+      label: orderLabel(order),
+      createdAt: order.createdAt,
+    });
   }
 
   async function pay(body, label) {
@@ -115,21 +152,34 @@ export default function ShopPage() {
     }
     setPaying(label);
     setError('');
+    setSuccessMsg('');
     try {
       const { ok, data } = await postJson('/api/shop/order', body);
       if (!ok || !data.success) {
         setError(data.message || 'Gagal membuat pembayaran.');
         return;
       }
-      if (!snapReady.current) {
-        await loadSnapJs(catalog.payment.snapJsUrl, catalog.payment.clientKey);
-        snapReady.current = true;
+      let amountIdr = 0;
+      let what = 'Pembelian';
+      if (body.kind === 'xp') {
+        const p = (catalog?.xpPacks || []).find((x) => x.id === body.packId);
+        amountIdr = Number(p?.priceIdr) || 0;
+        what = `Top-Up ${Number(p?.xp || 0).toLocaleString('id-ID')} XP`;
+      } else {
+        amountIdr = (catalog?.slot?.priceIdr || 10000) * (Number(body.qty) || 1);
+        what = `Slot Pajangan x${body.qty}`;
       }
-      window.snap.pay(data.snapToken, {
-        onSuccess: () => checkOrder(data.orderId),
-        onPending: () => checkOrder(data.orderId),
-        onClose: () => checkOrder(data.orderId),
+      openQr({
+        orderId: data.orderId,
+        qrUrl: data.qrUrl,
+        qrContent: data.qrContent,
+        checkoutUrl: data.checkoutUrl,
+        channel: data.qrChannel,
+        amountIdr,
+        label: what,
+        createdAt: Date.now(),
       });
+      await load({ quiet: true });
     } catch {
       setError('Tidak bisa menghubungi server.');
     } finally {
@@ -144,6 +194,8 @@ export default function ShopPage() {
   const maxSlots = catalog?.slot?.maxPerUser || 50;
   const slotRoom = Math.max(0, maxSlots - slots.length);
   const shopOn = Boolean(catalog?.enabled);
+  const ttlMs = catalog?.payment?.orderTtlMs || 15 * 60 * 1000;
+  const qrLeft = qrOrder ? qrOrder.createdAt + ttlMs - nowTick : 0;
 
   if (!loading && catalog && !shopOn) {
     return (
@@ -174,6 +226,58 @@ export default function ShopPage() {
           {successMsg ? (
             <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{successMsg}</div>
           ) : null}
+          {qrOrder ? (
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="section-title">Pembayaran QRIS — {qrOrder.label}</div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                {qrOrder.qrUrl ? (
+                  <img
+                    src={qrOrder.qrUrl}
+                    alt="QRIS pembayaran"
+                    style={{ width: 220, height: 220, objectFit: 'contain', background: '#fff', borderRadius: 12, padding: 8, border: '1px solid var(--hairline)' }}
+                  />
+                ) : null}
+                <div style={{ flex: '1 1 240px', fontSize: 13, lineHeight: 1.9 }}>
+                  <div><b>Order ID:</b> {qrOrder.orderId}</div>
+                  <div><b>Nominal:</b> {idr(qrOrder.amountIdr)}</div>
+                  <div><b>Berlaku:</b> {qrLeft > 0 ? fmtSisa(qrLeft) : 'kadaluarsa — buat order baru'}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 12 }}>
+                    Scan QR dengan aplikasi bank / e-wallet yang mendukung QRIS. Status tercentang otomatis — atau tekan Cek Status.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {qrOrder.checkoutUrl ? (
+                      <a
+                        className="btn"
+                        style={{ width: 'auto', padding: '0 14px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                        href={qrOrder.checkoutUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Buka Halaman Pembayaran
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ width: 'auto', minHeight: 0, padding: '8px 14px', fontSize: 13 }}
+                      disabled={checking === qrOrder.orderId}
+                      onClick={() => checkOrder(qrOrder.orderId)}
+                    >
+                      {checking === qrOrder.orderId ? '...' : 'Cek Status'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      style={{ width: 'auto', minHeight: 0, padding: '8px 14px', fontSize: 13 }}
+                      onClick={() => setQrOrder(null)}
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
           {!me ? (
             <div className="card" style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 13 }}>
@@ -186,7 +290,7 @@ export default function ShopPage() {
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="section-title">Top-Up XP{myXp != null ? ` (kamu: ${myXp.toLocaleString('id-ID')} XP)` : ''}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-              XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS (Midtrans).
+              XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS (scan dari aplikasi bank / e-wallet).
             </div>
             <div className="title-grid">
               {(catalog?.xpPacks || []).map((p) => (
@@ -265,15 +369,14 @@ export default function ShopPage() {
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
                     {o.status === 'pending' ? (
                       <>
-                        {o.snapToken ? (
+                        {o.qrUrl || o.checkoutUrl ? (
                           <button
                             type="button"
                             className="btn"
                             style={{ width: 'auto', minHeight: 0, padding: '4px 10px', fontSize: 12 }}
-                            disabled={paying === o.orderId}
                             onClick={(e) => { e.stopPropagation(); payAgain(o); }}
                           >
-                            {paying === o.orderId ? '...' : 'Bayar'}
+                            Bayar
                           </button>
                         ) : null}
                         <button

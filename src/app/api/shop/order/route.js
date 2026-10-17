@@ -2,7 +2,7 @@ import { getDb } from '@/lib/db';
 import { checkRateCount } from '@/lib/rateLimit';
 import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
-  createSnapTransaction, countUserSlots, ensureShopTables, isShopEnabled,
+  createPaydisiniTransaction, countUserSlots, ensureShopTables, isShopEnabled,
 } from '@/lib/shop';
 import { countDisplayCards } from '@/lib/display';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -10,7 +10,7 @@ import { getIdempotencyKey, ensureIdempotencyTable, checkIdempotency, saveIdempo
 import { NextResponse } from 'next/server';
 
 // POST /api/shop/order { kind: 'xp', packId } | { kind: 'slot', qty }
-// Return { orderId, snapToken } untuk dibuka via Snap.js.
+// Return { orderId, qrUrl, qrContent, checkoutUrl, qrChannel } untuk QRIS.
 async function POST_impl(req, _ctx, session) {
   if (!isShopEnabled()) {
     return jsonFail('Shop belum dibuka.', 403);
@@ -56,26 +56,39 @@ async function POST_impl(req, _ctx, session) {
     } else {
       return jsonFail('Jenis order tidak dikenal.', 400);
     }
-    // order_id Midtrans = order_id kita (dipakai verifikasi webhook).
+    // unique_code PayDisini = order_id kita (dipakai verifikasi callback & cek status).
     const orderId = genMerchantOrderId();
-    const { token } = await createSnapTransaction({
+    const tx = await createPaydisiniTransaction({
       orderId,
-      grossAmount: amountIdr,
-      itemName,
-      username: session.username,
+      amount: amountIdr,
+      note: `${itemName} — ${session.username || 'Animein'}`,
     });
     const now = Date.now();
     await getDb().execute({
-      sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, snap_token, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
-      args: [orderId, String(session.id), String(session.username || ''), kind, ref, qty, amountIdr, xpAmount, token, now, now],
+      sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+      args: [orderId, String(session.id), String(session.username || ''), kind, ref, qty, amountIdr, xpAmount,
+        tx.payId, tx.qrUrl, tx.qrContent, tx.checkoutUrl, tx.channelName, now, now],
     });
-    const out = { success: true, orderId, snapToken: token };
+    const out = {
+      success: true,
+      orderId,
+      qrUrl: tx.qrUrl,
+      qrContent: tx.qrContent,
+      checkoutUrl: tx.checkoutUrl,
+      qrChannel: tx.channelName,
+    };
     if (idemKey) await saveIdempotency(db, idemKey, session.id, 'shop/order', 200, out);
-    return jsonOk({ orderId, snapToken: token });
+    return jsonOk({
+      orderId,
+      qrUrl: tx.qrUrl,
+      qrContent: tx.qrContent,
+      checkoutUrl: tx.checkoutUrl,
+      qrChannel: tx.channelName,
+    });
   } catch (e) {
     console.error('[SHOP ORDER]', e.message);
-    const msg = /MIDTRANS_SERVER_KEY/.test(e.message)
+    const msg = /PAYDISINI_API_KEY/.test(e.message)
       ? 'Pembayaran belum dikonfigurasi. Hubungi admin.'
       : 'Gagal membuat pembayaran. Coba lagi.';
     return jsonFail(msg, 500);

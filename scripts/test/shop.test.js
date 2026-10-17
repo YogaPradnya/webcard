@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT,
-  findPack, editsLeft, verifyWebhookSignature,
+  findPack, editsLeft, verifyPaydisiniCallbackSignature, genMerchantOrderId,
 } from '../../src/lib/shop.js';
 
 describe('shop katalog', () => {
@@ -27,18 +27,26 @@ describe('shop katalog', () => {
   });
 });
 
-describe('shop webhook signature', () => {
-  it('sha512(order+status+gross+key) valid vs palsu', () => {
-    const serverKey = 'SB-test-key-123';
-    const payload = { orderId: 'ANIMEIN-1', statusCode: '200', grossAmount: '5000' };
-    const sig = createHash('sha512')
-      .update(`${payload.orderId}${payload.statusCode}${payload.grossAmount}${serverKey}`)
+describe('shop webhook signature (PayDisini)', () => {
+  it('md5(key+unique_code+CallbackStatus) valid vs palsu', () => {
+    const apiKey = 'PD-test-key-123';
+    const uniqueCode = 'ANIMEIN-1';
+    const sig = createHash('md5')
+      .update(`${apiKey}${uniqueCode}CallbackStatus`)
       .digest('hex');
-    process.env.MIDTRANS_SERVER_KEY = serverKey;
-    assert.equal(verifyWebhookSignature({ ...payload, signature: sig }), true);
-    assert.equal(verifyWebhookSignature({ ...payload, signature: sig.toUpperCase() }), true);
-    assert.equal(verifyWebhookSignature({ ...payload, signature: 'palsu' }), false);
-    assert.equal(verifyWebhookSignature({ ...payload, grossAmount: '10000', signature: sig }), false);
-    delete process.env.MIDTRANS_SERVER_KEY;
+    process.env.PAYDISINI_API_KEY = apiKey;
+    assert.equal(verifyPaydisiniCallbackSignature({ key: apiKey, uniqueCode, signature: sig }), true);
+    assert.equal(verifyPaydisiniCallbackSignature({ key: apiKey, uniqueCode, signature: sig.toUpperCase() }), true);
+    assert.equal(verifyPaydisiniCallbackSignature({ key: apiKey, uniqueCode, signature: 'palsu' }), false);
+    assert.equal(verifyPaydisiniCallbackSignature({ key: 'key-lain', uniqueCode, signature: sig }), false);
+    assert.equal(verifyPaydisiniCallbackSignature({ key: apiKey, uniqueCode: 'ANIMEIN-2', signature: sig }), false);
+    delete process.env.PAYDISINI_API_KEY;
+    assert.equal(verifyPaydisiniCallbackSignature({ key: apiKey, uniqueCode, signature: sig }), false);
+  });
+  it('order id merchant muat di unique_code PayDisini (maks 32 char)', () => {
+    for (let i = 0; i < 20; i++) {
+      const id = genMerchantOrderId();
+      assert.ok(id.length <= 32, `order id terlalu panjang: ${id}`);
+    }
   });
 });

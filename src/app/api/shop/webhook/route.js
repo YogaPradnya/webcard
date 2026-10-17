@@ -1,26 +1,25 @@
 import {
-  verifyWebhookSignature, getOrder, setOrderStatus, fulfillPaidOrder, ensureShopTables,
+  verifyPaydisiniCallbackSignature, getOrder, setOrderStatus, fulfillPaidOrder, ensureShopTables,
 } from '@/lib/shop';
-import { apiHandler, jsonOk, jsonFail, parseJson, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
+import { apiHandler, jsonOk, jsonFail, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
-// POST /api/shop/webhook — notifikasi Midtrans (tanpa login, verifikasi signature).
-// Daftarkan URL ini di dashboard Midtrans: https://kartu.yogaa.web.id/api/shop/webhook
-// Pakai req.json biasa (signature ada di body.signature_key, bukan raw-body/header),
-// jadi aman dibungkus apiHandler auth:false. Midtrans hanya peduli status HTTP.
+// POST /api/shop/webhook — notifikasi PayDisini (tanpa login, verifikasi signature md5).
+// Daftarkan URL ini di Pengaturan Akun PayDisini: https://kartu.yogaa.web.id/api/shop/webhook
+// Body form-urlencoded: key, pay_id, unique_code, status, signature.
+// Balasan yang diharapkan PayDisini: {"success": true} — jsonOk() sudah bentuk ini.
 async function POST_impl(req) {
-  const { body, error: bodyErr } = await parseJson(req);
-  if (bodyErr) return jsonFail('Payload tidak valid.', 400);
-  const orderId = String(body.order_id || '');
-  const statusCode = String(body.status_code || '');
-  const grossAmount = String(body.gross_amount || '');
-  if (!orderId) return jsonFail('Payload tidak valid.', 400);
-  const valid = verifyWebhookSignature({
-    orderId,
-    statusCode,
-    grossAmount,
-    signature: String(body.signature_key || ''),
-  });
-  if (!valid) {
+  let form;
+  try {
+    form = await req.formData();
+  } catch {
+    return jsonFail('Payload tidak valid.', 400);
+  }
+  const orderId = String(form.get('unique_code') || '');
+  const status = String(form.get('status') || '');
+  const key = String(form.get('key') || '');
+  const signature = String(form.get('signature') || '');
+  if (!orderId || !status) return jsonFail('Payload tidak valid.', 400);
+  if (!verifyPaydisiniCallbackSignature({ key, uniqueCode: orderId, signature })) {
     console.warn('[SHOP WEBHOOK] Signature tidak valid:', orderId);
     return jsonFail('Signature tidak valid.', 403);
   }
@@ -28,25 +27,17 @@ async function POST_impl(req) {
     await ensureShopTables();
     const order = await getOrder(orderId);
     if (!order) return jsonOk({ ignored: true });
-    if (order.status !== 'pending') return jsonOk({ ignored: true });
-    // Cocokkan nominal agar order tidak bisa dimanipulasi.
-    if (Number(grossAmount) !== Number(order.amountIdr)) {
-      console.warn('[SHOP WEBHOOK] Nominal beda:', orderId, grossAmount, order.amountIdr);
-      return jsonOk({ ignored: true });
-    }
-    const tx = String(body.transaction_status || '');
-    const fraud = String(body.fraud_status || '');
-    if (tx === 'capture' || tx === 'settlement') {
-      if (tx === 'capture' && fraud === 'challenge') {
-        return jsonOk({ ignored: true });
-      }
-      const r = await fulfillPaidOrder(order, { paymentType: body.payment_type });
+    // Anti double-kirim: order yang sudah paid/failed diabaikan.
+    if (order.status !== 'pending' && order.status !== 'expired') return jsonOk({ ignored: true });
+    if (status === 'Success') {
+      // PayDisini tidak mengirim nominal di callback; amount sudah dipatok saat
+      // pembuatan transaksi (unique_code = order_id kita), jadi tidak bisa dimanipulasi.
+      const r = await fulfillPaidOrder(order, { paymentType: order.payChannel });
       if (!r.fulfilled) console.warn('[SHOP WEBHOOK] Gagal penuhi:', orderId, r.reason);
       return jsonOk();
     }
-    if (tx === 'pending') return jsonOk();
-    if (['deny', 'cancel', 'expire', 'failure'].includes(tx)) {
-      await setOrderStatus(orderId, tx === 'expire' ? 'expired' : 'failed');
+    if (status === 'Canceled') {
+      if (order.status === 'pending') await setOrderStatus(orderId, 'failed');
       return jsonOk();
     }
     return jsonOk({ ignored: true });
@@ -56,5 +47,5 @@ async function POST_impl(req) {
   }
 }
 
-// Tanpa auth (verifikasi signature Midtrans); batas hang via apiHandler.
+// Tanpa auth (verifikasi signature PayDisini); batas hang via apiHandler.
 export const POST = apiHandler(POST_impl, { auth: false, timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/shop/webhook/route.js' });

@@ -6,10 +6,10 @@ import { cleanHex } from './color.js';
 import { DISPLAY_BORDERS } from './constants.js';
 
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
-// Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Midtrans.
+// Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via PayDisini.
 
 // Feature flag Shop: tampil hanya bila NEXT_PUBLIC_SHOP_ENABLED=true.
-// Matikan (default) sampai key production Midtrans siap, agar fitur
+// Matikan (default) sampai key production PayDisini siap, agar fitur
 // pembayaran tidak terlihat publik. Nyalakan lokal untuk tes.
 export function isShopEnabled() {
   return String(process.env.NEXT_PUBLIC_SHOP_ENABLED || '').toLowerCase() === 'true';
@@ -40,102 +40,130 @@ export function editsLeft(slot) {
   return Math.max(0, MAX_EDITS_PER_SLOT - (Number(slot?.edits_used) || 0));
 }
 
-function isProduction() {
-  return String(process.env.MIDTRANS_IS_PRODUCTION || 'false').toLowerCase() === 'true';
+// ---- PayDisini (https://payment.paydisini.co.id/docs) ----
+// Satu endpoint untuk semua request; body form-urlencoded + signature md5.
+// Channel default: 11 = QRIS Merchant PayDisini (fee 0.7%, min Rp100, maks Rp10jt).
+const PAYDISINI_API_URL = 'https://api.paydisini.co.id/v1/';
+export const PAYDISINI_DEFAULT_SERVICE = '11';
+
+export function paydisiniApiKey() {
+  return String(process.env.PAYDISINI_API_KEY || '').trim();
 }
 
-export function midtransBaseUrl() {
-  return isProduction() ? 'https://app.midtrans.com' : 'https://app.sandbox.midtrans.com';
+export function paydisiniServiceId() {
+  return String(process.env.PAYDISINI_SERVICE || '').trim() || PAYDISINI_DEFAULT_SERVICE;
 }
 
-export function snapJsUrl() {
-  return `${midtransBaseUrl()}/snap/snap.js`;
+// 1 = fee ditanggung customer, 2 = fee ditanggung merchant (harga katalog tetap).
+export function paydisiniTypeFee() {
+  return String(process.env.PAYDISINI_TYPE_FEE || '').trim() === '1' ? '1' : '2';
 }
 
-export function isMidtransConfigured() {
-  return Boolean(process.env.MIDTRANS_SERVER_KEY) && Boolean(process.env.MIDTRANS_CLIENT_KEY);
+export function isPaydisiniConfigured() {
+  return Boolean(paydisiniApiKey());
 }
 
-// Buat transaksi Snap. Return { token, redirectUrl }.
-export async function createSnapTransaction({ orderId, grossAmount, itemName, username }) {
-  const serverKey = process.env.MIDTRANS_SERVER_KEY || '';
-  if (!serverKey) throw new Error('MIDTRANS_SERVER_KEY belum diisi');
-  const res = await fetch(`${midtransBaseUrl()}/snap/v1/transactions`, {
+function md5(s) {
+  return createHash('md5').update(String(s)).digest('hex');
+}
+
+// valid_time PayDisini: 300-10800 detik; disamakan dengan TTL order.
+export function paydisiniValidTimeSec() {
+  const sec = Math.ceil(ORDER_PENDING_TTL_MS / 1000);
+  return Math.min(10800, Math.max(300, sec));
+}
+
+async function paydisiniPost(params) {
+  const res = await fetch(PAYDISINI_API_URL, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
-      Authorization: `Basic ${Buffer.from(`${serverKey}:`).toString('base64')}`,
     },
-    body: JSON.stringify({
-      transaction_details: { order_id: orderId, gross_amount: grossAmount },
-      // Daftar channel diatur di dashboard Midtrans (Snap Checkout > Payment methods):
-      // nyalakan HANYA GoPay/GoPay Later (Always show QRIS) + Other QRIS,
-      // matikan VA, kartu, retail, dsb. Tanpa enabled_payments agar ikut dashboard.
-      item_details: [{ id: orderId, price: grossAmount, quantity: 1, name: String(itemName).slice(0, 50) }],
-      customer_details: { first_name: String(username || 'Animein').slice(0, 50) },
-    }),
+    body: new URLSearchParams(params).toString(),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.token) {
-    const msg = Array.isArray(data?.error_messages) ? data.error_messages.join('; ') : data?.message;
-    throw new Error(msg || `Midtrans ${res.status}`);
+  if (!res.ok || !data.success) {
+    throw new Error(String(data?.msg || `PayDisini ${res.status}`));
   }
-  return { token: data.token, redirectUrl: data.redirect_url || null };
-}
-
-// Verifikasi signature webhook: sha512(order_id + status_code + gross_amount + serverKey).
-export function verifyWebhookSignature({ orderId, statusCode, grossAmount, signature }, serverKey) {
-  const raw = `${orderId}${statusCode}${grossAmount}${serverKey || process.env.MIDTRANS_SERVER_KEY || ''}`;
-  const expected = createHash('sha512').update(raw).digest('hex');
-  return expected === String(signature || '').toLowerCase();
-}
-
-export function midtransApiBaseUrl() {
-  return isProduction() ? 'https://api.midtrans.com' : 'https://api.sandbox.midtrans.com';
-}
-
-// Ambil status transaksi langsung dari Midtrans (dipakai tombol "Cek Status"
-// dan sinkronisasi otomatis — penting untuk localhost yang tak terjangkau webhook).
-export async function fetchTransactionStatus(orderId) {
-  const serverKey = process.env.MIDTRANS_SERVER_KEY || '';
-  if (!serverKey) throw new Error('MIDTRANS_SERVER_KEY belum diisi');
-  const res = await fetch(`${midtransApiBaseUrl()}/v2/${encodeURIComponent(String(orderId))}/status`, {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Basic ${Buffer.from(`${serverKey}:`).toString('base64')}`,
-    },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.status_message || `Midtrans ${res.status}`);
   return data;
 }
 
-// Sinkronkan 1 order ke status Midtrans + penuhi bila lunas.
-// Pemaaf: order 'expired' yang ternyata settlement di Midtrans tetap dipenuhi
+// Buat transaksi baru. Return data untuk ditampilkan (QR) + disimpan.
+export async function createPaydisiniTransaction({ orderId, amount, note }) {
+  const key = paydisiniApiKey();
+  if (!key) throw new Error('PAYDISINI_API_KEY belum diisi');
+  const code = String(orderId).slice(0, 32); // unique_code maks 32 karakter
+  const service = paydisiniServiceId();
+  const amountStr = String(Math.round(Number(amount) || 0));
+  const validTime = String(paydisiniValidTimeSec());
+  const signature = md5(`${key}${code}${service}${amountStr}${validTime}NewTransaction`);
+  const data = await paydisiniPost({
+    key,
+    request: 'new',
+    unique_code: code,
+    service,
+    amount: amountStr,
+    note: String(note || 'Pembayaran Animein').slice(0, 250),
+    valid_time: validTime,
+    type_fee: paydisiniTypeFee(),
+    callback_count: '3',
+    signature,
+  });
+  const d = data.data || {};
+  return {
+    payId: String(d.pay_id || ''),
+    qrContent: String(d.qr_content || ''),
+    qrUrl: String(d.qrcode_url || ''),
+    checkoutUrl: String(d.checkout_url_v3 || d.checkout_url_v2 || d.checkout_url || ''),
+    channelName: String(d.service_name || '').trim(),
+    status: String(d.status || 'Pending'),
+  };
+}
+
+// Verifikasi signature callback: md5(key + unique_code + 'CallbackStatus'),
+// plus pastikan `key` yang dikirim memang API key kita.
+export function verifyPaydisiniCallbackSignature({ key, uniqueCode, signature }) {
+  const apiKey = paydisiniApiKey();
+  if (!apiKey) return false;
+  if (String(key || '') !== apiKey) return false;
+  const expected = md5(`${apiKey}${uniqueCode}CallbackStatus`);
+  return expected === String(signature || '').toLowerCase();
+}
+
+// Ambil status transaksi langsung dari PayDisini (dipakai tombol "Cek Status"
+// dan sinkronisasi otomatis — penting untuk localhost yang tak terjangkau callback).
+export async function fetchPaydisiniStatus(uniqueCode) {
+  const key = paydisiniApiKey();
+  if (!key) throw new Error('PAYDISINI_API_KEY belum diisi');
+  const code = String(uniqueCode);
+  const signature = md5(`${key}${code}StatusTransaction`);
+  return paydisiniPost({ key, request: 'status', unique_code: code, signature });
+}
+
+// Sinkronkan 1 order ke status PayDisini + penuhi bila lunas.
+// Pemaaf: order 'expired' yang ternyata Success di PayDisini tetap dipenuhi
 // (anti double-kirim: status langsung jadi 'paid', sync berikutnya diabaikan).
 // Return { status: 'paid'|'pending'|'failed'|'expired'|'unknown', reason? }.
-export async function syncOrderFromMidtrans(orderId) {
+export async function syncOrderFromPaydisini(orderId) {
   const order = await getOrder(orderId);
   if (!order) return { status: 'unknown' };
   if (order.status !== 'pending' && order.status !== 'expired') return { status: order.status };
-  const st = await fetchTransactionStatus(orderId);
-  const tx = String(st.transaction_status || '');
-  if (tx === 'capture' || tx === 'settlement') {
-    if (tx === 'capture' && String(st.fraud_status) === 'challenge') return { status: 'pending' };
-    const r = await fulfillPaidOrder(order, { paymentType: st.payment_type });
+  // Order lama (era Midtrans) tidak punya transaksi di PayDisini.
+  if (!order.payId && !order.qrUrl) return { status: order.status };
+  const st = await fetchPaydisiniStatus(orderId);
+  const status = String(st?.data?.status || '');
+  const channel = String(st?.service?.name || st?.data?.service_name || '');
+  if (status === 'Success') {
+    const r = await fulfillPaidOrder(order, { paymentType: channel });
     if (!r.fulfilled && r.reason !== 'bukan pending/expired') return { status: order.status, reason: r.reason };
     return { status: 'paid' };
   }
-  if (tx === 'pending') return { status: 'pending' };
-  if (['deny', 'cancel', 'failure'].includes(tx)) {
+  if (status === 'Canceled') {
     await setOrderStatus(orderId, 'failed');
     return { status: 'failed' };
   }
-  if (tx === 'expire') {
-    await setOrderStatus(orderId, 'expired');
-    return { status: 'expired' };
-  }
+  if (status === 'Pending') return { status: 'pending' };
   return { status: order.status };
 }
 
@@ -162,13 +190,23 @@ export async function ensureShopTables() {
       paid_at INTEGER DEFAULT 0,
       payment_type TEXT DEFAULT '',
       created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
+      updated_at INTEGER NOT NULL,
+      pay_id TEXT DEFAULT '',
+      qr_url TEXT DEFAULT '',
+      qr_content TEXT DEFAULT '',
+      checkout_url TEXT DEFAULT '',
+      pay_channel TEXT DEFAULT ''
     )
   `);
   await db.execute('CREATE INDEX IF NOT EXISTS idx_shop_orders_user ON shop_orders (user_id, created_at DESC)');
-  // Detail pembayaran (best-effort untuk DB lama).
+  // Kolom tambahan (best-effort untuk DB lama).
   try { await db.execute('ALTER TABLE shop_orders ADD COLUMN paid_at INTEGER DEFAULT 0'); } catch { /* sudah ada */ }
   try { await db.execute('ALTER TABLE shop_orders ADD COLUMN payment_type TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN pay_id TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN qr_url TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN qr_content TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN checkout_url TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
+  try { await db.execute('ALTER TABLE shop_orders ADD COLUMN pay_channel TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
   await db.execute(`
     CREATE TABLE IF NOT EXISTS user_display_slots (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -188,15 +226,16 @@ export async function ensureShopTables() {
   try { await db.execute('ALTER TABLE user_display_slots ADD COLUMN description TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
 }
 
-export async function createOrder({ userId, username, kind, ref, qty, amountIdr, xpAmount, snapToken }) {
+export async function createOrder({ userId, username, kind, ref, qty, amountIdr, xpAmount, pay = {} }) {
   const db = getDb();
   await ensureShopTables();
   const orderId = genMerchantOrderId();
   const now = Date.now();
   await db.execute({
-    sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, snap_token, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`,
-    args: [orderId, String(userId), String(username || ''), kind, String(ref || ''), Number(qty) || 1, amountIdr, xpAmount || 0, snapToken || null, now, now],
+    sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
+    args: [orderId, String(userId), String(username || ''), kind, String(ref || ''), Number(qty) || 1, amountIdr, xpAmount || 0,
+      pay.payId || '', pay.qrUrl || '', pay.qrContent || '', pay.checkoutUrl || '', pay.channelName || '', now, now],
   });
   return orderId;
 }
@@ -215,6 +254,9 @@ export async function getOrder(orderId) {
     amountIdr: Number(r.amount_idr) || 0,
     xpAmount: Number(r.xp_amount) || 0,
     status: String(r.status),
+    payId: String(r.pay_id || ''),
+    qrUrl: String(r.qr_url || ''),
+    payChannel: String(r.pay_channel || ''),
   };
 }
 
@@ -237,7 +279,7 @@ export async function expireStalePendingOrders(userId) {
 
 export async function listUserOrders(userId, limit = 10) {
   const res = await getDb().execute({
-    sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, snap_token, paid_at, payment_type, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, paid_at, payment_type, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
     args: [String(userId), Math.min(20, Math.max(1, Number(limit) || 10))],
   });
   return (res.rows || []).map((r) => ({
@@ -248,7 +290,11 @@ export async function listUserOrders(userId, limit = 10) {
     amountIdr: Number(r.amount_idr) || 0,
     xpAmount: Number(r.xp_amount) || 0,
     status: String(r.status),
-    snapToken: r.snap_token || null,
+    payId: String(r.pay_id || ''),
+    qrUrl: String(r.qr_url || ''),
+    qrContent: String(r.qr_content || ''),
+    checkoutUrl: String(r.checkout_url || ''),
+    payChannel: String(r.pay_channel || ''),
     paidAt: Number(r.paid_at) || 0,
     paymentType: String(r.payment_type || ''),
     createdAt: Number(r.created_at) || 0,
@@ -277,9 +323,9 @@ export async function countUserSlots(userId) {
 }
 
 // Penuhi order yang sudah dibayar (idempoten).
-// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Midtrans
-// bilang lunas padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
-// payment: { paymentType } dari Midtrans (disimpan untuk detail transaksi).
+// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: PayDisini
+// bilang Success padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
+// payment: { paymentType } dari PayDisini (nama channel, disimpan untuk detail transaksi).
 // Return { fulfilled: true } atau { fulfilled: false, reason }.
 export async function fulfillPaidOrder(order, payment = {}) {
   const db = getDb();
@@ -310,7 +356,7 @@ export async function fulfillPaidOrder(order, payment = {}) {
   try {
     await db.execute({
       sql: 'UPDATE shop_orders SET paid_at = ?, payment_type = ? WHERE order_id = ?',
-      args: [Date.now(), String(payment.paymentType || ''), fresh.orderId],
+      args: [Date.now(), String(payment.paymentType || fresh.payChannel || 'QRIS'), fresh.orderId],
     });
   } catch { /* kolom lama: abaikan, status paid tetap sah */ }
   return { fulfilled: true };
