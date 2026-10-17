@@ -717,6 +717,67 @@
   text-align: center;
 }
 
+/* ===== Konversi: baris kartu + stepper (rapi di HP) ===== */
+.convert-row {
+  gap: 10px;
+}
+
+.convert-row > img {
+  flex-shrink: 0;
+}
+
+.convert-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.convert-name {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.convert-meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.convert-row .stepper .btn {
+  width: 36px;
+  min-height: 36px;
+}
+
+.convert-row .stepper-val {
+  min-width: 48px;
+}
+
+@media (max-width: 720px) {
+  .convert-row {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  /* Stepper pindah ke baris kedua, rata kanan — nama kartu dapat ruang penuh */
+  .convert-row .stepper {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+
+  .convert-row .stepper .btn {
+    width: 44px;
+    min-height: 40px;
+  }
+
+  .convert-row .stepper-val {
+    min-width: 64px;
+  }
+}
+
 /* ===== Ilustrasi menunggu battle ===== */
 .waiting-card {
   text-align: center;

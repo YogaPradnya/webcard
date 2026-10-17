@@ -21,6 +21,7 @@ export default function ConvertPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [query, setQuery] = useState('');
+  const [onlyDupes, setOnlyDupes] = useState(false); // filter: hanya kartu dengan >1 copy
 
   async function load() {
     setError('');
@@ -45,11 +46,16 @@ export default function ConvertPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
+  const dupeCount = useMemo(() => cards.filter((c) => (c.quantity || 0) > 1).length, [cards]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return cards;
-    return cards.filter((c) => `${c.name} ${c.tier}`.toLowerCase().includes(q));
-  }, [cards, query]);
+    return cards.filter((c) => {
+      if (onlyDupes && (c.quantity || 0) <= 1) return false;
+      if (q && !`${c.name} ${c.tier}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [cards, query, onlyDupes]);
 
   function setQty(c, qty) {
     const key = c.name.toLowerCase();
@@ -131,30 +137,45 @@ export default function ConvertPage() {
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label="Cari kartu"
               />
+              <button
+                type="button"
+                className={onlyDupes ? 'chip active' : 'chip'}
+                onClick={() => setOnlyDupes((v) => !v)}
+                aria-pressed={onlyDupes}
+              >
+                Duplikat (&gt;1){dupeCount > 0 ? ` • ${dupeCount}` : ''}
+              </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               {filtered.map((c) => {
                 const q = pick[c.name.toLowerCase()] || 0;
                 return (
-                  <div className="user-row" key={c.name}>
+                  <div className="user-row convert-row" key={c.name}>
                     {c.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={optImg(c.imageUrl, 100)} alt={c.name} width={36} height={48} style={{ objectFit: 'cover', borderRadius: 6 }} loading="lazy" />
                     ) : null}
-                    <span style={{ flex: 1 }}>
-                      <b>{c.name}</b> <span style={{ color: 'var(--muted)', fontSize: 12 }}>[{c.tier}] x{c.quantity} • {RATES[c.tier] || 0} XP</span>
-                      {c.showcase ? <span className="stat-tag showcase" style={{ marginLeft: 6 }}>Pajangan</span> : null}
+                    <span className="convert-info">
+                      <b className="convert-name">{c.name}</b>
+                      <span className="convert-meta">
+                        [{c.tier}] x{c.quantity} • {RATES[c.tier] || 0} XP
+                        {c.showcase ? <span className="stat-tag showcase" style={{ marginLeft: 6 }}>Pajangan</span> : null}
+                      </span>
                     </span>
                     <span className="stepper">
-                      <button type="button" className="btn btn-ghost" style={{ width: 36, minHeight: 36 }} disabled={q <= 0} onClick={() => setQty(c, q - 1)} aria-label="Kurangi">-</button>
-                      <span className="stepper-val" style={{ minWidth: 48 }}>{q}/{c.quantity}</span>
-                      <button type="button" className="btn btn-ghost" style={{ width: 36, minHeight: 36 }} disabled={q >= c.quantity} onClick={() => setQty(c, q + 1)} aria-label="Tambah">+</button>
+                      <button type="button" className="btn btn-ghost" disabled={q <= 0} onClick={() => setQty(c, q - 1)} aria-label="Kurangi">-</button>
+                      <span className="stepper-val">{q}/{c.quantity}</span>
+                      <button type="button" className="btn btn-ghost" disabled={q >= c.quantity} onClick={() => setQty(c, q + 1)} aria-label="Tambah">+</button>
                     </span>
                   </div>
                 );
               })}
             </div>
-            {filtered.length === 0 ? <div style={{ fontSize: 13 }}>Tidak ada kartu cocok.</div> : null}
+            {filtered.length === 0 ? (
+              <div style={{ fontSize: 13 }}>
+                {onlyDupes ? 'Tidak ada kartu dengan lebih dari 1 copy.' : 'Tidak ada kartu cocok.'}
+              </div>
+            ) : null}
           </div>
 
           <div style={{ height: 90 }} />
