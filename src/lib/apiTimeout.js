@@ -6,10 +6,30 @@
 // 503 + bisa retry, bukan menggantung koneksi selamanya. Pekerjaan yang
 // sudah terlanjur jalan di background tetap selesai sendiri (best-effort).
 // JANGAN dipakai untuk SSE/stream (koneksi memang panjang).
-// Untuk POST mutasi (pull/claim/order) pakai batas longgar (45 dtk) agar
-// tidak memotong transaksi yang sah; klien TIDAK auto-retry POST.
-export function withTimeout(handler, ms = 15000, label = 'API') {
+//
+// ATURAN: timeout server HARUS lebih pendek dari timeout klien, supaya 503
+// rapi ("Server sibuk, coba lagi.") sempat terkirim sebelum klien menyerah.
+// Klien: fetchJson default 12 dtk, battle GET 10 dtk / POST 20 dtk,
+// upload gambar 30 dtk (lihat web-cards/src/app + lib/fetchJson.js).
+export const READ_TIMEOUT_MS = 9000; // < 10 dtk (GET battle) & 12 dtk (default klien)
+export const WRITE_TIMEOUT_MS = 10000; // < 12 dtk (POST default klien)
+export const UPLOAD_TIMEOUT_MS = 25000; // khusus upload Cloudinary (< 30 dtk klien)
+
+// Request lebih lambat dari ini dicatat server-side (bukti untuk investigasi
+// latency; insiden 17 Okt: p95 8 dtk tidak kelihatan sampai log platform dibaca).
+const SLOW_LOG_MS = 2000;
+
+function safePath(req) {
+  try {
+    return new URL(req?.url || '', 'http://local').pathname;
+  } catch {
+    return '';
+  }
+}
+
+export function withTimeout(handler, ms = READ_TIMEOUT_MS, label = 'API') {
   return async (req, ctx) => {
+    const t0 = Date.now();
     let timer = null;
     try {
       const res = await Promise.race([
@@ -22,6 +42,10 @@ export function withTimeout(handler, ms = 15000, label = 'API') {
           }, ms);
         }),
       ]);
+      const elapsed = Date.now() - t0;
+      if (elapsed >= SLOW_LOG_MS) {
+        console.warn(`[SLOW ${label}] ${elapsed}ms ${safePath(req)}${res?.status ? ` -> ${res.status}` : ''}`);
+      }
       return res;
     } catch (e) {
       if (e?.code === 'API_TIMEOUT') {
@@ -34,6 +58,3 @@ export function withTimeout(handler, ms = 15000, label = 'API') {
     }
   };
 }
-
-export const READ_TIMEOUT_MS = 15000;
-export const WRITE_TIMEOUT_MS = 45000;

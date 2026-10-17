@@ -11,6 +11,14 @@ let _migrations = null;
 let _schemaReady = false;
 let _bootPromise = null;
 
+// PENTING (insiden 17 Okt): webpack/Next memberi bundle TERPISAH untuk
+// instrumentation.js dan tiap route — `_schemaReady` yang diset instrumentation
+// TIDAK terlihat oleh salinan modul di route, sehingga semua ensure* mengira
+// skema belum siap dan menjalankan DDL fallback (CREATE/ALTER berurutan ~1 dtk
+// per statement ke Turso Tokyo) di SETIAP request. Itu biang p95 8-10 dtk.
+// Solusi: simpan status ready di globalThis (per proses, lintas bundle).
+const GLOBAL_READY_KEY = '__animeinSchemaReadyV1';
+
 function migrationsDir() {
   // cwd = root web-cards saat `next start`, `npm run migrate`, dan `npm test`.
   const fromCwd = path.join(process.cwd(), 'db', 'migrations');
@@ -147,19 +155,27 @@ export async function applyMigrations(db) {
 }
 
 export function isSchemaReady() {
-  return _schemaReady;
+  if (_schemaReady) return true;
+  try {
+    if (globalThis[GLOBAL_READY_KEY] === true) {
+      _schemaReady = true; // cache lokal agar cek berikutnya gratis
+      return true;
+    }
+  } catch { /* lingkungan aneh -> anggap belum siap */ }
+  return false;
 }
 
 export function markSchemaReady() {
   _schemaReady = true;
+  try { globalThis[GLOBAL_READY_KEY] = true; } catch { /* abaikan */ }
 }
 
 // Dipakai saat boot (instrumentation): kejar migrasi bila tertinggal,
 // tandai ready bila versi DB >= versi file. Gagal -> log loud, situs tetap
 // hidup via fallback ensure* (fail-safe, lihat SCHEMA_OWNERSHIP).
 export async function initSchemaOnBoot() {
-  if (_schemaReady) return true;
-  if (_bootPromise) { await _bootPromise; return _schemaReady; }
+  if (isSchemaReady()) return true;
+  if (_bootPromise) { await _bootPromise; return isSchemaReady(); }
   _bootPromise = (async () => {
     try {
       const db = getDb();
@@ -178,7 +194,7 @@ export async function initSchemaOnBoot() {
     }
   })();
   await _bootPromise;
-  return _schemaReady;
+  return isSchemaReady();
 }
 
 // Validasi eksplisit untuk skrip/tooling. Return { ok, db, expected }.

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSessionFromRequest } from './session.js';
-import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from './apiTimeout.js';
+import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS, UPLOAD_TIMEOUT_MS } from './apiTimeout.js';
 
-export { READ_TIMEOUT_MS, WRITE_TIMEOUT_MS };
+export { READ_TIMEOUT_MS, WRITE_TIMEOUT_MS, UPLOAD_TIMEOUT_MS };
 
 export function jsonOk(data = {}) {
   return NextResponse.json({ success: true, ...data });

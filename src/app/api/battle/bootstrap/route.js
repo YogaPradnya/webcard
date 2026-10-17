@@ -5,7 +5,8 @@ import {
   WAITING_TTL_MS,
   FORFEIT_TIMEOUT_MS,
   forfeitMsLeft,
-  cleanupExpiredWaitingRooms,
+  maybeCleanupRooms,
+  mineRoomsStmt,
 } from '@/lib/rooms';
 
 export const dynamic = 'force-dynamic';
@@ -17,12 +18,10 @@ export const runtime = 'nodejs';
 const PAGE_SIZE = 10;
 
 // Gabungan /rooms + /mine dalam 1 request (hemat separuh request idle lobby).
-// Cache list publik 10 dtk + cleanup throttle 60 dtk (sama seperti rooms).
+// Cache list publik 10 dtk + cleanup throttle global (lib/rooms).
 // Bagian mine user-specific TIDAK di-cache.
 const _roomsCache = new Map(); // `${q}|${page}` -> { at, payload }
 const ROOMS_TTL_MS = 10 * 1000;
-let _lastCleanupAt = 0;
-const CLEANUP_MIN_GAP_MS = 60 * 1000;
 
 // GET /api/battle/bootstrap?q=&page= — { rooms, pagination, q, mine }.
 async function GET_impl(req, _ctx, session) {
@@ -34,10 +33,7 @@ async function GET_impl(req, _ctx, session) {
   try {
     await ensureBattleRooms();
     const now = Date.now();
-    if (now - _lastCleanupAt > CLEANUP_MIN_GAP_MS) {
-      _lastCleanupAt = now;
-      await cleanupExpiredWaitingRooms(now);
-    }
+    await maybeCleanupRooms(now);
     const minCreated = now - WAITING_TTL_MS;
 
     // ---- rooms publik (cache 10 dtk) ----
@@ -57,33 +53,24 @@ async function GET_impl(req, _ctx, session) {
       }));
       pagination = hit.payload.pagination;
       // Cache hit: tinggal mine (1 round-trip).
-      const only = await getDb().execute({
-        sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
-            FROM battle_rooms WHERE (p1_id = ? OR p2_id = ?) AND status IN ('waiting','ongoing')
-            ORDER BY updated_at DESC LIMIT 5`,
-        args: [String(session.id), String(session.id)],
-      });
+      const only = await getDb().execute(mineRoomsStmt(session.id, now));
       mineRows = only.rows;
     } else {
-    // COUNT + SELECT + mine dalam 1 round-trip (dulu 3 sequential ke Tokyo).
+    // COUNT + SELECT + mine paralel via execute (JANGAN db.batch: patologi
+    // Turso 17 Okt = batch statement puluhan detik per statement).
       const like = `%${q}%`;
       const where = q
         ? `WHERE mode = 'pvp' AND status = 'waiting' AND created_at >= ? AND (p1_username LIKE ? OR code LIKE ?)`
         : `WHERE mode = 'pvp' AND status = 'waiting' AND created_at >= ?`;
       const args = q ? [minCreated, like, like] : [minCreated];
-      const [countRes, res, mineRes] = await getDb().batch([
-        { sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`, args },
-        {
+      const [countRes, res, mineRes] = await Promise.all([
+        getDb().execute({ sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`, args }),
+        getDb().execute({
           sql: `SELECT code, p1_id, p1_username, created_at FROM battle_rooms ${where}
               ORDER BY created_at DESC LIMIT ? OFFSET ?`,
           args: [...args, PAGE_SIZE, offset],
-        },
-        {
-          sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
-            FROM battle_rooms WHERE (p1_id = ? OR p2_id = ?) AND status IN ('waiting','ongoing')
-            ORDER BY updated_at DESC LIMIT 5`,
-          args: [String(session.id), String(session.id)],
-        },
+        }),
+        getDb().execute(mineRoomsStmt(session.id, now)),
       ]);
       const total = Number(countRes.rows[0]?.total || 0);
       pagination = { page, limit: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };

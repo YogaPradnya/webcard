@@ -29,17 +29,19 @@ async function GET_impl(req, _ctx, session) {
       : 'WHERE expires_at > ?';
     const args = q ? [now, like, like, like] : [now];
 
-    // Cleanup + COUNT + SELECT dalam 1 round-trip (dulu 4 sequential ke Tokyo).
-    const [, , countRes, res] = await db.batch([
-      { sql: 'DELETE FROM trade_offer_items WHERE code NOT IN (SELECT code FROM trade_offers WHERE expires_at > ?)', args: [now] },
-      { sql: 'DELETE FROM trade_offers WHERE expires_at <= ?', args: [now] },
-      { sql: `SELECT COUNT(*) AS total FROM trade_offers ${where}`, args },
-      {
+    // Cleanup + COUNT + SELECT paralel via execute (JANGAN db.batch: patologi
+    // Turso 17 Okt = batch statement puluhan detik per statement).
+    // Keempat statement saling lepas: WHERE-nya sudah mengecualikan baris kedaluwarsa.
+    const [, , countRes, res] = await Promise.all([
+      db.execute({ sql: 'DELETE FROM trade_offer_items WHERE code NOT IN (SELECT code FROM trade_offers WHERE expires_at > ?)', args: [now] }),
+      db.execute({ sql: 'DELETE FROM trade_offers WHERE expires_at <= ?', args: [now] }),
+      db.execute({ sql: `SELECT COUNT(*) AS total FROM trade_offers ${where}`, args }),
+      db.execute({
         sql: `SELECT code, owner_id, owner_username, char_name, rarity, expires_at, amount
             FROM trade_offers ${where}
             ORDER BY rowid DESC LIMIT ? OFFSET ?`,
         args: [...args, PAGE_SIZE, offset],
-      },
+      }),
     ]);
     const total = Number(countRes.rows[0]?.total || 0);
     const codes = res.rows.map((r) => String(r.code));

@@ -1,6 +1,6 @@
 import { checkRateCount } from '@/lib/rateLimit';
 import { uploadSlotImage, MAX_UPLOAD_BYTES, ALLOWED_UPLOAD_MIME } from '@/lib/cloudinary';
-import { apiHandler, jsonOk, jsonFail, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
+import { apiHandler, jsonOk, jsonFail, UPLOAD_TIMEOUT_MS } from '@/lib/apiHandler';
 
 // POST /api/shop/slot/image (multipart form-data, field "file")
 // Upload gambar ke Cloudinary, return { imageUrl }. Tidak makan jatah ubah
@@ -43,4 +43,5 @@ async function POST_impl(req, _ctx, session) {
 }
 
 // Auth + batas hang server via apiHandler (penjaga Turso menggantung).
-export const POST = apiHandler(POST_impl, { timeout: WRITE_TIMEOUT_MS, tag: 'src/app/api/shop/slot/image/route.js' });
+// Upload Cloudinary bisa lebih lama dari write biasa -> timeout khusus 25 dtk.
+export const POST = apiHandler(POST_impl, { timeout: UPLOAD_TIMEOUT_MS, tag: 'src/app/api/shop/slot/image/route.js' });

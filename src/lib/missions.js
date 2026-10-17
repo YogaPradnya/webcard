@@ -79,7 +79,10 @@ export async function recordEvent(userId, username, event, n = 1) {
         args: [String(userId), String(username)],
       });
     }
-    if (stmts.length > 0) await db.batch(stmts);
+    // JANGAN db.batch: patologi Turso (insiden 17 Okt) = batch tulis/multi
+    // statement ~30-45 dtk per statement (timeout 503). execute tunggal
+    // ~0,5-1 dtk; dijalankan paralel karena upsert-nya independen.
+    if (stmts.length > 0) await Promise.all(stmts.map((s) => db.execute(s)));
   } catch { /* misi non-kritis: jangan gagalkan game */ }
 }
 

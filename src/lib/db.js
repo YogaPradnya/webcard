@@ -12,6 +12,27 @@ export function getDb() {
   return client;
 }
 
+// Turso (insiden 17 Okt): transaksi TULIS pertama per client bisa macet
+// 12-35 dtk (akuisisi write-lock pertama); transaksi berikutnya <1 dtk.
+// Satu-satunya pemakai transaction() adalah trade (butuh all-or-nothing),
+// jadi panaskan sekali saat boot agar user tidak kena stall.
+let _warmPromise = null;
+export function warmWriteTxOnce() {
+  if (_warmPromise) return _warmPromise;
+  _warmPromise = (async () => {
+    try {
+      const tx = await getDb().transaction('write');
+      // Tulis nyata tapi aman (nilai sama) — no-op mungkin tak ambil write-lock.
+      await tx.execute('INSERT OR REPLACE INTO schema_version (version, applied_at) SELECT version, applied_at FROM schema_version');
+      await tx.commit();
+      console.log('[DB] warm-up write tx selesai');
+    } catch (e) {
+      console.error('[DB] warm-up write tx gagal (abaikan):', String(e?.message || e));
+    }
+  })();
+  return _warmPromise;
+}
+
 export async function readSetting(key) {
   try {
     const res = await getDb().execute({ sql: 'SELECT value FROM settings WHERE key = ?', args: [key] });

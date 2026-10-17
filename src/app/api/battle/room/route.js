@@ -15,7 +15,7 @@ import {
   publicState,
   isWaitingExpired,
   deleteRoom,
-  cleanupExpiredWaitingRooms,
+  maybeCleanupRooms,
 } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
 import { apiHandler, jsonOk, jsonFail, parseJson, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -85,7 +85,7 @@ async function POST_impl(req, _ctx, session) {
 
   try {
     await ensureBattleRooms();
-    await cleanupExpiredWaitingRooms(Date.now());
+    await maybeCleanupRooms(Date.now());
     const db = getDb();
     const err = await validateTeam(db, session.id, body.team);
     if (err) return jsonFail(err, 400);

@@ -7,6 +7,10 @@ export async function register() {
     try {
       const { initSchemaOnBoot } = await import('./lib/schema.js');
       await initSchemaOnBoot();
+      // Panaskan write-transaction pertama (stall 12-35 dtk per proses,
+      // lihat lib/db.js) — jangan blokir boot.
+      const { warmWriteTxOnce } = await import('./lib/db.js');
+      warmWriteTxOnce();
     } catch (e) {
       console.error('[SCHEMA BOOT]', String(e?.message || e));
     }

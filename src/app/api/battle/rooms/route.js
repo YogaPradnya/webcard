@@ -1,6 +1,6 @@
 import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
-import { ensureBattleRooms, WAITING_TTL_MS, cleanupExpiredWaitingRooms } from '@/lib/rooms';
+import { ensureBattleRooms, WAITING_TTL_MS, maybeCleanupRooms } from '@/lib/rooms';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,11 +11,9 @@ export const runtime = 'nodejs';
 const PAGE_SIZE = 10;
 
 // List room publik berubah pelan (TTL room 5 mnt) -> cache 10 dtk.
-// Cleanup DELETE berat juga di-throttle 60 dtk (bukan tiap request).
+// Cleanup DELETE berat di-throttle global di lib/rooms (maybeCleanupRooms).
 const _roomsCache = new Map(); // `${q}|${page}` -> { at, payload }
 const ROOMS_TTL_MS = 10 * 1000;
-let _lastCleanupAt = 0;
-const CLEANUP_MIN_GAP_MS = 60 * 1000;
 
 // GET /api/battle/rooms?q=&page= — list room PvP waiting yang masih hidup (10/page).
 // Hanya usn + kode + sisa waktu. Search cocok ke username dan kode.
@@ -42,10 +40,7 @@ async function GET_impl(req, _ctx, session) {
       return jsonOk({ rooms, pagination: hit.payload.pagination, q });
     }
     const now = Date.now();
-    if (now - _lastCleanupAt > CLEANUP_MIN_GAP_MS) {
-      _lastCleanupAt = now;
-      await cleanupExpiredWaitingRooms(now);
-    }
+    await maybeCleanupRooms(now);
     const minCreated = now - WAITING_TTL_MS;
 
     const like = `%${q}%`;
@@ -54,14 +49,15 @@ async function GET_impl(req, _ctx, session) {
       : `WHERE mode = 'pvp' AND status = 'waiting' AND created_at >= ?`;
     const args = q ? [minCreated, like, like] : [minCreated];
 
-    // 1 round-trip untuk COUNT + SELECT (dulu 2 sequential ke Tokyo).
-    const [countRes, res] = await getDb().batch([
-      { sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`, args },
-      {
+    // COUNT + SELECT paralel via execute (JANGAN db.batch: patologi Turso
+    // 17 Okt = batch statement puluhan detik per statement).
+    const [countRes, res] = await Promise.all([
+      getDb().execute({ sql: `SELECT COUNT(*) AS total FROM battle_rooms ${where}`, args }),
+      getDb().execute({
         sql: `SELECT code, p1_id, p1_username, created_at FROM battle_rooms ${where}
             ORDER BY created_at DESC LIMIT ? OFFSET ?`,
         args: [...args, PAGE_SIZE, offset],
-      },
+      }),
     ]);
     const total = Number(countRes.rows[0]?.total || 0);
     const pagination = { page, limit: PAGE_SIZE, total, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)) };

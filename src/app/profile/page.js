@@ -46,47 +46,40 @@ export default function ProfilePage() {
     setError('');
     try {
       if (!me) return; // useMe menendang ke /login bila belum login
-      // Profil wajib; sisanya pelengkap (timeout -> halaman tetap tampil).
-      const [pRes, cData, lbData, dData, srcData, slotData, mData] = await Promise.all([
-        fetchJson('/api/profile'),
-        fetchLenient('/api/cards'),
-        fetchLenient('/api/battle/leaderboard?tab=pvp'),
-        fetchLenient('/api/display'),
-        fetchLenient('/api/profile/showcase-source'),
-        fetchLenient('/api/shop/slots'),
-        fetchLenient('/api/missions'),
-      ]);
-      const pData = pRes.data;
-      if (!pRes.ok || !pData.success) {
-        setError(pData.message || 'Gagal memuat profil.');
+      // SATU request untuk seluruh halaman (dulu 7 endpoint paralel).
+      // Profil wajib; seksi lain punya flag sections.* -> halaman tetap tampil.
+      const { ok, data } = await fetchJson('/api/profile/summary');
+      if (!ok || !data.success) {
+        setError(data.message || 'Gagal memuat profil.');
         return;
       }
-      setProfile(pData.profile);
-      if (cData.success) {
-        const owned = (cData.cards || []).filter((c) => c.owned);
-        setOwnedCards(owned);
+      const pData = data.profile;
+      setProfile(pData);
+      const sec = data.sections || {};
+      if (sec.ownedCards) {
+        setOwnedCards(data.ownedCards || []);
       }
       let activeDisplay = null;
-      if (dData.success) {
-        setDisplayCards(dData.cards || []);
-        activeDisplay = (dData.cards || []).find((c) => c.showcase) || null;
+      if (sec.display) {
+        setDisplayCards(data.displayCards || []);
+        activeDisplay = (data.displayCards || []).find((c) => c.showcase) || null;
       }
       // Satu slot pajangan: sumber efektif samakan dengan server
       // (auto = display bila ada, else gacha). Pilihan tersimpan eksplisit
       // saat user menekan Simpan.
-      const src = srcData.success && srcData.source ? srcData.source : 'auto';
+      const src = sec.showcaseSource && data.showcaseSource ? data.showcaseSource : 'auto';
       const eff = src === 'gacha' ? 'gacha'
         : src === 'display' ? 'display'
         : activeDisplay ? 'display' : 'gacha';
       setShowcaseSource(eff);
       if (eff === 'display' && activeDisplay) setShowcasePick(activeDisplay.name);
-      else if (pData.profile?.showcase) setShowcasePick(pData.profile.showcase.name);
+      else if (pData?.showcase) setShowcasePick(pData.showcase.name);
       else setShowcasePick('');
-      if (lbData.success) setLbMini((lbData.leaderboard || []).slice(0, 5));
-      if (slotData.success) setCustomSlots(slotData.slots || []);
-      if (mData.success) {
-        setDailyMissions(mData.daily || []);
-        setWeeklyMissions(mData.weekly || []);
+      if (sec.leaderboard) setLbMini((data.leaderboard || []).slice(0, 5));
+      if (sec.slots) setCustomSlots(data.slots || []);
+      if (sec.missions) {
+        setDailyMissions(data.daily || []);
+        setWeeklyMissions(data.weekly || []);
       }
     } catch (e) {
       setError(e?.name === 'AbortError' ? 'Server lambat (timeout). Coba lagi.' : 'Tidak bisa menghubungi server.');

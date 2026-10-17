@@ -84,7 +84,10 @@ export async function ensureBattleRooms() {
       updated_at INTEGER NOT NULL
     )
   `);
-  await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_p1 ON battle_rooms (p1_id)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_p1_status ON battle_rooms (p1_id, status)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_p2_status ON battle_rooms (p2_id, status)');
+  await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_status_updated ON battle_rooms (status, updated_at)');
+  await db.execute('DROP INDEX IF EXISTS idx_battle_p1');
   await db.execute('CREATE INDEX IF NOT EXISTS idx_battle_waiting ON battle_rooms (mode, status, created_at)');
   await db.execute(`
     CREATE TABLE IF NOT EXISTS battle_leaderboard (
@@ -162,13 +165,60 @@ export async function deleteRoom(code) {
   await getDb().execute({ sql: 'DELETE FROM battle_rooms WHERE code = ?', args: [String(code)] });
 }
 
-export async function cleanupExpiredWaitingRooms(now = Date.now()) {
+// Retensi room: tabel TIDAK boleh tumbuh selamanya (insiden 17 Okt: 824 room
+// finished menumpuk -> query "room aktif" full-scan ~5MB JSON tiap 30 dtk/tab).
+// Finished disimpan 6 jam (rematch masih aman dalam sesi); ongoing basi 24 jam.
+export const FINISHED_RETENTION_MS = 6 * 60 * 60 * 1000;
+export const STALE_ONGOING_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+export async function cleanupStaleRooms(now = Date.now()) {
   try {
-    await getDb().execute({
-      sql: `DELETE FROM battle_rooms WHERE mode = 'pvp' AND status = 'waiting' AND created_at < ?`,
-      args: [now - WAITING_TTL_MS],
-    });
+    // Promise.all (bukan db.batch): patologi Turso 17 Okt — batch statement
+    // dihitung puluhan detik per statement; execute tunggal <1 dtk.
+    // Ketiga DELETE ini WHERE-nya saling lepas, aman paralel.
+    await Promise.all([
+      getDb().execute({
+        sql: `DELETE FROM battle_rooms WHERE mode = 'pvp' AND status = 'waiting' AND created_at < ?`,
+        args: [now - WAITING_TTL_MS],
+      }),
+      getDb().execute({
+        sql: `DELETE FROM battle_rooms WHERE status = 'finished' AND updated_at < ?`,
+        args: [now - FINISHED_RETENTION_MS],
+      }),
+      getDb().execute({
+        sql: `DELETE FROM battle_rooms WHERE status = 'ongoing' AND updated_at < ?`,
+        args: [now - STALE_ONGOING_RETENTION_MS],
+      }),
+    ]);
   } catch (_) { /* tabel belum ada -> abaikan */ }
+}
+
+// Cleanup cukup 1x/60 dtk per proses (bukan tiap request polling).
+let _lastCleanupAt = 0;
+const CLEANUP_MIN_GAP_MS = 60 * 1000;
+export async function maybeCleanupRooms(now = Date.now()) {
+  if (now - _lastCleanupAt < CLEANUP_MIN_GAP_MS) return;
+  _lastCleanupAt = now;
+  await cleanupStaleRooms(now);
+}
+
+// Query "room aktif milik user" (dipakai /api/battle/mine + /bootstrap).
+// UNION ALL dua cabang agar PASTI pakai idx_battle_p1_status / idx_battle_p2_status;
+// bentuk `p1_id = ? OR p2_id = ?` sebelumnya memicu full table scan.
+// Waiting kedaluwarsa difilter di SQL (tanpa DELETE global per request);
+// cleanup massa dijalankan berkala oleh maybeCleanupRooms.
+export function mineRoomsStmt(userId, now = Date.now()) {
+  return {
+    sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
+          FROM (
+            SELECT * FROM battle_rooms WHERE p1_id = ? AND status IN ('waiting','ongoing')
+            UNION ALL
+            SELECT * FROM battle_rooms WHERE p2_id = ? AND status IN ('waiting','ongoing')
+          )
+          WHERE status != 'waiting' OR created_at >= ?
+          ORDER BY updated_at DESC LIMIT 5`,
+    args: [String(userId), String(userId), now - WAITING_TTL_MS],
+  };
 }
 
 export async function getRoom(code) {

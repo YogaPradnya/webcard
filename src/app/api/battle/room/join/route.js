@@ -1,7 +1,7 @@
 import { getDb } from '@/lib/db';
 import { getCardStatsMap } from '@/lib/cards';
 import { createBattle } from '@/lib/engine';
-import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, isWaitingExpired, deleteRoom, cleanupExpiredWaitingRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
+import { ensureBattleRooms, getRoom, getRoomCached, saveRoom, isWaitingExpired, deleteRoom, maybeCleanupRooms, forfeitMsLeft, FORFEIT_TIMEOUT_MS } from '@/lib/rooms';
 import { bumpRoom } from '@/lib/roomEvents';
 import { checkRateCount } from '@/lib/rateLimit';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -23,7 +23,7 @@ async function POST_impl(req, _ctx, session) {
 
   try {
     await ensureBattleRooms();
-    await cleanupExpiredWaitingRooms(Date.now());
+    await maybeCleanupRooms(Date.now());
     const db = getDb();
     const room = await getRoomCached(code);
     if (!room || room.mode !== 'pvp' || room.status !== 'waiting') {

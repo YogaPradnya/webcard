@@ -3,12 +3,18 @@ import { createHash, randomBytes, createCipheriv, createDecipheriv, scryptSync }
 const COOKIE_NAME = 'cards_session';
 
 // Kunci 32 byte turunan SESSION_SECRET (scrypt, salt statis agar valid lintas instance serverless).
+// Di-cache per proses: scrypt sinkron ~40-100ms dan sebelumnya dihitung ULANG di
+// setiap request (unseal cookie tiap API) sehingga memblokir event loop.
+// Kunci konstan selama SESSION_SECRET tidak berubah (deploy ulang = hitung ulang).
+let _key = null;
 function sessionKey() {
+  if (_key) return _key;
   const secret = process.env.SESSION_SECRET || '';
   if (!secret || secret.length < 16) {
     throw new Error('SESSION_SECRET belum diisi (min 16 karakter) di .env.local');
   }
-  return scryptSync(secret, 'animein-card-book', 32);
+  _key = scryptSync(secret, 'animein-card-book', 32);
+  return _key;
 }
 
 // Segel { id, key, username } -> string cookie (AES-256-GCM).

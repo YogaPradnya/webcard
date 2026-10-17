@@ -1,6 +1,6 @@
 import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
-import { ensureBattleRooms, WAITING_TTL_MS, FORFEIT_TIMEOUT_MS, forfeitMsLeft, parseRoom } from '@/lib/rooms';
+import { ensureBattleRooms, WAITING_TTL_MS, FORFEIT_TIMEOUT_MS, forfeitMsLeft, maybeCleanupRooms, mineRoomsStmt } from '@/lib/rooms';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -13,19 +13,10 @@ async function GET_impl(req, _ctx, session) {
   try {
     await ensureBattleRooms();
     const now = Date.now();
-    // Cleanup + SELECT dalam 1 round-trip (dulu 2 sequential ke Tokyo).
-    const [, res] = await getDb().batch([
-      {
-        sql: `DELETE FROM battle_rooms WHERE mode = 'pvp' AND status = 'waiting' AND created_at < ?`,
-        args: [now - WAITING_TTL_MS],
-      },
-      {
-        sql: `SELECT code, mode, p1_id, p1_username, p2_id, p2_username, state, turn, status, winner, result, created_at, updated_at
-            FROM battle_rooms WHERE (p1_id = ? OR p2_id = ?) AND status IN ('waiting','ongoing')
-            ORDER BY updated_at DESC LIMIT 5`,
-        args: [String(session.id), String(session.id)],
-      },
-    ]);
+    // Cleanup retensi room (finished/ongoing basi) — throttle 60 dtk per proses,
+    // bukan DELETE tiap request seperti dulu.
+    await maybeCleanupRooms(now);
+    const res = await getDb().execute(mineRoomsStmt(session.id, now));
     const rooms = res.rows.map((r) => {
       let battle = {};
       let result = null;
