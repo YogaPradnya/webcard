@@ -1,6 +1,7 @@
 /* ===== Hiasan global (neo-brutalist playful) =====
-   Lapisan dekorasi fixed di belakang konten: bentuk mengapung, tema musiman,
-   washi tape, podium rank, confetti Mythic, stempel misi, maskot empty state.
+   Lapisan dekorasi fixed di belakang konten: bentuk hiasan STATIS (tanpa
+   animasi agar tidak membebani render), tema musiman, washi tape, podium rank,
+   confetti Mythic, stempel misi, maskot empty state.
    Semua ornamen aria-hidden + pointer-events:none (lihat DecoLayer.js). */
 
 /* -- Konten selalu di atas lapisan hiasan -- */
@@ -18,11 +19,10 @@
   overflow: hidden;
 }
 
-/* -- Bentuk mengapung -- */
+/* -- Bentuk hiasan statis (sengaja tanpa animasi: hemat render/anti-lag) -- */
 .deco-shape {
   position: absolute;
   opacity: 0.5;
-  animation: deco-bob 9s ease-in-out infinite;
 }
 
 .deco-star,
@@ -72,11 +72,6 @@
   border-color: #69d6b6;
 }
 
-@keyframes deco-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-14px); }
-}
-
 /* -- Washi tape di tepi layar (desktop) -- */
 .deco-tape {
   display: none;
@@ -110,11 +105,11 @@
     #ffb7d5;
 }
 
-/* -- Tema musiman (data-season diisi script kecil di layout.js) -- */
+/* -- Tema musiman (data-season diisi script kecil di layout.js) --
+   Kelopak/salju tampil sebagai ornamen statis (tidak lagi berjatuhan). */
 .deco-petal,
 .deco-snow {
   display: none;
-  top: -8vh;
 }
 
 .deco-petal {
@@ -123,7 +118,7 @@
   background: #ffb7d5;
   border-radius: 70% 0 70% 0;
   opacity: 0.85;
-  animation: deco-fall 11s linear infinite;
+  transform: rotate(24deg);
 }
 
 .deco-snow {
@@ -133,12 +128,6 @@
   border: 1px solid rgba(10, 10, 10, 0.08);
   border-radius: 999px;
   opacity: 0.9;
-  animation: deco-fall 12s linear infinite;
-}
-
-@keyframes deco-fall {
-  0% { transform: translateY(0) rotate(0deg); }
-  100% { transform: translateY(126vh) rotate(320deg); }
 }
 
 [data-season='sakura'] .deco-star,
@@ -407,19 +396,13 @@
 .banner-legendary { --banner-accent: var(--rar-legendary); }
 .banner-mythic { --banner-accent: var(--rar-mythic); }
 
-/* -- Prefers-reduced-motion: matikan semua animasi hiasan -- */
+/* -- Prefers-reduced-motion: matikan animasi hiasan yang tersisa -- */
 @media (prefers-reduced-motion: reduce) {
-  .deco-shape,
   .rara-bob,
   .user-row.lb-1,
   .lb-confetti i,
   .mythic-confetti i,
   .done-stamp {
     animation: none !important;
-  }
-
-  .deco-petal,
-  .deco-snow {
-    display: none !important;
   }
 }
