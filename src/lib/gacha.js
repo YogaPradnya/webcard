@@ -14,6 +14,7 @@ import { hashNameLower } from './hash.js';
 import { getUserCard, getUserXp, debitXp, creditXp } from './userCardsRepo.js';
 import { invalidateBookCache } from './cards.js';
 import { MAX_CARD_COPIES, GACHA_HISTORY_LIMIT } from './constants.js';
+import { parseExcludedUsernames, excludedUsernamesClause } from './exclusions.js';
 
 export { calcLevel, jakartaDateKey };
 
@@ -41,13 +42,12 @@ const STOCK_LIMITS = { Common: Infinity, Rare: Infinity, Epic: 50, Legendary: 10
 const DEFAULT_STOCKS = { Mythic: 1, Legendary: 10, Epic: 50 };
 // Username yang diabaikan dari hitungan stok global (akun tes/admin).
 // Env STOCK_EXCLUDE_USERNAMES="yogaa,admin" (koma). Default: yogaa.
-export function parseStockExclusions(raw) {
-  const src = raw !== undefined ? raw : (process.env.STOCK_EXCLUDE_USERNAMES ?? 'yogaa');
-  return String(src).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
-}
+// Parser & klausa SQL kini di lib/exclusions.js (dipakai juga filter
+// klasemen Kolektor); nama lama di-re-export agar import lama tetap jalan.
+export { parseExcludedUsernames as parseStockExclusions };
 
 function stockExclusionClause(excl) {
-  return excl.length ? ` AND LOWER(username) NOT IN (${excl.map(() => '?').join(',')})` : '';
+  return excludedUsernamesClause(excl, 'username', 'AND').sql;
 }
 const RARITY_DOWNGRADE = { Mythic: 'Legendary', Legendary: 'Epic', Epic: 'Rare', Rare: 'Common', Common: null };
 // Web: hanya Mythic yang unik per user (Epic/Legendary boleh menumpuk).

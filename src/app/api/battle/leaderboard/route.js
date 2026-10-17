@@ -1,6 +1,7 @@
 import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import { getDb } from '@/lib/db';
 import { ensureBattleRooms } from '@/lib/rooms';
+import { parseExcludedUsernames, excludedUsernamesClause } from '@/lib/exclusions';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -9,6 +10,8 @@ export const runtime = 'nodejs';
 
 
 // GET /api/battle/leaderboard?tab=pvp|collector|xp — klasemen PvP, kolektor, XP.
+// Klasemen Kolektor (jumlah kartu) menyembunyikan akun exclude
+// (STOCK_EXCLUDE_USERNAMES — pasti punya semua kartu). PvP & XP apa adanya.
 // Publik & sama untuk semua user -> cache memori 60 dtk (0 query saat hit).
 const _lbCache = new Map(); // tab -> { at, payload }
 const LB_TTL_MS = 60 * 1000;
@@ -27,12 +30,15 @@ async function GET_impl(req, _ctx, session) {
   try {
     await ensureBattleRooms();
     const db = getDb();
+    // Kolektor: sembunyikan akun exclude (pasti punya semua kartu) dari
+    // hitungan jumlah kartu. PvP & XP tetap menampilkan mereka.
+    const exStats = excludedUsernamesClause(parseExcludedUsernames(), 's.username');
     if (tab === 'collector') {
       const res = await db.execute({
         sql: `SELECT s.user_id, s.username, COUNT(c.char_name) AS owned
-              FROM user_stats s LEFT JOIN user_cards c ON c.user_id = s.user_id
+              FROM user_stats s LEFT JOIN user_cards c ON c.user_id = s.user_id${exStats.sql}
               GROUP BY s.user_id, s.username ORDER BY owned DESC LIMIT 20`,
-        args: [],
+        args: exStats.args,
       });
       const rows = res.rows.map((r) => ({
         user_id: String(r.user_id),
