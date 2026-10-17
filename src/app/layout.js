@@ -3,7 +3,13 @@ import './book.css';
 import './shell.css';
 import './battle.css';
 import './components.css';
+import './deco.css';
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google';
+import DecoLayer from '@/components/DecoLayer';
+
+/* Tema musiman hiasan: biarkan '' untuk otomatis dari tanggal,
+   atau isi 'sakura' | 'halloween' | 'natal' untuk memaksa (buat testing). */
+const SEASON_OVERRIDE = '';
 
 const bodyFont = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -61,9 +67,15 @@ export default function RootLayout({ children }) {
             __html: `(function(){try{if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}}catch(e){}})();`,
           }}
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var ov=${JSON.stringify(SEASON_OVERRIDE)};var s=ov;if(!s){var d=new Date();var m=d.getMonth()+1;var day=d.getDate();if((m===3&&day>=21)||(m===4&&day<=20))s='sakura';else if(m===10)s='halloween';else if(m===12)s='natal';}document.documentElement.setAttribute('data-season',s||'none');}catch(e){}})();`,
+          }}
+        />
       </head>
       <body>
         {children}
+        <DecoLayer />
       </body>
     </html>
   );

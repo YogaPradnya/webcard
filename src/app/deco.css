@@ -1,0 +1,425 @@
+/* ===== Hiasan global (neo-brutalist playful) =====
+   Lapisan dekorasi fixed di belakang konten: bentuk mengapung, tema musiman,
+   washi tape, podium rank, confetti Mythic, stempel misi, maskot empty state.
+   Semua ornamen aria-hidden + pointer-events:none (lihat DecoLayer.js). */
+
+/* -- Konten selalu di atas lapisan hiasan -- */
+.layout,
+.page {
+  position: relative;
+  z-index: 1;
+}
+
+.deco-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* -- Bentuk mengapung -- */
+.deco-shape {
+  position: absolute;
+  opacity: 0.5;
+  animation: deco-bob 9s ease-in-out infinite;
+}
+
+.deco-star,
+.deco-diamond {
+  background: var(--lime);
+}
+
+.deco-plus {
+  width: 14px;
+  height: 14px;
+  background: var(--blue-bright);
+  opacity: 0.3;
+  clip-path: polygon(35% 0, 65% 0, 65% 35%, 100% 35%, 100% 65%, 65% 65%, 65% 100%, 35% 100%, 35% 65%, 0 65%, 0 35%, 35% 35%);
+}
+
+.deco-bubble {
+  width: 18px;
+  height: 18px;
+  background: transparent;
+  border: 2.5px solid var(--mint-deep);
+  border-radius: 999px;
+  opacity: 0.55;
+}
+
+.deco-star {
+  width: 15px;
+  height: 15px;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+}
+
+.deco-diamond {
+  width: 12px;
+  height: 12px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+[data-theme='dark'] .deco-star,
+[data-theme='dark'] .deco-diamond {
+  opacity: 0.4;
+}
+
+[data-theme='dark'] .deco-plus {
+  background: #7fb0ec;
+}
+
+[data-theme='dark'] .deco-bubble {
+  border-color: #69d6b6;
+}
+
+@keyframes deco-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
+/* -- Washi tape di tepi layar (desktop) -- */
+.deco-tape {
+  display: none;
+  width: 94px;
+  height: 26px;
+  border: 1.5px solid var(--hairline-strong);
+  box-shadow: 2px 2px 0 rgba(10, 10, 10, 0.22);
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 6px, transparent 6px 12px),
+    var(--lime);
+}
+
+@media (min-width: 721px) {
+  .deco-tape {
+    display: block;
+  }
+}
+
+.deco-tape.t1 {
+  top: 24vh;
+  left: -24px;
+  transform: rotate(-8deg);
+}
+
+.deco-tape.t2 {
+  bottom: 20vh;
+  right: -24px;
+  transform: rotate(7deg);
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 6px, transparent 6px 12px),
+    #ffb7d5;
+}
+
+/* -- Tema musiman (data-season diisi script kecil di layout.js) -- */
+.deco-petal,
+.deco-snow {
+  display: none;
+  top: -8vh;
+}
+
+.deco-petal {
+  width: 12px;
+  height: 12px;
+  background: #ffb7d5;
+  border-radius: 70% 0 70% 0;
+  opacity: 0.85;
+  animation: deco-fall 11s linear infinite;
+}
+
+.deco-snow {
+  width: 9px;
+  height: 9px;
+  background: #ffffff;
+  border: 1px solid rgba(10, 10, 10, 0.08);
+  border-radius: 999px;
+  opacity: 0.9;
+  animation: deco-fall 12s linear infinite;
+}
+
+@keyframes deco-fall {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(126vh) rotate(320deg); }
+}
+
+[data-season='sakura'] .deco-star,
+[data-season='sakura'] .deco-plus,
+[data-season='sakura'] .deco-bubble,
+[data-season='sakura'] .deco-diamond {
+  display: none;
+}
+
+[data-season='sakura'] .deco-petal {
+  display: block;
+}
+
+[data-season='natal'] .deco-plus,
+[data-season='natal'] .deco-bubble,
+[data-season='natal'] .deco-diamond {
+  display: none;
+}
+
+[data-season='natal'] .deco-snow {
+  display: block;
+}
+
+[data-season='halloween'] .deco-star,
+[data-season='halloween'] .deco-diamond {
+  background: #f59e0b;
+}
+
+[data-season='halloween'] .deco-plus {
+  background: #7c5cd6;
+  opacity: 0.45;
+}
+
+[data-season='halloween'] .deco-bubble {
+  border-color: #7c5cd6;
+}
+
+/* -- Aksen garis putus di bawah judul halaman -- */
+.brand h1 {
+  position: relative;
+}
+
+.brand h1::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -7px;
+  width: 76px;
+  height: 3px;
+  border-radius: 999px;
+  background-image: repeating-linear-gradient(90deg, currentColor 0 8px, transparent 8px 13px);
+  opacity: 0.3;
+}
+
+/* ===== Podium leaderboard (top 3) ===== */
+.user-row.lb-1,
+.user-row.lb-2,
+.user-row.lb-3 {
+  position: relative;
+  padding: 10px 12px;
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  margin-bottom: 8px;
+  box-shadow: 2px 2px 0 var(--hairline-strong);
+}
+
+.user-row.lb-1 {
+  background: #fff6cf;
+  animation: lb-champ 2.6s ease-in-out infinite;
+}
+
+.user-row.lb-2 {
+  background: #eef2fa;
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+.user-row.lb-3 {
+  background: #f8e8d8;
+  margin-left: 24px;
+  margin-right: 24px;
+}
+
+[data-theme='dark'] .user-row.lb-1 {
+  background: #3a3410;
+}
+
+[data-theme='dark'] .user-row.lb-2 {
+  background: #232a3d;
+}
+
+[data-theme='dark'] .user-row.lb-3 {
+  background: #33261a;
+}
+
+@keyframes lb-champ {
+  0%, 100% { box-shadow: 2px 2px 0 var(--hairline-strong); }
+  50% { box-shadow: 2px 2px 0 var(--hairline-strong), 0 0 18px 3px rgba(163, 230, 54, 0.55); }
+}
+
+.lb-medal {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-right: 8px;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: 999px;
+  box-shadow: 2px 2px 0 var(--hairline-strong);
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.lb-medal.m1 {
+  background: linear-gradient(135deg, #ffe066, #f5b301);
+}
+
+.lb-medal.m2 {
+  background: linear-gradient(135deg, #eef2f8, #c9d3e4);
+}
+
+.lb-medal.m3 {
+  background: linear-gradient(135deg, #f2c49b, #cd8a52);
+}
+
+/* Confetti kecil satu kali untuk juara 1 */
+.lb-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.lb-confetti i {
+  position: absolute;
+  top: -10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: lb-fall 1.6s ease-in forwards;
+}
+
+@keyframes lb-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(64px) rotate(260deg); opacity: 0; }
+}
+
+/* ===== Confetti layar penuh saat pull Mythic ===== */
+.mythic-confetti {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.mythic-confetti i {
+  position: absolute;
+  top: -6vh;
+  width: 9px;
+  height: 13px;
+  border-radius: 2px;
+  opacity: 0;
+  box-shadow: 0 0 0 1px rgba(10, 10, 10, 0.15);
+  animation: mythic-fall 2s cubic-bezier(0.3, 0.4, 0.6, 1) forwards;
+}
+
+.mythic-confetti i:nth-child(3n) {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.mythic-confetti i:nth-child(4n) {
+  width: 6px;
+  height: 16px;
+  border-radius: 3px;
+}
+
+@keyframes mythic-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(122vh) rotate(300deg); opacity: 0.85; }
+}
+
+/* ===== Stempel misi selesai ===== */
+.done-stamp {
+  display: inline-block;
+  transform: rotate(-8deg);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--success);
+  border: 1.5px solid var(--success);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  animation: stamp-pop 0.4s ease-out;
+}
+
+@keyframes stamp-pop {
+  0% { transform: rotate(-8deg) scale(1.7); opacity: 0; }
+  100% { transform: rotate(-8deg) scale(1); opacity: 1; }
+}
+
+/* ===== Empty state + maskot ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 12px 0 4px;
+}
+
+.empty-state .btn {
+  width: auto;
+  min-width: 150px;
+}
+
+.rara-bob {
+  animation: rara-bob 3.4s ease-in-out infinite;
+}
+
+@keyframes rara-bob {
+  0%, 100% { transform: translateY(0) rotate(-1.4deg); }
+  50% { transform: translateY(-5px) rotate(1.4deg); }
+}
+
+/* ===== Banner profil (aksen sesuai tier gelar terpasang) ===== */
+.profile-hero {
+  position: relative;
+  background-image:
+    radial-gradient(420px 190px at 100% 0%, color-mix(in srgb, var(--banner-accent, var(--lime)) 20%, transparent), transparent 72%),
+    radial-gradient(rgba(10, 10, 10, 0.05) 1.4px, transparent 1.5px);
+  background-size: auto, 14px 14px;
+}
+
+[data-theme='dark'] .profile-hero {
+  background-image:
+    radial-gradient(420px 190px at 100% 0%, color-mix(in srgb, var(--banner-accent, var(--lime)) 26%, transparent), transparent 72%),
+    radial-gradient(rgba(255, 255, 246, 0.05) 1.4px, transparent 1.5px);
+}
+
+.profile-hero::after {
+  content: '';
+  position: absolute;
+  left: -1.5px;
+  top: 20px;
+  bottom: 20px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--banner-accent, var(--lime));
+  pointer-events: none;
+}
+
+.banner-common { --banner-accent: var(--rar-common); }
+.banner-rare { --banner-accent: var(--rar-rare); }
+.banner-epic { --banner-accent: var(--rar-epic); }
+.banner-legendary { --banner-accent: var(--rar-legendary); }
+.banner-mythic { --banner-accent: var(--rar-mythic); }
+
+/* -- Prefers-reduced-motion: matikan semua animasi hiasan -- */
+@media (prefers-reduced-motion: reduce) {
+  .deco-shape,
+  .rara-bob,
+  .user-row.lb-1,
+  .lb-confetti i,
+  .mythic-confetti i,
+  .done-stamp {
+    animation: none !important;
+  }
+
+  .deco-petal,
+  .deco-snow {
+    display: none !important;
+  }
+}

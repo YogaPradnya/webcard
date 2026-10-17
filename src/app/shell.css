@@ -80,6 +80,7 @@
   color: var(--on-primary);
   border-color: var(--hairline-strong);
   box-shadow: 2px 2px 0 var(--hairline-strong);
+  transform: rotate(-1.5deg);
 }
 
 .sidebar-logout {
@@ -123,6 +124,18 @@
     position: sticky;
     top: 0;
     z-index: 20;
+  }
+
+  /* Garis pola tipis di bawah topbar (hiasan) */
+  .topbar::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -3.5px;
+    height: 3.5px;
+    background: repeating-linear-gradient(90deg, var(--lime) 0 14px, transparent 14px 28px);
+    pointer-events: none;
   }
 
   .topbar-spacer {

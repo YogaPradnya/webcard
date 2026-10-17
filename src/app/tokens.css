@@ -134,7 +134,10 @@
 
 body {
   background-color: var(--sky-bottom);
-  background-image: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 32%, var(--mint) 68%, var(--mint-deep) 100%);
+  background-image:
+    radial-gradient(rgba(10, 10, 10, 0.05) 1.1px, transparent 1.2px),
+    linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 32%, var(--mint) 68%, var(--mint-deep) 100%);
+  background-size: 22px 22px, auto;
   background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-body);
@@ -160,7 +163,9 @@ body {
 
 [data-theme='dark'] body {
   background-color: #0a0a0a;
-  background-image: linear-gradient(to bottom, #1b2a6b 0%, #101a45 42%, #0a0a0a 100%);
+  background-image:
+    radial-gradient(rgba(255, 255, 246, 0.045) 1.1px, transparent 1.2px),
+    linear-gradient(to bottom, #1b2a6b 0%, #101a45 42%, #0a0a0a 100%);
 }
 
 @media (max-width: 720px) {
