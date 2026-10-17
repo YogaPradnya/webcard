@@ -131,6 +131,7 @@
 .flip-front,
 .flip-back {
   width: 100%;
+  position: relative;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
@@ -347,5 +348,117 @@
   background: var(--accent-grad);
   border-radius: var(--r-pill);
   transition: width 0.3s;
+}
+
+/* ===== Hiasan kartu: shine Epic+, sparkle & aura Mythic, sudut tier ===== */
+
+/* Shine sweep saat hover (elemen .card-shine dirender di flip-front kartu Epic+) */
+.card-shine {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--r-lg);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.card-shine::after {
+  content: '';
+  position: absolute;
+  top: -25%;
+  bottom: -25%;
+  left: -65%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%);
+  transform: translateX(0) skewX(-16deg);
+}
+
+.card-item.owned:hover .card-shine::after {
+  animation: card-shine-sweep 0.9s ease-out;
+}
+
+[data-theme='dark'] .card-shine::after {
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 246, 0.35) 50%, transparent 100%);
+}
+
+@keyframes card-shine-sweep {
+  from { transform: translateX(0) skewX(-16deg); }
+  to { transform: translateX(430%) skewX(-16deg); }
+}
+
+/* Sparkle untuk kartu Legendary/Mythic */
+.card-spark {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--rar-legendary);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  animation: card-sparkle 2.4s ease-in-out infinite;
+}
+
+.rar-Mythic .card-spark {
+  background: var(--rar-mythic);
+}
+
+.card-spark.cs1 { top: 8px; right: 36px; }
+.card-spark.cs2 { bottom: 46px; left: 8px; width: 9px; height: 9px; animation-delay: 0.8s; }
+.card-spark.cs3 { top: 45%; right: 8px; width: 10px; height: 10px; animation-delay: 1.6s; }
+
+@keyframes card-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); }
+  50% { opacity: 0.95; transform: scale(1) rotate(24deg); }
+}
+
+/* Sudut hiasan Epic+ (overlay ::before di flip-front) */
+.card-item.owned.rar-Epic .flip-front::before,
+.card-item.owned.rar-Legendary .flip-front::before,
+.card-item.owned.rar-Mythic .flip-front::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.9;
+  background-image:
+    linear-gradient(135deg, var(--corner) 0 9px, transparent 9px),
+    linear-gradient(225deg, var(--corner) 0 9px, transparent 9px),
+    linear-gradient(45deg, var(--corner) 0 9px, transparent 9px),
+    linear-gradient(315deg, var(--corner) 0 9px, transparent 9px);
+  background-position: top left, top right, bottom left, bottom right;
+  background-size: 13px 13px;
+  background-repeat: no-repeat;
+}
+
+.card-item.owned.rar-Epic .flip-front::before { --corner: var(--rar-epic); }
+.card-item.owned.rar-Legendary .flip-front::before { --corner: var(--rar-legendary); }
+.card-item.owned.rar-Mythic .flip-front::before { --corner: var(--rar-mythic); }
+
+/* Aura berdenyut kartu Mythic */
+.card-item.owned.rar-Mythic {
+  animation: mythic-aura 2.8s ease-in-out infinite;
+}
+
+@keyframes mythic-aura {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0); }
+  50% { box-shadow: 0 0 20px 4px rgba(229, 72, 77, 0.5); }
+}
+
+[data-theme='dark'] .card-item.owned.rar-Mythic {
+  animation-name: mythic-aura-dark;
+}
+
+@keyframes mythic-aura-dark {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 122, 156, 0); }
+  50% { box-shadow: 0 0 22px 5px rgba(255, 122, 156, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-item.owned.rar-Mythic,
+  .card-spark,
+  .card-item.owned:hover .card-shine::after {
+    animation: none !important;
+  }
 }
 

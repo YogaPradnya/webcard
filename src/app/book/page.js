@@ -580,6 +580,18 @@ export default function BookPage() {
             <div className="flip-inner">
               <div className="flip-front">
                 <span className="tier-ribbon" style={c.owned ? { ['--tier']: TIER_COLORS[c.tier], background: TIER_COLORS[c.tier] } : undefined} />
+                {c.owned && (c.tier === 'Epic' || c.tier === 'Legendary' || c.tier === 'Mythic') ? (
+                  <>
+                    <span className="card-shine" aria-hidden="true" />
+                    {c.tier !== 'Epic' ? (
+                      <>
+                        <i className="card-spark cs1" aria-hidden="true" />
+                        <i className="card-spark cs2" aria-hidden="true" />
+                        <i className="card-spark cs3" aria-hidden="true" />
+                      </>
+                    ) : null}
+                  </>
+                ) : null}
                 {c.owned ? (
                   <div className="framed-art">
                     {c.imageUrl ? (
