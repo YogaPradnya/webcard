@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import RetryAlert from '@/components/RetryAlert';
+import Rara from '@/components/Rara';
 import { fetchJson } from '@/lib/fetchJson';
 
 const TABS = [
@@ -11,6 +12,8 @@ const TABS = [
   ['collector', 'Kolektor'],
   ['xp', 'Level/XP'],
 ];
+
+const LB_CONFETTI = ['#a3e636', '#ffd94a', '#ffb7d5', '#7fb0ec'];
 
 export default function LeaderboardPage() {
   const router = useRouter();
@@ -105,11 +108,24 @@ export default function LeaderboardPage() {
                 <div className="skeleton-line" style={{ width: '65%' }} />
               </div>
             ) : shown.length === 0 ? (
-              <div style={{ fontSize: 13 }}>{lb.length === 0 ? 'Belum ada data.' : 'Tidak ada yang cocok.'}</div>
+              <div className="empty-state">
+                {lb.length === 0 ? (
+                  <>
+                    <Rara size={96} className="rara-bob" />
+                    <div style={{ fontSize: 13 }}>Belum ada data.</div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13 }}>Tidak ada yang cocok.</div>
+                )}
+              </div>
             ) : (
               shown.map((u, i) => (
-                <div className="user-row" key={`${u.username}-${i}`}>
-                  <span style={{ fontWeight: 700, width: 28 }}>{i + 1}.</span>
+                <div className={`user-row${i < 3 ? ` lb-${i + 1}` : ''}`} key={`${u.username}-${i}`}>
+                  {i < 3 ? (
+                    <span className={`lb-medal m${i + 1}`} aria-hidden="true">{i + 1}</span>
+                  ) : (
+                    <span style={{ fontWeight: 700, width: 28 }}>{i + 1}.</span>
+                  )}
                   <span style={{ fontWeight: 700 }}>
                     @{u.username}
                     {u.isMe ? ' (kamu)' : ''}
@@ -117,6 +133,20 @@ export default function LeaderboardPage() {
                   <span style={{ marginLeft: 'auto', color: 'var(--body)', fontSize: 12 }}>
                     {tab === 'pvp' ? `${u.wins}W - ${u.losses}L | WR ${u.winRate}%` : tab === 'collector' ? `${u.owned} kartu` : `Lv ${u.level} • ${u.xp} XP`}
                   </span>
+                  {i === 0 && !q.trim() ? (
+                    <span className="lb-confetti" aria-hidden="true">
+                      {Array.from({ length: 8 }).map((_, ci) => (
+                        <i
+                          key={ci}
+                          style={{
+                            left: `${6 + ci * 12}%`,
+                            background: LB_CONFETTI[ci % LB_CONFETTI.length],
+                            animationDelay: `${ci * 130}ms`,
+                          }}
+                        />
+                      ))}
+                    </span>
+                  ) : null}
                 </div>
               ))
             )}

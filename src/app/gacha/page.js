@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { FrameDefs, FrameOverlay } from '@/components/Frames';
+import MythicConfetti from '@/components/MythicConfetti';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
 import { optImg, srcSetImg, IMG_SIZES_CARD } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
@@ -79,6 +80,7 @@ export default function GachaPage() {
   const [anticipating, setAnticipating] = useState(false); // slow-mo 0,5 dtk khusus Epic+
   const [burst, setBurst] = useState(-1); // index kartu yang meledak (Legendary/Mythic)
   const [shake, setShake] = useState(false); // guncang panggung saat Legendary/Mythic
+  const [celebrate, setCelebrate] = useState(false); // confetti layar penuh saat Mythic
   const [finished, setFinished] = useState(false);
   const [waitIdx, setWaitIdx] = useState(0); // pesan bergantian di panggung tunggu
   const [waitCount, setWaitCount] = useState(1); // 1|10 — jumlah kartu di panggung tunggu
@@ -154,6 +156,7 @@ export default function GachaPage() {
         if (pull && (pull.rarity === 'Legendary' || pull.rarity === 'Mythic')) {
           setBurst(index);
           triggerShake();
+          if (pull.rarity === 'Mythic') setCelebrate(true);
         }
         timers.current.push(setTimeout(() => {
           if (index + 1 < pullsRef.current.length) schedule(index + 1);
@@ -251,6 +254,7 @@ export default function GachaPage() {
   return (
     <div className="layout">
       <Sidebar username={me?.username} />
+      {celebrate ? <MythicConfetti onDone={() => setCelebrate(false)} /> : null}
       <div className="layout-main">
         <div className="page">
           <FrameDefs />

@@ -24,7 +24,10 @@ function MissionRow({ m, period, claiming, onClaim }) {
           {claiming === `${period}:${m.id}` ? '...' : `Klaim +${m.xp} XP`}
         </button>
       ) : m.claimed ? (
-        <div style={{ fontSize: 11, color: 'var(--success)', fontWeight: 800 }}>Sudah diklaim ✓</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--success)', fontWeight: 800 }}>Sudah diklaim ✓</div>
+          <span className="done-stamp" aria-hidden="true">SELESAI</span>
+        </div>
       ) : null}
     </div>
   );

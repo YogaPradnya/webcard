@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
+import Rara from '@/components/Rara';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
 import { useMe } from '@/hooks/useMe';
@@ -205,9 +206,12 @@ export default function ShopPage() {
           <div className="page">
             <div className="brand"><h1>Shop</h1></div>
             <div className="card">
-              <div className="section-title">Segera hadir 🛠️</div>
-              <div style={{ fontSize: 13, color: 'var(--body)' }}>
-                Toko Top-Up XP dan Slot Kartu Pajangan sedang disiapkan dan akan segera dibuka.
+              <div className="empty-state">
+                <Rara size={104} className="rara-bob" />
+                <div className="section-title" style={{ margin: 0 }}>Segera hadir 🛠️</div>
+                <div style={{ fontSize: 13, color: 'var(--body)' }}>
+                  Toko Top-Up XP dan Slot Kartu Pajangan sedang disiapkan dan akan segera dibuka.
+                </div>
               </div>
             </div>
           </div>

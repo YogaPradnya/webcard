@@ -184,6 +184,12 @@ export default function ProfilePage() {
     return <PageSkeleton username={me?.username} title="Profil" lines={[35, 80, 60]} />;
   }
 
+  // Aksen banner profil mengikuti tier gelar yang sedang dipasang.
+  const equipped = profile ? (profile.titles?.earned || []).find((t) => t.title === profile.title) : null;
+  const bannerTier = equipped
+    ? String(equipped.tier || /\btier-([a-z]+)\.svg/.exec(equipped.icon || '')?.[1] || '').toLowerCase()
+    : '';
+
   return (
     <div className="layout">
       <Sidebar username={me?.username} />
@@ -194,7 +200,7 @@ export default function ProfilePage() {
 
           {profile ? (
             <>
-              <div className="card profile-hero">
+              <div className={`card profile-hero${bannerTier ? ` banner-${bannerTier}` : ''}`}>
                 <div className="profile-top">
                   <div className="profile-avatar" style={{ background: avatarColor(profile.username) }}>
                     {String(profile.username || '?').slice(0, 1).toUpperCase()}

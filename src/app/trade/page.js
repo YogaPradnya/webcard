@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton } from '@/components/PageState';
+import Rara from '@/components/Rara';
 import { optImg } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
@@ -593,7 +594,12 @@ export default function TradePage() {
                 <span style={{ marginLeft: 'auto', color: 'var(--body)' }}>{u.owned} kartu</span>
               </div>
             ))}
-            {users.length === 0 ? <div style={{ fontSize: 13 }}>Belum ada user.</div> : null}
+            {users.length === 0 ? (
+              <div className="empty-state">
+                <Rara size={72} />
+                <div style={{ fontSize: 13 }}>Belum ada user.</div>
+              </div>
+            ) : null}
           </div>
 
           {mode === 'create' ? (
