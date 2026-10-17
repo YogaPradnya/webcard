@@ -22,6 +22,16 @@ function revealMsFor(pull) {
   return REVEAL_MS_BY_RARITY[pull?.rarity] || 900;
 }
 
+// Pesan bergantian di panggung tunggu (server 10x bisa ~4-5 dtk — biarkan
+// terasa "sedang bekerja", bukan hang).
+const WAIT_MSGS = [
+  'Memanggil kartu',
+  'Menyeleksi pool',
+  'Membaca keberuntungan',
+  'Menghitung pity',
+  'Membuka paket',
+];
+
 function RevealCard({ pull, face, anticipating, burst }) {
   const color = TIER_COLORS[pull.rarity] || '#9ca3af';
   if (face === 'back') {
@@ -70,6 +80,8 @@ export default function GachaPage() {
   const [burst, setBurst] = useState(-1); // index kartu yang meledak (Legendary/Mythic)
   const [shake, setShake] = useState(false); // guncang panggung saat Legendary/Mythic
   const [finished, setFinished] = useState(false);
+  const [waitIdx, setWaitIdx] = useState(0); // pesan bergantian di panggung tunggu
+  const [waitCount, setWaitCount] = useState(1); // 1|10 — jumlah kartu di panggung tunggu
   const [instant, setInstant] = useState(() => {
     try {
       if (typeof window === 'undefined') return false;
@@ -158,6 +170,8 @@ export default function GachaPage() {
     if (pulling) return;
     clearTimers();
     setPulling(true);
+    setWaitCount(count === 10 ? 10 : 1);
+    setWaitIdx(0);
     setError('');
     setPulls([]);
     setFinished(false);
@@ -203,6 +217,14 @@ export default function GachaPage() {
 
   useEffect(() => () => clearTimers(), []);
 
+  // Panggung tunggu: pesan bergantian selama request pull berjalan.
+  useEffect(() => {
+    if (!pulling) return;
+    setWaitIdx(0);
+    const t = setInterval(() => setWaitIdx((i) => (i + 1) % WAIT_MSGS.length), 1100);
+    return () => clearInterval(t);
+  }, [pulling]);
+
   const revealing = pulls.length > 0 && !finished;
   const newCount = pulls.filter((p) => p.isNew).length;
 
@@ -234,10 +256,10 @@ export default function GachaPage() {
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 <button className="btn" style={{ flex: 1, minWidth: 140 }} disabled={pulling || revealing} onClick={() => doPull(1)}>
-                  Gacha 1x ({info.cost} XP)
+                  {pulling && waitCount === 1 ? 'Memanggil…' : `Gacha 1x (${info.cost} XP)`}
                 </button>
                 <button className="btn" style={{ flex: 1, minWidth: 140 }} disabled={pulling || revealing} onClick={() => doPull(10)}>
-                  Gacha 10x ({info.cost10} XP, hemat 10%)
+                  {pulling && waitCount === 10 ? 'Memanggil 10 kartu…' : `Gacha 10x (${info.cost10} XP, hemat 10%)`}
                 </button>
               </div>
               <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12 }}>
@@ -262,6 +284,32 @@ export default function GachaPage() {
                   ⚡ {instant ? 'Langsung: ON' : 'Reveal 1-1'}
                 </button>
               </div>
+            </div>
+          ) : null}
+
+          {pulling ? (
+            <div className="card gacha-wait" style={{ marginBottom: 16 }} aria-busy="true">
+              <div className="gacha-wait-grid" aria-hidden="true">
+                {Array.from({ length: waitCount }).map((_, i) => (
+                  <div key={i} className="gacha-card wait-card" style={{ animationDelay: `${-(i % 10) * 90}ms` }}>
+                    <div className="gacha-back magic"><span>✦</span></div>
+                  </div>
+                ))}
+              </div>
+              <div className="gacha-wait-status" role="status" aria-live="polite">
+                <span className="gacha-orb" aria-hidden="true" />
+                <span>{WAIT_MSGS[waitIdx]}…</span>
+              </div>
+              <div className="gacha-progress" aria-hidden="true"><i /></div>
+              <div className="gacha-wait-hint">
+                {waitCount === 10
+                  ? '10x diproses kartu satu-satu (anti-bentrok stok) — biasanya 2-5 detik.'
+                  : 'Biasanya di bawah 1 detik.'}
+              </div>
+              <span className="gacha-spark" aria-hidden="true" style={{ left: '10%' }} />
+              <span className="gacha-spark" aria-hidden="true" style={{ left: '36%', animationDelay: '.6s' }} />
+              <span className="gacha-spark" aria-hidden="true" style={{ left: '64%', animationDelay: '1.2s' }} />
+              <span className="gacha-spark" aria-hidden="true" style={{ left: '88%', animationDelay: '1.7s' }} />
             </div>
           ) : null}
 
