@@ -13,9 +13,14 @@ function tokenCookie(token, maxAge) {
 async function POST_impl(req) {
   try {
     let tnc = false;
+    let clientToken = '';
     try {
       const body = await req.json();
       tnc = Boolean(body && body.tnc);
+      // Token opsional dari browser (sessionStorage). Dipakai agar polling
+      // tetap bisa mencocokkan kode walau cookie login_token hilang/terblokir.
+      const raw = String(body?.clientToken || '').trim();
+      if (/^[a-f0-9]{64}$/i.test(raw)) clientToken = raw;
     } catch { /* body kosong = tidak setuju */ }
     if (!tnc) {
       return jsonFail('Centang persetujuan Syarat & Ketentuan dulu.', 400);
@@ -37,7 +42,7 @@ async function POST_impl(req) {
       return jsonFail('Gagal buat kode.', 500);
     }
 
-    const token = newToken();
+    const token = clientToken || newToken();
     const expiresAt = Date.now() + LOGIN_CODE_TTL_MS;
     await db.execute({
       sql: 'INSERT INTO web_login_codes (code, token_hash, expires_at, created_at, tnc_at) VALUES (?, ?, ?, ?, ?)',

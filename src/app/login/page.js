@@ -8,6 +8,38 @@ import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '
 import { LEGAL_LINKS } from '@/lib/legal';
 
 const TNC_KEY = 'animein-tnc-ok';
+const LOGIN_TOKEN_KEY = 'animein-login-token';
+
+function newClientToken() {
+  try {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return '';
+  }
+}
+
+function readClientToken() {
+  try {
+    const t = sessionStorage.getItem(LOGIN_TOKEN_KEY) || '';
+    return /^[a-f0-9]{64}$/i.test(t) ? t : '';
+  } catch {
+    return '';
+  }
+}
+
+function writeClientToken(token) {
+  try {
+    if (token) sessionStorage.setItem(LOGIN_TOKEN_KEY, token);
+    else sessionStorage.removeItem(LOGIN_TOKEN_KEY);
+  } catch { /* abaikan */ }
+}
+
+function loginHeaders() {
+  const token = readClientToken();
+  return token ? { 'X-Login-Token': token } : undefined;
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,10 +47,13 @@ export default function LoginPage() {
   const [expiresAt, setExpiresAt] = useState(0);
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [checkingNow, setCheckingNow] = useState(false);
   const [error, setError] = useState('');
+  const [statusMsg, setStatusMsg] = useState('');
   const [copied, setCopied] = useState(false);
   const [tnc, setTnc] = useState(false);
   const pollTimer = useRef(null);
+  const claimedRef = useRef(false);
 
   async function makeCode() {
     if (!tnc) {
@@ -26,14 +61,18 @@ export default function LoginPage() {
       return;
     }
     setError('');
+    setStatusMsg('');
     setCode('');
     setCopied(false);
     setLoading(true);
+    claimedRef.current = false;
+    const clientToken = newClientToken();
+    if (clientToken) writeClientToken(clientToken);
     try {
       const { ok, data } = await fetchJson('/api/auth/code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tnc: true }),
+        body: JSON.stringify({ tnc: true, ...(clientToken ? { clientToken } : {}) }),
       });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal buat kode.');
@@ -61,17 +100,56 @@ export default function LoginPage() {
     }
   }
 
+  function completeLogin() {
+    if (claimedRef.current) return;
+    claimedRef.current = true;
+    writeClientToken('');
+    router.replace('/book');
+  }
+
+  async function checkNow() {
+    if (!code) return;
+    setCheckingNow(true);
+    setStatusMsg('');
+    try {
+      const { data } = await fetchJson('/api/auth/code/status', {
+        ms: 10000,
+        headers: loginHeaders(),
+        cache: 'no-store',
+      }).catch(() => ({ data: {} }));
+      if (claimedRef.current) return;
+      if (data.status === 'claimed') {
+        completeLogin();
+        return;
+      }
+      if (data.status === 'expired') {
+        setCode('');
+        setError('Kode kedaluwarsa. Buat kode baru.');
+        return;
+      }
+      setStatusMsg(`Kode ${code} belum diklaim. Pastikan .login ${code} sudah terkirim ke bot Animein.`);
+    } catch {
+      setStatusMsg('Gagal cek status. Coba lagi.');
+    } finally {
+      setCheckingNow(false);
+    }
+  }
+
   useEffect(() => {
     // Muat status centang TnC + pulihkan kode yang belum diklaim
-    // (cookie login_token tetap ada walau browser di-refresh).
+    // (cookie/token login tetap ada walau browser di-refresh).
     try {
       if (localStorage.getItem(TNC_KEY) === '1') setTnc(true);
     } catch { /* abaikan */ }
     (async () => {
       try {
-        const { data } = await fetchJson('/api/auth/code/status', { ms: 10000 }).catch(() => ({ data: {} }));
+        const { data } = await fetchJson('/api/auth/code/status', {
+          ms: 10000,
+          headers: loginHeaders(),
+          cache: 'no-store',
+        }).catch(() => ({ data: {} }));
         if (data.status === 'claimed') {
-          router.push('/book');
+          completeLogin();
           return;
         }
         if (data.status === 'pending' && data.code) {
@@ -97,14 +175,22 @@ export default function LoginPage() {
   useEffect(() => {
     if (!code) return;
     let stopped = false;
+    let inFlight = false;
+
     // Poll rekursif: request berikutnya baru dijadwalkan SETELAH respons datang,
     // jadi tidak ada tumpukan request saat server lambat (dulu setInterval 2 dtk).
     const poll = async () => {
+      if (stopped || inFlight || claimedRef.current) return;
+      inFlight = true;
       try {
-        const { data } = await fetchJson('/api/auth/code/status', { ms: 10000 }).catch(() => ({ data: {} }));
-        if (stopped) return;
+        const { data } = await fetchJson('/api/auth/code/status', {
+          ms: 10000,
+          headers: loginHeaders(),
+          cache: 'no-store',
+        }).catch(() => ({ data: {} }));
+        if (stopped || claimedRef.current) return;
         if (data.status === 'claimed') {
-          router.push('/book');
+          completeLogin();
           return;
         }
         if (data.status === 'expired') {
@@ -114,12 +200,30 @@ export default function LoginPage() {
         }
       } catch {
         // coba lagi setelah jeda berikut
+      } finally {
+        inFlight = false;
       }
-      if (!stopped) pollTimer.current = setTimeout(poll, 2000);
+      if (!stopped && !claimedRef.current) pollTimer.current = setTimeout(poll, 2000);
     };
-    pollTimer.current = setTimeout(poll, 2000);
-    return () => { stopped = true; clearTimeout(pollTimer.current); };
-  }, [code, router]);
+
+    // Saat pengguna kembali dari chat bot ke browser, cek langsung.
+    // Timer di tab background sering ditunda oleh browser mobile.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !claimedRef.current) {
+        clearTimeout(pollTimer.current);
+        poll();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    pollTimer.current = setTimeout(poll, 600);
+    return () => {
+      stopped = true;
+      clearTimeout(pollTimer.current);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   return (
     <div className="page deco-wrap" style={{ maxWidth: 420 }}>
@@ -166,7 +270,9 @@ export default function LoginPage() {
         ) : (
           <div>
             <div className="trade-code-big">{code}</div>
-            <div className="trade-hint">Ketik .login {code} di chat. Menunggu klaim...</div>
+            <div className="trade-hint">
+              {statusMsg || `Ketik .login ${code} di chat. Menunggu klaim...`}
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn" onClick={copyCode} type="button" style={{ flex: 1 }}>
                 {copied ? 'Tersalin!' : 'Salin .login'}
@@ -175,6 +281,15 @@ export default function LoginPage() {
                 Kode Baru
               </button>
             </div>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ marginTop: 8 }}
+              onClick={checkNow}
+              disabled={checkingNow}
+            >
+              {checkingNow ? 'Memeriksa...' : 'Sudah kirim .login? Cek status'}
+            </button>
           </div>
         )}
       </div>
