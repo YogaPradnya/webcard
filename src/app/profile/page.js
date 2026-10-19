@@ -35,7 +35,6 @@ export default function ProfilePage() {
   const [ownedCards, setOwnedCards] = useState([]);
   const [busy, setBusy] = useState('');
   const [displayCards, setDisplayCards] = useState([]);
-  const [customSlots, setCustomSlots] = useState([]);
   const [dailyMissions, setDailyMissions] = useState([]);
   const [weeklyMissions, setWeeklyMissions] = useState([]);
   const [missionClaiming, setMissionClaiming] = useState('');
@@ -77,7 +76,6 @@ export default function ProfilePage() {
       else if (pData?.showcase) setShowcasePick(pData.showcase.name);
       else setShowcasePick('');
       if (sec.leaderboard) setLbMini((data.leaderboard || []).slice(0, 5));
-      if (sec.slots) setCustomSlots(data.slots || []);
       if (sec.missions) {
         setDailyMissions(data.daily || []);
         setWeeklyMissions(data.weekly || []);
@@ -384,34 +382,6 @@ export default function ProfilePage() {
                   Pajangan tampil di profil, badge Book, dan .profil chat.
                 </div>
               </div>
-
-              {shopOn ? (
-              <div className="card" style={{ marginTop: 16 }}>
-                <div className="section-title">Kartu Pajangan Custom ({customSlots.length}/50)</div>
-                {customSlots.length === 0 ? (
-                  <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                    Belum punya slot. <Link href="/shop" style={{ color: 'var(--link)', fontWeight: 800 }}>Beli di Shop</Link> (Rp10rb/slot).
-                  </div>
-                ) : (
-                  <div className="pick-grid">
-                    {customSlots.map((s) => (
-                      <div key={s.id} className="card-item">
-                        {s.imageUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img className="card-art" src={optImg(s.imageUrl, 300)} alt={s.name} loading="lazy" decoding="async" />
-                        ) : (
-                          <div className="card-art" />
-                        )}
-                        <div className="card-meta">
-                          <div className="card-name">{s.name}</div>
-                          <div className="card-anime">sisa ubah {s.editsLeft}/3</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              ) : null}
 
               <div className="card" style={{ marginTop: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
