@@ -1,6 +1,6 @@
 /* ===== Hiasan global (neo-brutalist playful) =====
    Lapisan dekorasi fixed di belakang konten: bentuk hiasan STATIS (tanpa
-   animasi agar tidak membebani render), tema musiman, washi tape, podium rank,
+   animasi agar tidak membebani render), tema musiman, podium rank,
    confetti Mythic, stempel misi, maskot empty state.
    Semua ornamen aria-hidden + pointer-events:none (lihat DecoLayer.js). */
 
@@ -70,39 +70,6 @@
 
 [data-theme='dark'] .deco-bubble {
   border-color: #69d6b6;
-}
-
-/* -- Washi tape di tepi layar (desktop) -- */
-.deco-tape {
-  display: none;
-  width: 94px;
-  height: 26px;
-  border: 1.5px solid var(--hairline-strong);
-  box-shadow: 2px 2px 0 rgba(10, 10, 10, 0.22);
-  background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 6px, transparent 6px 12px),
-    var(--lime);
-}
-
-@media (min-width: 721px) {
-  .deco-tape {
-    display: block;
-  }
-}
-
-.deco-tape.t1 {
-  top: 24vh;
-  left: -24px;
-  transform: rotate(-8deg);
-}
-
-.deco-tape.t2 {
-  bottom: 20vh;
-  right: -24px;
-  transform: rotate(7deg);
-  background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.5) 0 6px, transparent 6px 12px),
-    #ffb7d5;
 }
 
 /* -- Tema musiman (data-season diisi script kecil di layout.js) --

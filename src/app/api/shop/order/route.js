@@ -2,7 +2,8 @@ import { getDb } from '@/lib/db';
 import { checkRateCount } from '@/lib/rateLimit';
 import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
-  createPaydisiniTransaction, countUserSlots, ensureShopTables, isShopEnabled,
+  createTokopayTransaction, createSimulatedTransaction, countUserSlots,
+  ensureShopTables, isShopEnabled, isTokopayConfigured, isPaymentSimulationEnabled,
 } from '@/lib/shop';
 import { countDisplayCards } from '@/lib/display';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -15,6 +16,9 @@ async function POST_impl(req, _ctx, session) {
   if (!isShopEnabled()) {
     return jsonFail('Shop belum dibuka.', 403);
   }
+  if (!isTokopayConfigured() && !isPaymentSimulationEnabled()) {
+    return jsonFail('Pembayaran belum dikonfigurasi. Hubungi admin.', 503);
+  }
   const { body, error: bodyErr } = await parseJson(req);
   if (bodyErr) return bodyErr;
   const kind = String(body.kind || '');
@@ -23,8 +27,8 @@ async function POST_impl(req, _ctx, session) {
     return jsonFail('Terlalu sering bikin order. Tunggu sebentar.', 429);
   }
   try {
-    await ensureShopTables();
-    await ensureIdempotencyTable();
+    // Paralel: kedua ensure independen, bisa jalan bersamaan.
+    await Promise.all([ensureShopTables(), ensureIdempotencyTable()]);
     const db = getDb();
     const idemKey = getIdempotencyKey(req);
     if (idemKey) {
@@ -56,13 +60,21 @@ async function POST_impl(req, _ctx, session) {
     } else {
       return jsonFail('Jenis order tidak dikenal.', 400);
     }
-    // unique_code PayDisini = order_id kita (dipakai verifikasi callback & cek status).
+    // reff_id Tokopay = order_id kita (dipakai verifikasi callback & cek status).
     const orderId = genMerchantOrderId();
-    const tx = await createPaydisiniTransaction({
-      orderId,
-      amount: amountIdr,
-      note: `${itemName} — ${session.username || 'Animein'}`,
-    });
+    let tx;
+    if (isPaymentSimulationEnabled()) {
+      tx = createSimulatedTransaction({ orderId, amount: amountIdr });
+    } else {
+      tx = await createTokopayTransaction({
+        orderId,
+        amount: amountIdr,
+        customerName: session.username || 'Animein User',
+        customerEmail: `noreply+${session.id}@kartu.yogaa.web.id`,
+        customerPhone: '081234567890',
+        itemName,
+      });
+    }
     const now = Date.now();
     await getDb().execute({
       sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, created_at, updated_at)
@@ -88,10 +100,13 @@ async function POST_impl(req, _ctx, session) {
     });
   } catch (e) {
     console.error('[SHOP ORDER]', e.message);
-    const msg = /PAYDISINI_API_KEY/.test(e.message)
-      ? 'Pembayaran belum dikonfigurasi. Hubungi admin.'
-      : 'Gagal membuat pembayaran. Coba lagi.';
-    return jsonFail(msg, 500);
+    let msg = 'Gagal membuat pembayaran. Coba lagi.';
+    if (/TOKOPAY_(MERCHANT_ID|SECRET)/.test(e.message)) {
+      msg = 'Pembayaran belum dikonfigurasi. Hubungi admin.';
+    } else if (e.message) {
+      msg = e.message;
+    }
+    return jsonFail(msg, 502);
   }
 }
 

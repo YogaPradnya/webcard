@@ -12,7 +12,7 @@
 // Klien: fetchJson default 12 dtk, battle GET 10 dtk / POST 20 dtk,
 // upload gambar 30 dtk (lihat web-cards/src/app + lib/fetchJson.js).
 export const READ_TIMEOUT_MS = 9000; // < 10 dtk (GET battle) & 12 dtk (default klien)
-export const WRITE_TIMEOUT_MS = 10000; // < 12 dtk (POST default klien)
+export const WRITE_TIMEOUT_MS = 18000; // Tokopay API call bisa 3-5 dtk, total flow perlu ruang lebih
 export const UPLOAD_TIMEOUT_MS = 25000; // khusus upload Cloudinary (< 30 dtk klien)
 
 // Request lebih lambat dari ini dicatat server-side (bukti untuk investigasi

@@ -11,14 +11,23 @@ function xpForLevel(lv) {
   return Math.floor(20 * Math.pow(lv, 3));
 }
 
-export async function buildProfileData(session) {
+// preloaded.book / preloaded.display boleh berupa Promise. Dipakai
+// /api/profile/summary agar kartu & display tidak di-query dua kali
+// (dulu buildProfileData + route memanggil keduanya bersamaan).
+export async function buildProfileData(session, preloaded = {}) {
   const db = getDb();
   await ensureWebTitleColumn();
+  const bookPromise = preloaded.book
+    ? Promise.resolve(preloaded.book)
+    : getBookCards(session.id);
+  const displayPromise = preloaded.display
+    ? Promise.resolve(preloaded.display).catch(() => ({ cards: [], total: 0 }))
+    : getDisplayCards(session.id).catch(() => ({ cards: [], total: 0 }));
   const [book, statsRes, lbRes, displayData] = await Promise.all([
-    getBookCards(session.id),
+    bookPromise,
     db.execute({ sql: 'SELECT username, xp, level, custom_title, web_title FROM user_stats WHERE user_id = ?', args: [String(session.id)] }),
     db.execute({ sql: 'SELECT wins, losses FROM battle_leaderboard WHERE user_id = ?', args: [String(session.id)] }),
-    getDisplayCards(session.id).catch(() => ({ cards: [], total: 0 })),
+    displayPromise,
   ]);
   const row = statsRes.rows[0] || {};
   // Migrasi satu kali: bila custom_title berisi gelar WEB (dari versi lama),

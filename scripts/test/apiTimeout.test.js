@@ -5,7 +5,7 @@ import { withTimeout, READ_TIMEOUT_MS, WRITE_TIMEOUT_MS } from '../../src/lib/ap
 describe('apiTimeout', () => {
   it('batas default benar', () => {
     assert.equal(READ_TIMEOUT_MS, 9000);
-    assert.equal(WRITE_TIMEOUT_MS, 10000);
+    assert.equal(WRITE_TIMEOUT_MS, 18000);
   });
   it('handler cepat lolos apa adanya', async () => {
     const h = withTimeout(async () => ({ ok: 1 }), 1000, 'T');

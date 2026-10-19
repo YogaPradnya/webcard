@@ -109,6 +109,15 @@
   align-items: center;
   justify-content: center;
   font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 140ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    background-color 140ms ease;
+}
+
+.flip-btn:active {
+  transform: scale(0.9);
 }
 
 .pick-role {
@@ -687,14 +696,40 @@
   border-radius: 10px;
 }
 
+/* Bingkai lebih besar dari art (lebar & panjang). Ukuran pembesaran beda
+   per tier; bleed-nya tetap di dalam gap grid dan kartu WAJIB overflow
+   visible supaya ornamen tidak terpotong (jangan hapus skala ini tanpa
+   mengecek ulang overflow kartu). */
 .frame-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  transform: scale(1.07);
+  transform: scale(1.05);
   transform-origin: center;
+}
+
+/* Common: ring desainnya paling masuk ke dalam, jadi paling lebar (X 1.12)
+   supaya tepi border mendekati tepi art; tinggi tetap 1.09 */
+.frame-overlay.tier-Common {
+  transform: scale(1.12, 1.09);
+}
+
+/* Rare: sedikit lebih lebar dari baseline, tinggi tetap */
+.frame-overlay.tier-Rare {
+  transform: scale(1.10, 1.09);
+}
+
+/* Epic: baseline (lebar & panjang seimbang) */
+.frame-overlay.tier-Epic {
+  transform: scale(1.09);
+}
+
+/* Legendary/Mythic: lebar tetap, sedikit dipanjangkan (vertikal) */
+.frame-overlay.tier-Legendary,
+.frame-overlay.tier-Mythic {
+  transform: scale(1.05, 1.08);
 }
 
 /* ===== Stepper jumlah (+/-) ===== */
@@ -814,18 +849,19 @@
   color: var(--link);
 }
 
-/* ===== Toggle tema ===== */
+/* ===== Toggle tema (ikon saja, tanpa teks) ===== */
 .theme-toggle {
   width: 100%;
   min-height: 40px;
-  font-size: 13px;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .topbar-toggle .theme-toggle {
   width: auto;
   min-height: 0;
-  padding: 8px 12px;
-  font-size: 12px;
+  padding: 8px 10px;
+  font-size: 16px;
 }
 
 /* ===== White mode: kontras di atas #EAEAEA / putih ===== */
@@ -892,9 +928,22 @@
 .skeleton-line {
   height: 14px;
   border-radius: 8px;
-  background: var(--hairline-soft);
+  background-color: var(--hairline-soft);
+  background-image: linear-gradient(
+    100deg,
+    var(--hairline-soft) 20%,
+    var(--surface) 42%,
+    var(--hairline-soft) 64%
+  );
+  background-size: 220% 100%;
   border: 1.5px solid var(--hairline);
   margin-bottom: 10px;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from { background-position: 130% 0; }
+  to { background-position: -90% 0; }
 }
 
 /* Dekorasi login: awan + ikan (aria-hidden) */
@@ -1105,3 +1154,157 @@
     animation: none !important;
   }
 }
+
+/* ===== Splash pembuka (auto-fade, tidak menghalangi klik) ===== */
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--canvas);
+  pointer-events: none;
+  animation: splash-out 0.4s ease 0.5s forwards;
+}
+
+.splash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 28px;
+  background: var(--surface);
+  border: 2px solid var(--hairline-strong);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  animation: splash-pop 0.45s cubic-bezier(0.22, 0.8, 0.32, 1);
+}
+
+.splash-card img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+}
+
+.splash-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  color: var(--ink);
+}
+
+.splash-bar {
+  display: block;
+  width: 148px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--hairline-soft);
+  overflow: hidden;
+}
+
+.splash-bar i {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--lime);
+  animation: splash-load 0.9s ease-in-out infinite;
+}
+
+@keyframes splash-out {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes splash-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes splash-load {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(310%); }
+}
+
+/* ===== Transisi masuk antar halaman (opacity saja, aman utk position fixed) ===== */
+.route-fade {
+  animation: route-fade-in 260ms ease-out both;
+}
+
+@keyframes route-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== Reveal saat scroll (halus & elegan) =====
+   `js-reveal` dipasang inline script di <head> (hanya bila motion diizinkan),
+   jadi elemen sudah tersembunyi sejak paint pertama. JS (ScrollReveal)
+   menambahkan .reveal-in ketika elemen masuk viewport.
+   Fallback otomatis: jika observer tertunda atau gagal, elemen tetap muncul
+   dalam 450ms agar konten tidak pernah hilang / tersangkut. */
+@keyframes auto-reveal-fallback {
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+html.js-reveal :where(
+  .page .brand,
+  .page .card,
+  .book-grid > .card-item,
+  .pick-grid > .card-item
+) {
+  opacity: 0;
+  translate: 0 16px;
+  animation: auto-reveal-fallback 260ms ease 450ms forwards;
+  transition:
+    opacity 480ms cubic-bezier(0.22, 0.8, 0.32, 1) var(--reveal-delay, 0ms),
+    translate 480ms cubic-bezier(0.22, 0.8, 0.32, 1) var(--reveal-delay, 0ms),
+    transform 180ms ease-out,
+    box-shadow 250ms cubic-bezier(0.22, 0.8, 0.32, 1);
+}
+
+/* Skeleton loader jangan pernah disembunyikan agar feedback loading instan */
+html.js-reveal :where(
+  .card:has(.skeleton-line),
+  .skeleton-line
+) {
+  opacity: 1 !important;
+  translate: none !important;
+  animation: none !important;
+}
+
+html.js-reveal .reveal-in {
+  opacity: 1;
+  translate: 0 0;
+  animation: none;
+}
+
+/* ===== Reduced motion: matikan semua animasi baru ===== */
+@media (prefers-reduced-motion: reduce) {
+  .splash {
+    display: none !important;
+  }
+
+  .route-fade,
+  .splash-card,
+  .splash-bar i,
+  .skeleton-line {
+    animation: none !important;
+  }
+
+  html.js-reveal :where(
+    .page .brand,
+    .page .card,
+    .book-grid > .card-item,
+    .pick-grid > .card-item
+  ) {
+    opacity: 1 !important;
+    translate: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+

@@ -40,12 +40,43 @@ export default function Sidebar({ username }) {
     router.push('/login');
   }
 
-  const item = (href, label, badge) => (
-    <Link key={href} href={href} prefetch={false} className={pathname === href ? 'nav-item active' : 'nav-item'}>
-      {label}
-      {badge > 0 ? <span className="nav-badge" aria-label={`${badge} aktif`}>{badge}</span> : null}
-    </Link>
-  );
+  const [pendingNav, setPendingNav] = useState(null);
+
+  useEffect(() => {
+    setPendingNav(null);
+    function handlePop() {
+      setPendingNav(null);
+    }
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [pathname]);
+
+  const item = (href, label, badge) => {
+    const isCurrent = pathname === href;
+    const isPending = pendingNav === href && !isCurrent;
+    let cls = 'nav-item';
+    if (isCurrent) cls += ' active';
+    if (isPending) cls += ' pending-nav';
+
+    return (
+      <Link
+        key={href}
+        href={href}
+        prefetch={false}
+        className={cls}
+        onClick={() => {
+          if (href !== pathname) setPendingNav(href);
+        }}
+      >
+        {label}
+        {isPending ? (
+          <span className="nav-spinner" aria-hidden="true" />
+        ) : badge > 0 ? (
+          <span className="nav-badge" aria-label={`${badge} aktif`}>{badge}</span>
+        ) : null}
+      </Link>
+    );
+  };
 
   const desktopLinks = (
     <>

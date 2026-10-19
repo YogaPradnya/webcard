@@ -1,8 +1,8 @@
-import { getOrder, syncOrderFromPaydisini } from '@/lib/shop';
+import { getOrder, syncOrderFromTokopay } from '@/lib/shop';
 import { checkRateCount } from '@/lib/rateLimit';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
-// POST /api/shop/order/check { orderId } — tanya status ke PayDisini langsung.
+// POST /api/shop/order/check { orderId } — tanya status ke Tokopay langsung.
 // Dipakai tombol "Cek Status" + auto-cek (penting untuk localhost yang
 // tak terjangkau callback, dan cadangan bila callback gagal di production).
 async function POST_impl(req, _ctx, session) {
@@ -19,7 +19,7 @@ async function POST_impl(req, _ctx, session) {
     if (!order || String(order.userId) !== String(session.id)) {
       return jsonFail('Order tidak ditemukan.', 404);
     }
-    const r = await syncOrderFromPaydisini(orderId);
+    const r = await syncOrderFromTokopay(orderId);
     return jsonOk({ status: r.status, reason: r.reason || null });
   } catch (e) {
     console.error('[SHOP CHECK]', e.message);

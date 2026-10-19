@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 
 const KEY = 'animein-theme';
+// Event internal: tombol tema di sidebar & topbar (dua instance) saling sinkron
+// plus tab lain lewat event 'storage'.
+const EVT = 'animein-theme-change';
 
 function getInitial() {
   if (typeof window === 'undefined') return 'light';
@@ -21,6 +24,20 @@ export default function ThemeToggle() {
   const [theme, setTheme] = useState(getInitial);
 
   useEffect(() => {
+    function sync(t) {
+      if (t === 'light' || t === 'dark') setTheme(t);
+    }
+    const onLocal = (e) => sync(e.detail);
+    const onStorage = (e) => { if (e.key === KEY) sync(e.newValue); };
+    window.addEventListener(EVT, onLocal);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener(EVT, onLocal);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     try { window.localStorage.setItem(KEY, theme); } catch { /* abaikan */ }
   }, [theme]);
@@ -30,12 +47,15 @@ export default function ThemeToggle() {
     <button
       type="button"
       className="btn btn-ghost theme-toggle"
-      onClick={() => setTheme(next)}
+      onClick={() => {
+        setTheme(next);
+        window.dispatchEvent(new CustomEvent(EVT, { detail: next }));
+      }}
       aria-label={`Ganti ke mode ${next === 'dark' ? 'gelap' : 'terang'}`}
       title={`Ganti ke mode ${next === 'dark' ? 'gelap' : 'terang'}`}
       suppressHydrationWarning
     >
-      {theme === 'dark' ? '☀️ White mode' : '🌙 Dark mode'}
+      {theme === 'dark' ? '☀️' : '🌙'}
     </button>
   );
 }

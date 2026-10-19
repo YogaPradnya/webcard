@@ -132,6 +132,18 @@
   padding: 0;
 }
 
+/* Scroll halus untuk lompatan anchor; padding atas agar tidak ketutup topbar. */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 76px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 body {
   background-color: var(--sky-bottom);
   background-image:
@@ -170,7 +182,10 @@ body {
 
 @media (max-width: 720px) {
   .page {
-    padding: 20px 14px 64px;
+    /* Jarak ke bottomnav ditanggung .layout-main (padding-bottom: 76px),
+       jadi .page tidak perlu padding bawah tambahan — tidak ada area
+       kosong besar di bawah baris kartu terakhir */
+    padding: 20px 14px 8px;
   }
 
   .card {
@@ -195,8 +210,10 @@ body {
     text-overflow: ellipsis;
   }
 
-  /* Tombol "?" flip tidak menutupi nama/tier kartu. */
-  .card-item .card-meta {
+  /* Tombol "?" flip di halaman battle tidak menutupi nama/tier kartu.
+     (Scoped ke pick-grid: kartu di halaman Book tidak punya tombol itu,
+     jadi meta-nya boleh lebar penuh.) */
+  .pick-grid .card-item .card-meta {
     padding-right: 34px;
   }
 
@@ -243,17 +260,38 @@ body {
   cursor: pointer;
   font-family: inherit;
   box-shadow: var(--shadow);
-  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    transform 160ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    box-shadow 160ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    background-color 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
 }
 
-.btn:hover:not(:disabled) {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--hairline-strong);
+@media (hover: hover) {
+  .btn:hover:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--hairline-strong);
+  }
 }
 
 .btn:active:not(:disabled) {
-  transform: translate(3px, 3px);
+  transform: translate(2px, 2px) scale(0.98);
   box-shadow: none;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 .btn:disabled {

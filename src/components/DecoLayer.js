@@ -1,4 +1,4 @@
-/* Lapisan hiasan global: bentuk hiasan statis + washi tape + tema musiman.
+/* Lapisan hiasan global: bentuk hiasan statis + tema musiman.
    SENGAJA tanpa animasi (bob/fall dihapus) agar tidak membebani render.
    Murni dekoratif (aria-hidden, pointer-events:none) dan posisinya di belakang
    konten via z-index di deco.css. Musim diatur script kecil di layout.js
@@ -28,10 +28,6 @@ export default function DecoLayer() {
       {Array.from({ length: 7 }).map((_, i) => (
         <span key={`sn${i}`} className="deco-shape deco-snow" style={{ left: `${9 + i * 13}%`, top: `${5 + ((i * 17) % 76)}%` }} />
       ))}
-
-      {/* Washi tape di tepi layar (desktop saja) */}
-      <span className="deco-tape t1" />
-      <span className="deco-tape t2" />
     </div>
   );
 }

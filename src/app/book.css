@@ -41,6 +41,22 @@
   cursor: pointer;
   font-family: inherit;
   color: var(--body);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 140ms cubic-bezier(0.22, 0.8, 0.32, 1),
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.chip:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .chip.active {
@@ -86,40 +102,51 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px;
+  /* Kartu dalam satu baris setinggi barisnya (stretch, default): tombol
+     pajangan dipatok ke dasar kartu sehingga tidak ada ruang kosong
+     di bawah kartu yang lebih pendek */
 }
 
+/* Tanpa border: kartu cukup foto + meta. Rarity tetap terlihat lewat
+   pita tier, sparkle, shine, dan aura berdenyut (animasi dipertahankan). */
 .card-item {
   position: relative;
   border-radius: var(--r-lg);
+  /* visible (bukan hidden): bingkai rarity lebih besar dari art
+     (per tier, lihat .frame-overlay), bleed-nya tidak boleh terpotong */
   overflow: visible;
   background: var(--surface);
-  border: 2px solid var(--hairline-strong);
   transition: transform 0.18s ease-out, box-shadow 0.25s;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Kartu milik sendiri: border tebal + glow warna rarity */
+/* Kartu milik sendiri: glow warna rarity lewat animasi, bukan border */
 .card-item.owned {
-  border-width: 3px;
   cursor: pointer;
 }
 
-.card-item.owned:hover {
-  transform: translateY(-4px) scale(1.02);
-  z-index: 3;
+@media (hover: hover) {
+  .card-item.owned:hover {
+    transform: translateY(-4px) scale(1.02);
+    z-index: 3;
+  }
 }
 
-/* Utilitas rarity: pakai sebagai class tambahan (rar-Common dst.) */
-.rar-Common { border-color: var(--rar-common) !important; box-shadow: none; }
-.rar-Rare { border-color: var(--rar-rare) !important; box-shadow: none; }
-.rar-Epic { border-color: var(--rar-epic) !important; box-shadow: none; }
-.rar-Legendary { border-color: var(--rar-legendary) !important; box-shadow: none; }
-.rar-Mythic { border-color: var(--rar-mythic) !important; box-shadow: none; }
+/* Feedback tekan di layar sentuh (hover tidak tersedia) */
+@media (hover: none) {
+  .card-item.owned:active {
+    transform: scale(0.985);
+  }
+}
 
 /* Flip kartu milik sendiri: ketuk untuk lihat stat di baliknya */
 .flip-inner {
   position: relative;
   width: 100%;
-  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   transition: transform 0.6s;
   transform-style: preserve-3d;
 }
@@ -134,6 +161,14 @@
   position: relative;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* Sisi depan mengikuti tinggi kartu agar meta (tombol pajangan) bisa
+   dipatok ke dasar lewat margin auto */
+.flip-front {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .flip-back {
@@ -260,6 +295,7 @@
   width: 100%;
   object-fit: cover;
   display: block;
+  flex-shrink: 0;
   background: var(--hairline-soft);
 }
 
@@ -267,17 +303,27 @@
 .tier-ribbon {
   display: block;
   height: 5px;
+  flex-shrink: 0;
   background: var(--tier, var(--muted-soft));
   box-shadow: none;
 }
 
-/* Belum punya: abu-abu */
-.card-item.locked .card-art {
+/* Belum punya: abu-abu (foto DAN bingkai SVG ikut di-abu-abukan) */
+.card-item.locked .card-art,
+.card-item.locked .framed-art {
   filter: grayscale(1);
   opacity: 0.75;
 }
 
+/* Bingkai SVG rarity: jaga tingginya (jangan menyusut dalam flex kolom kartu) */
+.book-grid .framed-art {
+  flex-shrink: 0;
+}
+
 .card-meta {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 8px 10px 10px;
 }
 
@@ -300,9 +346,43 @@
 
 .card-stats {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   margin-top: 6px;
-  flex-wrap: wrap;
+  margin-bottom: 6px;
+  /* Konsisten: bintang + PWR berdampingan satu baris di atas tombol pajangan */
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+/* Tag stat pil: jangan pernah patah baris, pangkas lembut bila sempit */
+.card-stats .stat-tag {
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+/* Baris bintang+power boleh menyusut kecil di layar sempit */
+.card-stats .stat-tag.power {
+  flex-shrink: 1;
+}
+
+@media (max-width: 720px) {
+  .book-grid .card-stats {
+    gap: 4px;
+  }
+
+  .book-grid .stat-tag {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  /* Lebar kartu 3 kolom sempit: kecilkan tombol supaya tetap satu baris */
+  .book-grid .card-btn {
+    font-size: 10px;
+    padding: 4px 5px;
+  }
 }
 
 .stat-tag {
@@ -325,6 +405,25 @@
   background: var(--pastel-blue);
   color: var(--ink);
   border-color: var(--pastel-blue-bd);
+}
+
+/* ===== Tombol aksi kartu (evolusi / pajangan / ubah) =====
+   Satu tapak konsisten: lebar penuh, satu baris, dipangkas bila sempit. */
+.card-btn {
+  width: 100%;
+  min-height: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tombol pajangan dipatok ke dasar kartu: posisi tombol selalu sama
+   antar kartu dalam satu baris (tanpa ruang kosong di bawahnya) */
+.card-btn.card-btn-main {
+  margin-top: auto;
 }
 
 .progress-wrap {
@@ -373,8 +472,10 @@
   transform: translateX(0) skewX(-16deg);
 }
 
-.card-item.owned:hover .card-shine::after {
-  animation: card-shine-sweep 0.9s ease-out;
+@media (hover: hover) {
+  .card-item.owned:hover .card-shine::after {
+    animation: card-shine-sweep 0.9s ease-out;
+  }
 }
 
 [data-theme='dark'] .card-shine::after {
@@ -459,6 +560,11 @@
   .card-spark,
   .card-item.owned:hover .card-shine::after {
     animation: none !important;
+  }
+
+  .card-item.owned:active,
+  .chip:active {
+    transform: none;
   }
 }
 

@@ -11,6 +11,10 @@ export async function register() {
       // lihat lib/db.js) — jangan blokir boot.
       const { warmWriteTxOnce } = await import('./lib/db.js');
       warmWriteTxOnce();
+      // Cache kartu lintas-bundle: query card_battle_stats (~2,7 dtk) dan
+      // settings pool/art jangan ditanggung request pertama.
+      const { warmCardCaches } = await import('./lib/cards.js');
+      warmCardCaches();
     } catch (e) {
       console.error('[SCHEMA BOOT]', String(e?.message || e));
     }

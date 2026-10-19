@@ -11,8 +11,11 @@ export const runtime = 'nodejs';
 async function GET_impl(req, _ctx, session) {
   try {
     await ensureShopTables();
-    await expireStalePendingOrders(session.id);
-    const orders = await listUserOrders(session.id, 10);
+    // Paralel: expire tidak mengubah urutan list secara signifikan.
+    const [, orders] = await Promise.all([
+      expireStalePendingOrders(session.id),
+      listUserOrders(session.id, 10),
+    ]);
     return jsonOk({ orders });
   } catch (e) {
     console.error('[SHOP ORDERS]', e.message);

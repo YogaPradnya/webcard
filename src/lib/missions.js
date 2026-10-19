@@ -49,10 +49,32 @@ export async function ensureMissionTables() {
   `);
 }
 
+// Dedupe login harian lintas-bundle: /api/missions & /api/profile/summary
+// sama-sama mencatat 'login'. Tanpa ini tiap buka profil = 2-3 upsert tulis
+// yang berebut write-lock di sqld dan ikut menahan query lain.
+const LOGIN_DEDUPE_KEY = '__animeinLoginRecordedV1';
+
+function loginDedupe(userId) {
+  let set = globalThis[LOGIN_DEDUPE_KEY];
+  if (!set) {
+    set = new Set();
+    globalThis[LOGIN_DEDUPE_KEY] = set;
+  }
+  return { set, key: `${String(userId)}:${jakartaDateKey()}` };
+}
+
 // Catat event game ke progres periode berjalan (harian + mingguan sekaligus).
 // event: 'gacha' | 'battle' | 'pvp' | 'pvp_win' | 'trade' | 'login'. n = jumlah.
 export async function recordEvent(userId, username, event, n = 1) {
   const amount = Math.max(1, Math.floor(Number(n) || 1));
+  let dedupe = null;
+  if (event === 'login') {
+    const d = loginDedupe(userId);
+    if (d.set.has(d.key)) return;
+    if (d.set.size > 5000) d.set.clear();
+    d.set.add(d.key);
+    dedupe = d;
+  }
   try {
     await ensureMissionTables();
     const db = getDb();
@@ -83,7 +105,11 @@ export async function recordEvent(userId, username, event, n = 1) {
     // statement ~30-45 dtk per statement (timeout 503). execute tunggal
     // ~0,5-1 dtk; dijalankan paralel karena upsert-nya independen.
     if (stmts.length > 0) await Promise.all(stmts.map((s) => db.execute(s)));
-  } catch { /* misi non-kritis: jangan gagalkan game */ }
+  } catch {
+    // Gagal tulis: izinkan percobaan berikutnya (jangan dedupe kegagalan).
+    if (dedupe) dedupe.set.delete(dedupe.key);
+    /* misi non-kritis: jangan gagalkan game */
+  }
 }
 
 export async function getMissionStatus(userId) {

@@ -6,6 +6,9 @@ import './components.css';
 import './deco.css';
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google';
 import DecoLayer from '@/components/DecoLayer';
+import ScrollReveal from '@/components/ScrollReveal';
+import Splash from '@/components/Splash';
+import RouteProgress from '@/components/RouteProgress';
 
 /* Tema musiman hiasan: biarkan '' untuk otomatis dari tanggal,
    atau isi 'sakura' | 'halloween' | 'natal' untuk memaksa (buat testing). */
@@ -64,6 +67,11 @@ export default function RootLayout({ children }) {
         />
         <script
           dangerouslySetInnerHTML={{
+            __html: `(function(){try{if(!('IntersectionObserver' in window))return;if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;document.documentElement.classList.add('js-reveal');}catch(e){}})();`,
+          }}
+        />
+        <script
+          dangerouslySetInnerHTML={{
             __html: `(function(){try{if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}}catch(e){}})();`,
           }}
         />
@@ -74,7 +82,10 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body>
+        <RouteProgress />
+        <Splash />
         {children}
+        <ScrollReveal />
         <DecoLayer />
       </body>
     </html>

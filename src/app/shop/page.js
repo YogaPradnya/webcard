@@ -25,6 +25,7 @@ export default function ShopPage() {
   const [myXp, setMyXp] = useState(null);
   const [nowTick, setNowTick] = useState(Date.now());
   const [qrOrder, setQrOrder] = useState(null);
+  const [simulating, setSimulating] = useState('');
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 1000);
@@ -56,6 +57,29 @@ export default function ShopPage() {
     return o.kind === 'xp'
       ? `Top-Up ${Number(o.xpAmount || 0).toLocaleString('id-ID')} XP`
       : `Slot Pajangan x${o.qty || 1}`;
+  }
+
+  async function simulatePay(orderId) {
+    if (!orderId) return;
+    setSimulating(orderId);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const { ok, data } = await postJson('/api/shop/order/simulate', { orderId });
+      if (!ok || !data.success) {
+        setError(data.message || 'Gagal simulasi pembayaran.');
+        return;
+      }
+      const o = orders.find((x) => x.orderId === orderId);
+      const what = o ? (o.kind === 'xp' ? `+${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `+${o.qty} slot pajangan`) : (qrOrder?.label || 'item');
+      setSuccessMsg(`Simulasi pembayaran sukses! ${what} sudah masuk.`);
+      setQrOrder(null);
+      await load({ quiet: true });
+    } catch {
+      setError('Gagal menghubungi server untuk simulasi pembayaran.');
+    } finally {
+      setSimulating('');
+    }
   }
 
   async function checkOrder(orderId, opts = {}) {
@@ -155,7 +179,7 @@ export default function ShopPage() {
     setError('');
     setSuccessMsg('');
     try {
-      const { ok, data } = await postJson('/api/shop/order', body);
+      const { ok, data } = await postJson('/api/shop/order', body, { ms: 22000 });
       if (!ok || !data.success) {
         setError(data.message || 'Gagal membuat pembayaran.');
         return;
@@ -248,7 +272,23 @@ export default function ShopPage() {
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>
                     Scan QR dengan aplikasi bank / e-wallet yang mendukung QRIS. Status tercentang otomatis — atau tekan Cek Status.
                   </div>
+                  {catalog?.payment?.simulation || qrOrder.channel?.includes('Simulasi') ? (
+                    <div style={{ background: 'rgba(234, 179, 8, 0.12)', border: '1px solid rgba(234, 179, 8, 0.35)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--body)', margin: '4px 0 8px' }}>
+                      <b>Mode Simulasi Dev:</b> Karena gateway pihak ketiga sedang ditutup sementara, pembayaran dapat disimulasikan secara instan untuk pengujian.
+                    </div>
+                  ) : null}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                    {catalog?.payment?.simulation || qrOrder.channel?.includes('Simulasi') ? (
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ width: 'auto', padding: '0 16px', background: 'var(--success, #22c55e)', color: '#fff', border: 'none', fontWeight: 800 }}
+                        disabled={simulating === qrOrder.orderId}
+                        onClick={() => simulatePay(qrOrder.orderId)}
+                      >
+                        {simulating === qrOrder.orderId ? 'Memproses...' : '⚡ Bayar Instan (Simulasi Dev)'}
+                      </button>
+                    ) : null}
                     {qrOrder.checkoutUrl ? (
                       <a
                         className="btn"
@@ -381,6 +421,17 @@ export default function ShopPage() {
                             onClick={(e) => { e.stopPropagation(); payAgain(o); }}
                           >
                             Bayar
+                          </button>
+                        ) : null}
+                        {catalog?.payment?.simulation || o.payChannel?.includes('Simulasi') ? (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            style={{ width: 'auto', minHeight: 0, padding: '4px 8px', fontSize: 11, color: 'var(--success, #22c55e)', fontWeight: 700 }}
+                            disabled={simulating === o.orderId}
+                            onClick={(e) => { e.stopPropagation(); simulatePay(o.orderId); }}
+                          >
+                            {simulating === o.orderId ? '...' : 'Bayar (Simulasi)'}
                           </button>
                         ) : null}
                         <button

@@ -6,13 +6,19 @@ import { cleanHex } from './color.js';
 import { DISPLAY_BORDERS } from './constants.js';
 
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
-// Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via PayDisini.
+// Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Tokopay.
 
 // Feature flag Shop: tampil hanya bila NEXT_PUBLIC_SHOP_ENABLED=true.
-// Matikan (default) sampai key production PayDisini siap, agar fitur
+// Matikan (default) sampai kredensial production Tokopay siap, agar fitur
 // pembayaran tidak terlihat publik. Nyalakan lokal untuk tes.
 export function isShopEnabled() {
   return String(process.env.NEXT_PUBLIC_SHOP_ENABLED || '').toLowerCase() === 'true';
+}
+
+// Mode simulasi pembayaran: aktif di dev saat NEXT_PUBLIC_PAYMENT_SIMULATION=true
+// Berguna saat API gateway pihak ketiga (Tokopay) mengalami pemeliharaan.
+export function isPaymentSimulationEnabled() {
+  return String(process.env.NEXT_PUBLIC_PAYMENT_SIMULATION || '').toLowerCase() === 'true';
 }
 
 export const XP_PACKS = [
@@ -40,131 +46,225 @@ export function editsLeft(slot) {
   return Math.max(0, MAX_EDITS_PER_SLOT - (Number(slot?.edits_used) || 0));
 }
 
-// ---- PayDisini (https://payment.paydisini.co.id/docs) ----
-// Satu endpoint untuk semua request; body form-urlencoded + signature md5.
-// Channel default: 11 = QRIS Merchant PayDisini (fee 0.7%, min Rp100, maks Rp10jt).
-const PAYDISINI_API_URL = 'https://api.paydisini.co.id/v1/';
-export const PAYDISINI_DEFAULT_SERVICE = '11';
+// ---- Tokopay (https://docs.tokopay.id) ----
+// Order via POST JSON; signature md5(merchant_id:secret:reff_id) untuk
+// create & callback. Channel default: QRIS (QRISREALTIME bisa lewat env).
+const TOKOPAY_API_URL = 'https://api.tokopay.id/v1/';
+export const TOKOPAY_DEFAULT_CHANNEL = 'QRIS';
 
-export function paydisiniApiKey() {
-  return String(process.env.PAYDISINI_API_KEY || '').trim();
+export function tokopayMerchantId() {
+  return String(process.env.TOKOPAY_MERCHANT_ID || '').trim();
 }
 
-export function paydisiniServiceId() {
-  return String(process.env.PAYDISINI_SERVICE || '').trim() || PAYDISINI_DEFAULT_SERVICE;
+export function tokopaySecret() {
+  return String(process.env.TOKOPAY_SECRET || '').trim();
 }
 
-// 1 = fee ditanggung customer, 2 = fee ditanggung merchant (harga katalog tetap).
-export function paydisiniTypeFee() {
-  return String(process.env.PAYDISINI_TYPE_FEE || '').trim() === '1' ? '1' : '2';
+export function tokopayChannel() {
+  return String(process.env.TOKOPAY_CHANNEL || '').trim() || TOKOPAY_DEFAULT_CHANNEL;
 }
 
-export function isPaydisiniConfigured() {
-  return Boolean(paydisiniApiKey());
+export function isTokopayConfigured() {
+  return Boolean(tokopayMerchantId() && tokopaySecret());
 }
 
 function md5(s) {
   return createHash('md5').update(String(s)).digest('hex');
 }
 
-// valid_time PayDisini: 300-10800 detik; disamakan dengan TTL order.
-export function paydisiniValidTimeSec() {
-  const sec = Math.ceil(ORDER_PENDING_TTL_MS / 1000);
-  return Math.min(10800, Math.max(300, sec));
+function isTokopaySuccess(status) {
+  const s = String(status ?? '').trim().toLowerCase();
+  return s === 'success' || s === '1' || s === 'true';
 }
 
-async function paydisiniPost(params) {
-  const res = await fetch(PAYDISINI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Accept: 'application/json',
-    },
-    body: new URLSearchParams(params).toString(),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.success) {
-    throw new Error(String(data?.msg || `PayDisini ${res.status}`));
+export function tokopayChannelName(raw) {
+  const s = String(raw || '').trim();
+  const upper = s.toUpperCase();
+  if (upper === 'QRISREALTIME') return 'QRIS Realtime';
+  if (upper === 'QRIS_REALTIME_NOBU') return 'QRIS Realtime Nobu';
+  if (upper.startsWith('QRIS')) return 'QRIS';
+  return s || 'QRIS';
+}
+
+function tokopaySignature(refId) {
+  return md5(`${tokopayMerchantId()}:${tokopaySecret()}:${String(refId)}`);
+}
+
+// Buat transaksi QRIS baru. Return data untuk ditampilkan (QR) + disimpan.
+export async function createTokopayTransaction({
+  orderId, amount, customerName, customerEmail, customerPhone, itemName,
+}) {
+  const merchantId = tokopayMerchantId();
+  const secret = tokopaySecret();
+  if (!merchantId || !secret) {
+    throw new Error('TOKOPAY_MERCHANT_ID/TOKOPAY_SECRET belum diisi');
   }
-  return data;
-}
+  const refId = String(orderId);
+  const amountInt = Math.round(Number(amount) || 0);
+  if (amountInt < 1) throw new Error('Nominal tidak valid');
+  const channel = tokopayChannel();
 
-// Buat transaksi baru. Return data untuk ditampilkan (QR) + disimpan.
-export async function createPaydisiniTransaction({ orderId, amount, note }) {
-  const key = paydisiniApiKey();
-  if (!key) throw new Error('PAYDISINI_API_KEY belum diisi');
-  const code = String(orderId).slice(0, 32); // unique_code maks 32 karakter
-  const service = paydisiniServiceId();
-  const amountStr = String(Math.round(Number(amount) || 0));
-  const validTime = String(paydisiniValidTimeSec());
-  const signature = md5(`${key}${code}${service}${amountStr}${validTime}NewTransaction`);
-  const data = await paydisiniPost({
-    key,
-    request: 'new',
-    unique_code: code,
-    service,
-    amount: amountStr,
-    note: String(note || 'Pembayaran Animein').slice(0, 250),
-    valid_time: validTime,
-    type_fee: paydisiniTypeFee(),
-    callback_count: '3',
-    signature,
-  });
+  // Simple Order (GET) adalah metode utama sesuai dokumentasi Tokopay untuk QRIS
+  const simpleUrl = new URL('order', TOKOPAY_API_URL);
+  simpleUrl.searchParams.set('merchant', merchantId);
+  simpleUrl.searchParams.set('secret', secret);
+  simpleUrl.searchParams.set('ref_id', refId);
+  simpleUrl.searchParams.set('nominal', String(amountInt));
+  simpleUrl.searchParams.set('metode', channel);
+
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+
+  let res;
+  try {
+    res = await fetch(simpleUrl.toString(), {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('Tokopay tidak merespons dalam 8 detik (timeout)');
+    }
+    throw new Error(`Tokopay tidak bisa dihubungi: ${e.message}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !isTokopaySuccess(data.status)) {
+    const errMsg = String(data?.error_msg || data?.message || `Tokopay ${res.status}`);
+    throw new Error(`Tokopay: ${errMsg}`);
+  }
   const d = data.data || {};
+  if (!d.qr_link && !d.pay_url && !d.checkout_url) {
+    throw new Error('Tokopay tidak mengembalikan data QR');
+  }
   return {
-    payId: String(d.pay_id || ''),
-    qrContent: String(d.qr_content || ''),
-    qrUrl: String(d.qrcode_url || ''),
-    checkoutUrl: String(d.checkout_url_v3 || d.checkout_url_v2 || d.checkout_url || ''),
-    channelName: String(d.service_name || '').trim(),
-    status: String(d.status || 'Pending'),
+    payId: String(d.trx_id || ''),
+    qrContent: String(d.qr_string || ''),
+    qrUrl: String(d.qr_link || ''),
+    checkoutUrl: String(d.pay_url || d.checkout_url || ''),
+    channelName: tokopayChannelName(channel),
+    status: 'Pending',
   };
 }
 
-// Verifikasi signature callback: md5(key + unique_code + 'CallbackStatus'),
-// plus pastikan `key` yang dikirim memang API key kita.
-export function verifyPaydisiniCallbackSignature({ key, uniqueCode, signature }) {
-  const apiKey = paydisiniApiKey();
-  if (!apiKey) return false;
-  if (String(key || '') !== apiKey) return false;
-  const expected = md5(`${apiKey}${uniqueCode}CallbackStatus`);
+// Buat transaksi simulasi untuk pengujian lokal saat gateway tidak tersedia
+export function createSimulatedTransaction({ orderId, amount }) {
+  const refId = String(orderId);
+  const amountInt = Math.round(Number(amount) || 0);
+  return {
+    payId: `SIM-${Date.now()}`,
+    qrContent: `00020101021226590014ID.LINKAJA.WWW01189360091100222033880215${refId}520458125303360540${amountInt}5802ID5911ANIMEIN SHOP6007JAKARTA6304ABCD`,
+    qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=ANIMEIN_SIMULATION_${encodeURIComponent(refId)}`,
+    checkoutUrl: '',
+    channelName: 'QRIS (Simulasi Dev)',
+    status: 'Pending',
+  };
+}
+
+// Verifikasi callback: merchant_id harus milik kita + signature
+// md5(merchant_id:secret:reff_id). Signature Tokopay huruf kecil.
+export function verifyTokopayCallbackSignature({ merchantId, refId, signature }) {
+  const expectedMerchant = tokopayMerchantId();
+  const secret = tokopaySecret();
+  if (!expectedMerchant || !secret || !refId) return false;
+  if (String(merchantId || '') !== expectedMerchant) return false;
+  const expected = md5(`${expectedMerchant}:${secret}:${String(refId)}`);
   return expected === String(signature || '').toLowerCase();
 }
 
-// Ambil status transaksi langsung dari PayDisini (dipakai tombol "Cek Status"
-// dan sinkronisasi otomatis — penting untuk localhost yang tak terjangkau callback).
-export async function fetchPaydisiniStatus(uniqueCode) {
-  const key = paydisiniApiKey();
-  if (!key) throw new Error('PAYDISINI_API_KEY belum diisi');
-  const code = String(uniqueCode);
-  const signature = md5(`${key}${code}StatusTransaction`);
-  return paydisiniPost({ key, request: 'status', unique_code: code, signature });
+// Status callback/check-order Tokopay -> status internal.
+export function mapTokopayStatus(status) {
+  const s = String(status || '').trim().toLowerCase();
+  if (s === 'success' || s === 'completed') return 'paid';
+  if (s === 'failed') return 'failed';
+  if (s === 'unpaid' || s === 'proses callback' || s === 'pending') return 'pending';
+  return 'unknown';
 }
 
-// Sinkronkan 1 order ke status PayDisini + penuhi bila lunas.
-// Pemaaf: order 'expired' yang ternyata Success di PayDisini tetap dipenuhi
+// Ambil status transaksi langsung dari Tokopay (dipakai tombol "Cek Status"
+// dan sinkronisasi otomatis — penting untuk localhost yang tak terjangkau callback).
+export async function fetchTokopayStatus(refId) {
+  const merchantId = tokopayMerchantId();
+  const secret = tokopaySecret();
+  if (!merchantId || !secret) {
+    throw new Error('TOKOPAY_MERCHANT_ID/TOKOPAY_SECRET belum diisi');
+  }
+  const url = new URL('check-order', TOKOPAY_API_URL);
+  url.searchParams.set('merchant_id', merchantId);
+  url.searchParams.set('secret', secret);
+  url.searchParams.set('ref_id', String(refId));
+
+  const ctrl = new AbortController();
+  const timeoutId = setTimeout(() => ctrl.abort(), 7000);
+
+  let res;
+  try {
+    res = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: ctrl.signal,
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('Tokopay tidak merespons dalam 7 detik (timeout)');
+    }
+    throw new Error(`Tokopay tidak bisa dihubungi: ${e.message}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Tokopay ${res.status}`);
+  if (!isTokopaySuccess(data.status)) {
+    const msg = String(data?.error_msg || data?.message || 'Data Not Found');
+    // Transaksi lama/non-Tokopay: jangan dianggap error keras.
+    if (/not found|tidak ditemukan/i.test(msg)) return { found: false, data: null, reason: msg };
+    throw new Error(msg);
+  }
+  if (!data.data) return { found: false, data: null, reason: 'Data kosong' };
+  return { found: true, data: data.data };
+}
+
+// Sinkronkan 1 order ke status Tokopay + penuhi bila lunas.
+// Pemaaf: order 'expired' yang ternyata Success di Tokopay tetap dipenuhi
 // (anti double-kirim: status langsung jadi 'paid', sync berikutnya diabaikan).
 // Return { status: 'paid'|'pending'|'failed'|'expired'|'unknown', reason? }.
-export async function syncOrderFromPaydisini(orderId) {
+export async function syncOrderFromTokopay(orderId) {
   const order = await getOrder(orderId);
   if (!order) return { status: 'unknown' };
   if (order.status !== 'pending' && order.status !== 'expired') return { status: order.status };
-  // Order lama (era Midtrans) tidak punya transaksi di PayDisini.
-  if (!order.payId && !order.qrUrl) return { status: order.status };
-  const st = await fetchPaydisiniStatus(orderId);
-  const status = String(st?.data?.status || '');
-  const channel = String(st?.service?.name || st?.data?.service_name || '');
-  if (status === 'Success') {
+  // Order simulasi tidak dikirim ke Tokopay, bayar lewat tombol simulasi
+  if (order.payChannel?.includes('Simulasi') || order.payId?.startsWith('SIM-')) {
+    return { status: order.status, reason: 'Order simulasi dev — gunakan tombol Bayar Instan' };
+  }
+  const st = await fetchTokopayStatus(orderId);
+  if (!st.found) return { status: order.status, reason: st.reason || 'tidak ditemukan' };
+  const d = st.data;
+  const mapped = mapTokopayStatus(d.status);
+  const channel = tokopayChannelName(
+    d.nama_payment_channel || d.nama_channel || d.kode_channel || order.payChannel || 'QRIS',
+  );
+  if (mapped === 'paid') {
+    // Callback/check-order tidak menandatangani nominal, jadi pastikan cukup.
+    const paid = Number(d.jumlah_bayar ?? d.nominal ?? 0) || 0;
+    if (paid > 0 && paid < Number(order.amountIdr)) {
+      console.warn('[SHOP SYNC] Nominal kurang:', orderId, paid, order.amountIdr);
+      return { status: order.status, reason: 'nominal kurang' };
+    }
     const r = await fulfillPaidOrder(order, { paymentType: channel });
-    if (!r.fulfilled && r.reason !== 'bukan pending/expired') return { status: order.status, reason: r.reason };
+    if (!r.fulfilled && r.reason !== 'bukan pending/expired') {
+      return { status: order.status, reason: r.reason };
+    }
     return { status: 'paid' };
   }
-  if (status === 'Canceled') {
-    await setOrderStatus(orderId, 'failed');
+  if (mapped === 'failed') {
+    if (order.status === 'pending') await setOrderStatus(orderId, 'failed');
     return { status: 'failed' };
   }
-  if (status === 'Pending') return { status: 'pending' };
-  return { status: order.status };
+  return { status: mapped === 'pending' ? 'pending' : order.status };
 }
 
 export function genMerchantOrderId() {
@@ -323,9 +423,9 @@ export async function countUserSlots(userId) {
 }
 
 // Penuhi order yang sudah dibayar (idempoten).
-// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: PayDisini
+// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Tokopay
 // bilang Success padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
-// payment: { paymentType } dari PayDisini (nama channel, disimpan untuk detail transaksi).
+// payment: { paymentType } dari Tokopay (nama channel, disimpan untuk detail transaksi).
 // Return { fulfilled: true } atau { fulfilled: false, reason }.
 export async function fulfillPaidOrder(order, payment = {}) {
   const db = getDb();
@@ -360,6 +460,26 @@ export async function fulfillPaidOrder(order, payment = {}) {
     });
   } catch { /* kolom lama: abaikan, status paid tetap sah */ }
   return { fulfilled: true };
+}
+
+// Eksekusi pembayaran simulasi (hanya berlaku bila mode simulasi aktif)
+export async function simulateOrderPayment(orderId, userId) {
+  if (!isPaymentSimulationEnabled()) {
+    throw new Error('Mode simulasi tidak diaktifkan');
+  }
+  const order = await getOrder(orderId);
+  if (!order) throw new Error('Order tidak ditemukan');
+  if (userId && String(order.userId) !== String(userId)) {
+    throw new Error('Akses tidak diizinkan');
+  }
+  if (order.status === 'paid') {
+    return { status: 'paid', alreadyPaid: true };
+  }
+  const res = await fulfillPaidOrder(order, { paymentType: 'QRIS (Simulasi Dev)' });
+  if (!res.fulfilled && res.reason !== 'bukan pending/expired') {
+    throw new Error(res.reason || 'Gagal memenuhi order');
+  }
+  return { status: 'paid', fulfilled: true };
 }
 
 export async function listUserSlots(userId) {

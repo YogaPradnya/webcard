@@ -6,10 +6,10 @@ import { useShopEnabled } from '@/hooks/useShopEnabled';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
-import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { PageSkeleton } from '@/components/PageState';
 import ConfirmModal from '@/components/ConfirmModal';
 import RetryAlert from '@/components/RetryAlert';
+import { FrameDefs, FrameOverlay } from '@/components/Frames';
 import { optImg, srcSetImg, IMG_SIZES_CARD } from '@/lib/images';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
@@ -50,6 +50,7 @@ const SORTS = [
 ];
 
 export default function BookPage() {
+  const router = useRouter();
   const { me } = useMe();
   const shopOn = useShopEnabled();
   const [cards, setCards] = useState([]);
@@ -306,6 +307,7 @@ export default function BookPage() {
       <Sidebar username={me?.username} />
       <div className="layout-main">
         <div className="page">
+          {/* Sprite bingkai rarity (dipakai <FrameOverlay> via <use>), render sekali per halaman */}
           <FrameDefs />
           <div className="brand">
             <h1>Book Kartu</h1>
@@ -381,8 +383,7 @@ export default function BookPage() {
                               {!empty && !locked ? (
                                 <button
                                   type="button"
-                                  className="btn btn-ghost"
-                                  style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                  className="btn btn-ghost card-btn"
                                   onClick={(ev) => { ev.stopPropagation(); openSlotEditor(item); }}
                                 >
                                   Ubah
@@ -413,14 +414,10 @@ export default function BookPage() {
                               <div className="card-meta">
                                 <div className="card-name">{shortName(c.name)}</div>
                                 <div className="card-anime">Gift 🎁 • sisa ubah {c.editsLeft}/3</div>
-                                <div className="card-stats">
-                                  {c.showcase ? <span className="stat-tag showcase">Pajangan</span> : null}
-                                </div>
                                 {!locked ? (
                                   <button
                                     type="button"
-                                    className="btn btn-ghost"
-                                    style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                    className="btn btn-ghost card-btn"
                                     onClick={(e) => { e.stopPropagation(); openSlotEditor(c); }}
                                   >
                                     Ubah
@@ -428,8 +425,7 @@ export default function BookPage() {
                                 ) : null}
                                 <button
                                   type="button"
-                                  className="btn btn-ghost"
-                                  style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                                  className="btn btn-ghost card-btn card-btn-main"
                                   disabled={showcaseBusy === `display:${c.name}`}
                                   onClick={(e) => { e.stopPropagation(); toggleDisplayShowcase(c); }}
                                 >
@@ -579,7 +575,6 @@ export default function BookPage() {
           >
             <div className="flip-inner">
               <div className="flip-front">
-                <span className="tier-ribbon" style={c.owned ? { ['--tier']: TIER_COLORS[c.tier], background: TIER_COLORS[c.tier] } : undefined} />
                 {c.owned && (c.tier === 'Epic' || c.tier === 'Legendary' || c.tier === 'Mythic') ? (
                   <>
                     <span className="card-shine" aria-hidden="true" />
@@ -592,38 +587,23 @@ export default function BookPage() {
                     ) : null}
                   </>
                 ) : null}
-                {c.owned ? (
-                  <div className="framed-art">
-                    {c.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={optImg(c.imageUrl, 300)} srcSet={srcSetImg(c.imageUrl)} sizes={IMG_SIZES_CARD} alt={c.name} loading={idx < 3 ? 'eager' : 'lazy'} fetchpriority={idx < 3 ? 'high' : undefined} decoding="async" />
-                    ) : (
-                      <div className="framed-blank" />
-                    )}
-                    <FrameOverlay tier={c.tier} />
-                  </div>
-                ) : c.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="card-art" src={optImg(c.imageUrl, 300)} srcSet={srcSetImg(c.imageUrl)} sizes={IMG_SIZES_CARD} alt={c.name} loading={idx < 3 ? 'eager' : 'lazy'} fetchpriority={idx < 3 ? 'high' : undefined} decoding="async" />
-                ) : (
-                  <div className="card-art" />
-                )}
+                <div className="framed-art">
+                  {c.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="card-art" src={optImg(c.imageUrl, 300)} srcSet={srcSetImg(c.imageUrl)} sizes={IMG_SIZES_CARD} alt={c.name} loading={idx < 3 ? 'eager' : 'lazy'} fetchpriority={idx < 3 ? 'high' : undefined} decoding="async" />
+                  ) : (
+                    <div className="framed-blank" />
+                  )}
+                  <FrameOverlay tier={c.tier} />
+                </div>
                 <div className="card-meta">
                   <div className="card-name">{shortName(c.name)}</div>
                   <div className="card-anime">{c.anime} • {c.tier}</div>
-                  {c.owned ? (
-                    <div className="card-stats">
-                      <span className="stat-tag">★{c.level}</span>
-                      <span className="stat-tag power">PWR {c.power}</span>
-                      {c.quantity > 1 ? <span className="stat-tag power">x{c.quantity}</span> : null}
-                      {c.showcase ? <span className="stat-tag showcase">Pajangan</span> : null}
-                    </div>
-                  ) : null}
+                  {/* Tombol evolusi di atas, agar baris ★ + PWR selalu menempel tombol pajangan */}
                   {c.owned && (c.level >= 4 ? c.quantity >= 5 : c.quantity >= 3) && c.level < 5 && c.tier !== 'Legendary' && c.tier !== 'Mythic' ? (
                     <button
                       type="button"
-                      className="btn"
-                      style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                      className="btn card-btn"
                       disabled={showcaseBusy === `evo:${c.name}`}
                       onClick={(e) => { e.stopPropagation(); setEvoTarget(c); }}
                     >
@@ -631,10 +611,16 @@ export default function BookPage() {
                     </button>
                   ) : null}
                   {c.owned ? (
+                    <div className="card-stats">
+                      <span className="stat-tag">★{c.level}</span>
+                      <span className="stat-tag power">PWR {c.power}</span>
+                      {c.quantity > 1 ? <span className="stat-tag power">x{c.quantity}</span> : null}
+                    </div>
+                  ) : null}
+                  {c.owned ? (
                     <button
                       type="button"
-                      className="btn btn-ghost"
-                      style={{ width: '100%', minHeight: 0, padding: '4px 8px', fontSize: 11, marginTop: 6 }}
+                      className="btn btn-ghost card-btn card-btn-main"
                       disabled={showcaseBusy === c.name}
                       onClick={(e) => { e.stopPropagation(); toggleShowcase(c); }}
                     >
