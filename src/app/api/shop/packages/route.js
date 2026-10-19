@@ -1,8 +1,8 @@
 import { apiHandler, jsonOk, READ_TIMEOUT_MS } from '@/lib/apiHandler';
 import {
   XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT,
-  SLOT_BORDER_TYPES, ORDER_PENDING_TTL_MS, isShopEnabled, isTokopayConfigured,
-  isPaymentSimulationEnabled, tokopayChannel,
+  SLOT_BORDER_TYPES, ORDER_PENDING_TTL_MS, isShopEnabled, isTripayConfigured,
+  isPaymentSimulationEnabled, tripayChannel,
 } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
@@ -26,10 +26,10 @@ async function GET_impl() {
       desc: '1 slot = 1 kartu pajangan custom (display-only, tampil di profil). Tiap Simpan memakai 1 jatah ubah (maks 3x per slot).',
     },
     payment: {
-      configured: isTokopayConfigured() || sim,
-      provider: sim ? 'simulation' : 'tokopay',
+      configured: isTripayConfigured() || sim,
+      provider: sim ? 'simulation' : 'tripay',
       simulation: sim,
-      channelId: tokopayChannel(),
+      channelId: tripayChannel(),
       methods: ['QRIS'],
       orderTtlMs: ORDER_PENDING_TTL_MS,
     },

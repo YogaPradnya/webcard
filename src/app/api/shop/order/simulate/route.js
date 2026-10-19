@@ -3,7 +3,7 @@ import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib
 
 // POST /api/shop/order/simulate { orderId }
 // Endpoint khusus mode simulasi/pengujian dev lokal untuk melunasi order
-// tanpa harus bergantung pada gateway eksternal (Tokopay) yang sedang tutup.
+// tanpa harus bergantung pada gateway eksternal (Tripay) yang sedang tutup.
 async function POST_impl(req, _ctx, session) {
   if (!isPaymentSimulationEnabled()) {
     return jsonFail('Mode simulasi pembayaran tidak aktif.', 403);

@@ -1,4 +1,4 @@
-import { createHash, randomInt } from 'node:crypto';
+import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
 import { calcLevel } from './level.js';
@@ -6,17 +6,17 @@ import { cleanHex } from './color.js';
 import { DISPLAY_BORDERS } from './constants.js';
 
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
-// Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Tokopay.
+// Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Tripay.
 
 // Feature flag Shop: tampil hanya bila NEXT_PUBLIC_SHOP_ENABLED=true.
-// Matikan (default) sampai kredensial production Tokopay siap, agar fitur
+// Matikan (default) sampai kredensial production Tripay siap, agar fitur
 // pembayaran tidak terlihat publik. Nyalakan lokal untuk tes.
 export function isShopEnabled() {
   return String(process.env.NEXT_PUBLIC_SHOP_ENABLED || '').toLowerCase() === 'true';
 }
 
 // Mode simulasi pembayaran: aktif di dev saat NEXT_PUBLIC_PAYMENT_SIMULATION=true
-// Berguna saat API gateway pihak ketiga (Tokopay) mengalami pemeliharaan.
+// Berguna saat API gateway pihak ketiga (Tripay) mengalami pemeliharaan.
 export function isPaymentSimulationEnabled() {
   return String(process.env.NEXT_PUBLIC_PAYMENT_SIMULATION || '').toLowerCase() === 'true';
 }
@@ -46,108 +46,145 @@ export function editsLeft(slot) {
   return Math.max(0, MAX_EDITS_PER_SLOT - (Number(slot?.edits_used) || 0));
 }
 
-// ---- Tokopay (https://docs.tokopay.id) ----
-// Order via POST JSON; signature md5(merchant_id:secret:reff_id) untuk
-// create & callback. Channel default: QRIS (QRISREALTIME bisa lewat env).
-const TOKOPAY_API_URL = 'https://api.tokopay.id/v1/';
-export const TOKOPAY_DEFAULT_CHANNEL = 'QRIS';
+// ---- Tripay (https://tripay.co.id/developer) ----
+// Closed payment QRIS. Signature create:
+// HMAC-SHA256(merchant_code + merchant_ref + amount, private_key).
+// Signature callback: HMAC-SHA256(raw JSON body, private_key).
+const TRIPAY_API_PRODUCTION = 'https://tripay.co.id/api/';
+const TRIPAY_API_SANDBOX = 'https://tripay.co.id/api-sandbox/';
+export const TRIPAY_DEFAULT_CHANNEL = 'QRIS';
+export const TRIPAY_DEFAULT_CALLBACK_URL = 'https://kartu.yogaa.web.id/api/shop/webhook';
+export const TRIPAY_DEFAULT_RETURN_URL = 'https://kartu.yogaa.web.id/shop';
 
-export function tokopayMerchantId() {
-  return String(process.env.TOKOPAY_MERCHANT_ID || '').trim();
+export function tripayMode() {
+  return String(process.env.TRIPAY_MODE || 'production').trim().toLowerCase() === 'sandbox'
+    ? 'sandbox'
+    : 'production';
 }
 
-export function tokopaySecret() {
-  return String(process.env.TOKOPAY_SECRET || '').trim();
+export function tripayApiBase() {
+  return tripayMode() === 'sandbox' ? TRIPAY_API_SANDBOX : TRIPAY_API_PRODUCTION;
 }
 
-export function tokopayChannel() {
-  return String(process.env.TOKOPAY_CHANNEL || '').trim() || TOKOPAY_DEFAULT_CHANNEL;
+export function tripayMerchantCode() {
+  return String(process.env.TRIPAY_MERCHANT_CODE || '').trim();
 }
 
-export function isTokopayConfigured() {
-  return Boolean(tokopayMerchantId() && tokopaySecret());
+export function tripayApiKey() {
+  return String(process.env.TRIPAY_API_KEY || '').trim();
 }
 
-function md5(s) {
-  return createHash('md5').update(String(s)).digest('hex');
+export function tripayPrivateKey() {
+  return String(process.env.TRIPAY_PRIVATE_KEY || '').trim();
 }
 
-function isTokopaySuccess(status) {
-  const s = String(status ?? '').trim().toLowerCase();
-  return s === 'success' || s === '1' || s === 'true';
+export function tripayChannel() {
+  return String(process.env.TRIPAY_CHANNEL || '').trim() || TRIPAY_DEFAULT_CHANNEL;
 }
 
-export function tokopayChannelName(raw) {
+export function tripayCallbackUrl() {
+  return String(process.env.TRIPAY_CALLBACK_URL || '').trim() || TRIPAY_DEFAULT_CALLBACK_URL;
+}
+
+export function tripayReturnUrl() {
+  return String(process.env.TRIPAY_RETURN_URL || '').trim() || TRIPAY_DEFAULT_RETURN_URL;
+}
+
+export function isTripayConfigured() {
+  return Boolean(tripayMerchantCode() && tripayApiKey() && tripayPrivateKey());
+}
+
+export function tripayChannelName(raw) {
   const s = String(raw || '').trim();
-  const upper = s.toUpperCase();
-  if (upper === 'QRISREALTIME') return 'QRIS Realtime';
-  if (upper === 'QRIS_REALTIME_NOBU') return 'QRIS Realtime Nobu';
-  if (upper.startsWith('QRIS')) return 'QRIS';
-  return s || 'QRIS';
+  return s || TRIPAY_DEFAULT_CHANNEL;
 }
 
-function tokopaySignature(refId) {
-  return md5(`${tokopayMerchantId()}:${tokopaySecret()}:${String(refId)}`);
+// Signature request create transaksi (bukan signature callback).
+export function tripayCreateSignature({ merchantCode, merchantRef, amount, privateKey }) {
+  return createHmac('sha256', String(privateKey || ''))
+    .update(`${merchantCode}${merchantRef}${Math.round(Number(amount) || 0)}`)
+    .digest('hex');
 }
 
 // Buat transaksi QRIS baru. Return data untuk ditampilkan (QR) + disimpan.
-export async function createTokopayTransaction({
+export async function createTripayTransaction({
   orderId, amount, customerName, customerEmail, customerPhone, itemName,
 }) {
-  const merchantId = tokopayMerchantId();
-  const secret = tokopaySecret();
-  if (!merchantId || !secret) {
-    throw new Error('TOKOPAY_MERCHANT_ID/TOKOPAY_SECRET belum diisi');
+  const merchantCode = tripayMerchantCode();
+  const apiKey = tripayApiKey();
+  const privateKey = tripayPrivateKey();
+  if (!merchantCode || !apiKey || !privateKey) {
+    throw new Error('TRIPAY_MERCHANT_CODE/TRIPAY_API_KEY/TRIPAY_PRIVATE_KEY belum diisi');
   }
-  const refId = String(orderId);
+  const merchantRef = String(orderId);
   const amountInt = Math.round(Number(amount) || 0);
   if (amountInt < 1) throw new Error('Nominal tidak valid');
-  const channel = tokopayChannel();
+  const method = tripayChannel();
+  const signature = tripayCreateSignature({
+    merchantCode, merchantRef, amount: amountInt, privateKey,
+  });
 
-  // Simple Order (GET) adalah metode utama sesuai dokumentasi Tokopay untuk QRIS
-  const simpleUrl = new URL('order', TOKOPAY_API_URL);
-  simpleUrl.searchParams.set('merchant', merchantId);
-  simpleUrl.searchParams.set('secret', secret);
-  simpleUrl.searchParams.set('ref_id', refId);
-  simpleUrl.searchParams.set('nominal', String(amountInt));
-  simpleUrl.searchParams.set('metode', channel);
+  // Tripay menerima application/x-www-form-urlencoded (contoh resmi).
+  const form = new URLSearchParams();
+  form.set('method', method);
+  form.set('merchant_ref', merchantRef);
+  form.set('amount', String(amountInt));
+  form.set('customer_name', customerName || 'Animein User');
+  form.set('customer_email', customerEmail || 'noreply@kartu.yogaa.web.id');
+  if (customerPhone) form.set('customer_phone', String(customerPhone));
+  form.set('order_items[0][name]', itemName || 'Pembelian Animein');
+  form.set('order_items[0][price]', String(amountInt));
+  form.set('order_items[0][quantity]', '1');
+  form.set('callback_url', tripayCallbackUrl());
+  form.set('return_url', tripayReturnUrl());
+  form.set('expired_time', String(Math.floor((Date.now() + ORDER_PENDING_TTL_MS) / 1000)));
+  form.set('signature', signature);
 
   const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
+  const timeoutId = setTimeout(() => ctrl.abort(), 10000);
 
   let res;
   try {
-    res = await fetch(simpleUrl.toString(), {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
+    res = await fetch(`${tripayApiBase()}transaction/create`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json',
+      },
+      body: form,
       cache: 'no-store',
       signal: ctrl.signal,
     });
   } catch (e) {
     if (e.name === 'AbortError') {
-      throw new Error('Tokopay tidak merespons dalam 8 detik (timeout)');
+      throw new Error('Tripay tidak merespons dalam 10 detik (timeout)');
     }
-    throw new Error(`Tokopay tidak bisa dihubungi: ${e.message}`);
+    throw new Error(`Tripay tidak bisa dihubungi: ${e.message}`);
   } finally {
     clearTimeout(timeoutId);
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok || !isTokopaySuccess(data.status)) {
-    const errMsg = String(data?.error_msg || data?.message || `Tokopay ${res.status}`);
-    throw new Error(`Tokopay: ${errMsg}`);
+  if (!res.ok || data.success !== true) {
+    const errMsg = String(data?.message || `Tripay ${res.status}`);
+    throw new Error(`Tripay: ${errMsg}`);
   }
   const d = data.data || {};
-  if (!d.qr_link && !d.pay_url && !d.checkout_url) {
-    throw new Error('Tokopay tidak mengembalikan data QR');
+  const qrContent = String(d.qr_string || d.pay_code || '');
+  const qrUrl = String(d.qr_url || '');
+  const checkoutUrl = String(d.checkout_url || d.pay_url || '');
+  if (!d.reference) throw new Error('Tripay tidak mengembalikan referensi transaksi');
+  if (!qrContent && !qrUrl && !checkoutUrl) {
+    throw new Error('Tripay tidak mengembalikan data QR');
   }
   return {
-    payId: String(d.trx_id || ''),
-    qrContent: String(d.qr_string || ''),
-    qrUrl: String(d.qr_link || ''),
-    checkoutUrl: String(d.pay_url || d.checkout_url || ''),
-    channelName: tokopayChannelName(channel),
-    status: 'Pending',
+    payId: String(d.reference),
+    qrContent,
+    qrUrl,
+    checkoutUrl,
+    channelName: tripayChannelName(d.payment_name || d.payment_method || method),
+    status: String(d.status || 'UNPAID'),
   };
 }
 
@@ -165,91 +202,110 @@ export function createSimulatedTransaction({ orderId, amount }) {
   };
 }
 
-// Verifikasi callback: merchant_id harus milik kita + signature
-// md5(merchant_id:secret:reff_id). Signature Tokopay huruf kecil.
-export function verifyTokopayCallbackSignature({ merchantId, refId, signature }) {
-  const expectedMerchant = tokopayMerchantId();
-  const secret = tokopaySecret();
-  if (!expectedMerchant || !secret || !refId) return false;
-  if (String(merchantId || '') !== expectedMerchant) return false;
-  const expected = md5(`${expectedMerchant}:${secret}:${String(refId)}`);
-  return expected === String(signature || '').toLowerCase();
+// Verifikasi signature callback Tripay. Wajib memakai raw body persis seperti
+// yang diterima (bukan JSON.stringify ulang) agar HMAC tetap cocok.
+export function verifyTripayCallbackSignature({ rawBody, signature }) {
+  const privateKey = tripayPrivateKey();
+  if (!privateKey || !rawBody || !signature) return false;
+  const expected = createHmac('sha256', privateKey).update(String(rawBody)).digest('hex');
+  const given = String(signature).trim().toLowerCase();
+  if (!/^[0-9a-f]+$/.test(given) || given.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(given, 'hex'));
+  } catch {
+    return false;
+  }
 }
 
-// Status callback/check-order Tokopay -> status internal.
-export function mapTokopayStatus(status) {
-  const s = String(status || '').trim().toLowerCase();
-  if (s === 'success' || s === 'completed') return 'paid';
-  if (s === 'failed') return 'failed';
-  if (s === 'unpaid' || s === 'proses callback' || s === 'pending') return 'pending';
+// Status callback/check transaksi Tripay -> status internal.
+export function mapTripayStatus(status) {
+  const s = String(status || '').trim().toUpperCase();
+  if (s === 'PAID') return 'paid';
+  if (s === 'UNPAID' || s === 'PENDING') return 'pending';
+  if (s === 'FAILED') return 'failed';
+  if (s === 'EXPIRED') return 'expired';
+  if (s === 'REFUND') return 'refund';
   return 'unknown';
 }
 
-// Ambil status transaksi langsung dari Tokopay (dipakai tombol "Cek Status"
-// dan sinkronisasi otomatis — penting untuk localhost yang tak terjangkau callback).
-export async function fetchTokopayStatus(refId) {
-  const merchantId = tokopayMerchantId();
-  const secret = tokopaySecret();
-  if (!merchantId || !secret) {
-    throw new Error('TOKOPAY_MERCHANT_ID/TOKOPAY_SECRET belum diisi');
-  }
-  const url = new URL('check-order', TOKOPAY_API_URL);
-  url.searchParams.set('merchant_id', merchantId);
-  url.searchParams.set('secret', secret);
-  url.searchParams.set('ref_id', String(refId));
+// Ambil detail transaksi Tripay berdasarkan reference (dipakai tombol
+// "Cek Status" + sinkronisasi otomatis). Reference disimpan di kolom pay_id.
+export async function fetchTripayTransaction(reference) {
+  const apiKey = tripayApiKey();
+  if (!apiKey) throw new Error('TRIPAY_API_KEY belum diisi');
+  const ref = String(reference || '').trim();
+  if (!ref) return { found: false, data: null, reason: 'reference kosong' };
+
+  const url = new URL('transaction/detail', tripayApiBase());
+  url.searchParams.set('reference', ref);
 
   const ctrl = new AbortController();
-  const timeoutId = setTimeout(() => ctrl.abort(), 7000);
+  const timeoutId = setTimeout(() => ctrl.abort(), 8000);
 
   let res;
   try {
     res = await fetch(url.toString(), {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json',
+      },
       cache: 'no-store',
       signal: ctrl.signal,
     });
   } catch (e) {
     if (e.name === 'AbortError') {
-      throw new Error('Tokopay tidak merespons dalam 7 detik (timeout)');
+      throw new Error('Tripay tidak merespons dalam 8 detik (timeout)');
     }
-    throw new Error(`Tokopay tidak bisa dihubungi: ${e.message}`);
+    throw new Error(`Tripay tidak bisa dihubungi: ${e.message}`);
   } finally {
     clearTimeout(timeoutId);
   }
+
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Tokopay ${res.status}`);
-  if (!isTokopaySuccess(data.status)) {
-    const msg = String(data?.error_msg || data?.message || 'Data Not Found');
-    // Transaksi lama/non-Tokopay: jangan dianggap error keras.
+  if (!res.ok) {
+    const msg = String(data?.message || `Tripay ${res.status}`);
     if (/not found|tidak ditemukan/i.test(msg)) return { found: false, data: null, reason: msg };
-    throw new Error(msg);
+    throw new Error(`Tripay: ${msg}`);
+  }
+  if (data.success !== true) {
+    const msg = String(data?.message || 'Data tidak ditemukan');
+    // Order lama/non-Tripay: jangan dianggap error keras.
+    if (/not found|tidak ditemukan/i.test(msg)) return { found: false, data: null, reason: msg };
+    throw new Error(`Tripay: ${msg}`);
   }
   if (!data.data) return { found: false, data: null, reason: 'Data kosong' };
   return { found: true, data: data.data };
 }
 
-// Sinkronkan 1 order ke status Tokopay + penuhi bila lunas.
-// Pemaaf: order 'expired' yang ternyata Success di Tokopay tetap dipenuhi
+// Sinkronkan 1 order ke status Tripay + penuhi bila lunas.
+// Pemaaf: order 'expired' yang ternyata PAID di Tripay tetap dipenuhi
 // (anti double-kirim: status langsung jadi 'paid', sync berikutnya diabaikan).
-// Return { status: 'paid'|'pending'|'failed'|'expired'|'unknown', reason? }.
-export async function syncOrderFromTokopay(orderId) {
+// Return { status: 'paid'|'pending'|'failed'|'expired'|'refund'|'unknown', reason? }.
+export async function syncOrderFromTripay(orderId) {
   const order = await getOrder(orderId);
   if (!order) return { status: 'unknown' };
   if (order.status !== 'pending' && order.status !== 'expired') return { status: order.status };
-  // Order simulasi tidak dikirim ke Tokopay, bayar lewat tombol simulasi
+  // Order simulasi tidak dikirim ke Tripay, bayar lewat tombol simulasi.
   if (order.payChannel?.includes('Simulasi') || order.payId?.startsWith('SIM-')) {
     return { status: order.status, reason: 'Order simulasi dev — gunakan tombol Bayar Instan' };
   }
-  const st = await fetchTokopayStatus(orderId);
+  if (!order.payId) return { status: order.status, reason: 'reference Tripay belum tersimpan' };
+
+  const st = await fetchTripayTransaction(order.payId);
   if (!st.found) return { status: order.status, reason: st.reason || 'tidak ditemukan' };
   const d = st.data;
-  const mapped = mapTokopayStatus(d.status);
-  const channel = tokopayChannelName(
-    d.nama_payment_channel || d.nama_channel || d.kode_channel || order.payChannel || 'QRIS',
+  if (d.merchant_ref && String(d.merchant_ref) !== String(orderId)) {
+    console.warn('[SHOP SYNC] merchant_ref tidak cocok:', orderId, d.merchant_ref);
+    return { status: order.status, reason: 'merchant_ref tidak cocok' };
+  }
+  const mapped = mapTripayStatus(d.status);
+  const channel = tripayChannelName(
+    d.payment_name || d.payment_method || d.payment_method_code || order.payChannel,
   );
   if (mapped === 'paid') {
-    // Callback/check-order tidak menandatangani nominal, jadi pastikan cukup.
-    const paid = Number(d.jumlah_bayar ?? d.nominal ?? 0) || 0;
+    // Callback/detail bisa memuat total_amount (termasuk fee customer).
+    // Bandingkan dengan harga dasar order, bukan amount_received (setelah fee merchant).
+    const paid = Number(d.total_amount ?? d.amount ?? 0) || 0;
     if (paid > 0 && paid < Number(order.amountIdr)) {
       console.warn('[SHOP SYNC] Nominal kurang:', orderId, paid, order.amountIdr);
       return { status: order.status, reason: 'nominal kurang' };
@@ -263,6 +319,14 @@ export async function syncOrderFromTokopay(orderId) {
   if (mapped === 'failed') {
     if (order.status === 'pending') await setOrderStatus(orderId, 'failed');
     return { status: 'failed' };
+  }
+  if (mapped === 'expired') {
+    if (order.status === 'pending') await setOrderStatus(orderId, 'expired');
+    return { status: 'expired' };
+  }
+  if (mapped === 'refund') {
+    if (order.status !== 'refund') await setOrderStatus(orderId, 'refund');
+    return { status: 'refund' };
   }
   return { status: mapped === 'pending' ? 'pending' : order.status };
 }
@@ -423,9 +487,9 @@ export async function countUserSlots(userId) {
 }
 
 // Penuhi order yang sudah dibayar (idempoten).
-// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Tokopay
-// bilang Success padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
-// payment: { paymentType } dari Tokopay (nama channel, disimpan untuk detail transaksi).
+// Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Tripay
+// bilang PAID padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
+// payment: { paymentType } dari Tripay (nama channel, disimpan untuk detail transaksi).
 // Return { fulfilled: true } atau { fulfilled: false, reason }.
 export async function fulfillPaidOrder(order, payment = {}) {
   const db = getDb();

@@ -256,7 +256,7 @@ export default function ShopPage() {
           ) : null}
           {qrOrder ? (
             <div className="card" style={{ marginBottom: 16 }}>
-              <div className="section-title">Pembayaran QRIS — {qrOrder.label}</div>
+              <div className="section-title">Pembayaran QRIS via Tripay — {qrOrder.label}</div>
               <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                 {qrOrder.qrUrl ? (
                   <img
@@ -268,6 +268,9 @@ export default function ShopPage() {
                 <div style={{ flex: '1 1 240px', fontSize: 13, lineHeight: 1.9 }}>
                   <div><b>Order ID:</b> {qrOrder.orderId}</div>
                   <div><b>Nominal:</b> {idr(qrOrder.amountIdr)}</div>
+                  <div style={{ color: 'var(--muted)', fontSize: 11 }}>
+                    Total akhir mengikuti halaman pembayaran Tripay (termasuk biaya layanan bila ada).
+                  </div>
                   <div><b>Berlaku:</b> {qrLeft > 0 ? fmtSisa(qrLeft) : 'kadaluarsa — buat order baru'}</div>
                   <div style={{ color: 'var(--muted)', fontSize: 12 }}>
                     Scan QR dengan aplikasi bank / e-wallet yang mendukung QRIS. Status tercentang otomatis — atau tekan Cek Status.
@@ -407,8 +410,8 @@ export default function ShopPage() {
                   <span style={{ fontWeight: 700 }}>{o.kind === 'xp' ? `Top-Up ${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `Slot x${o.qty}`}</span>
                   <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>{idr(o.amountIdr)}</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#b8860b' : 'var(--error)' }}>
-                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'expired' ? 'Kadaluarsa' : 'Gagal'}
+                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#b8860b' : o.status === 'refund' ? '#b8860b' : 'var(--error)' }}>
+                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'expired' ? 'Kadaluarsa' : o.status === 'refund' ? 'Refund' : 'Gagal'}
                     </span>
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
                     {o.status === 'pending' ? (

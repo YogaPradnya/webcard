@@ -2,8 +2,8 @@ import { getDb } from '@/lib/db';
 import { checkRateCount } from '@/lib/rateLimit';
 import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
-  createTokopayTransaction, createSimulatedTransaction, countUserSlots,
-  ensureShopTables, isShopEnabled, isTokopayConfigured, isPaymentSimulationEnabled,
+  createTripayTransaction, createSimulatedTransaction, countUserSlots,
+  ensureShopTables, isShopEnabled, isTripayConfigured, isPaymentSimulationEnabled,
 } from '@/lib/shop';
 import { countDisplayCards } from '@/lib/display';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
@@ -16,7 +16,7 @@ async function POST_impl(req, _ctx, session) {
   if (!isShopEnabled()) {
     return jsonFail('Shop belum dibuka.', 403);
   }
-  if (!isTokopayConfigured() && !isPaymentSimulationEnabled()) {
+  if (!isTripayConfigured() && !isPaymentSimulationEnabled()) {
     return jsonFail('Pembayaran belum dikonfigurasi. Hubungi admin.', 503);
   }
   const { body, error: bodyErr } = await parseJson(req);
@@ -60,13 +60,13 @@ async function POST_impl(req, _ctx, session) {
     } else {
       return jsonFail('Jenis order tidak dikenal.', 400);
     }
-    // reff_id Tokopay = order_id kita (dipakai verifikasi callback & cek status).
+    // merchant_ref Tripay = order_id kita (dipakai verifikasi callback & cek status).
     const orderId = genMerchantOrderId();
     let tx;
     if (isPaymentSimulationEnabled()) {
       tx = createSimulatedTransaction({ orderId, amount: amountIdr });
     } else {
-      tx = await createTokopayTransaction({
+      tx = await createTripayTransaction({
         orderId,
         amount: amountIdr,
         customerName: session.username || 'Animein User',
@@ -101,7 +101,7 @@ async function POST_impl(req, _ctx, session) {
   } catch (e) {
     console.error('[SHOP ORDER]', e.message);
     let msg = 'Gagal membuat pembayaran. Coba lagi.';
-    if (/TOKOPAY_(MERCHANT_ID|SECRET)/.test(e.message)) {
+    if (/TRIPAY_(MERCHANT_CODE|API_KEY|PRIVATE_KEY)/.test(e.message)) {
       msg = 'Pembayaran belum dikonfigurasi. Hubungi admin.';
     } else if (e.message) {
       msg = e.message;

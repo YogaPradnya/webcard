@@ -1,10 +1,11 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import {
   XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT,
-  findPack, editsLeft, verifyTokopayCallbackSignature, mapTokopayStatus,
-  createTokopayTransaction, fetchTokopayStatus, genMerchantOrderId,
+  findPack, editsLeft, verifyTripayCallbackSignature, mapTripayStatus,
+  createTripayTransaction, fetchTripayTransaction, tripayCreateSignature,
+  genMerchantOrderId, isTripayConfigured, tripayMode, tripayApiBase,
 } from '../../src/lib/shop.js';
 
 describe('shop katalog', () => {
@@ -28,38 +29,51 @@ describe('shop katalog', () => {
   });
 });
 
-describe('shop webhook signature (Tokopay)', () => {
-  it('md5(merchant_id:secret:reff_id) valid vs palsu', () => {
-    const merchantId = 'M-test-123';
-    const secret = 'secret-xyz';
-    const refId = 'ANIMEIN-1';
-    const sig = createHash('md5')
-      .update(`${merchantId}:${secret}:${refId}`)
-      .digest('hex');
-    process.env.TOKOPAY_MERCHANT_ID = merchantId;
-    process.env.TOKOPAY_SECRET = secret;
+describe('shop webhook signature (Tripay)', () => {
+  it('signature create sesuai vektor dokumentasi Tripay', () => {
+    const sig = tripayCreateSignature({
+      merchantCode: 'T0001',
+      merchantRef: 'INV55567',
+      amount: 1500000,
+      privateKey: 'ytf6ooi2gmlNPfpchd94jDOk8hRWOu',
+    });
+    assert.equal(sig, '9f167eba844d1fcb369404e2bda53702e2f78f7aa12e91da6715414e65b8c86a');
+  });
+
+  it('HMAC-SHA256(raw body, private key) valid vs palsu', () => {
+    const privateKey = 'private-key-xyz';
+    const rawBody = JSON.stringify({
+      merchant_ref: 'ANIMEIN-1',
+      reference: 'T-1',
+      status: 'PAID',
+      total_amount: 5000,
+    });
+    const sig = createHmac('sha256', privateKey).update(rawBody).digest('hex');
+    process.env.TRIPAY_PRIVATE_KEY = privateKey;
     try {
-      assert.equal(verifyTokopayCallbackSignature({ merchantId, refId, signature: sig }), true);
-      assert.equal(verifyTokopayCallbackSignature({ merchantId, refId, signature: sig.toUpperCase() }), true);
-      assert.equal(verifyTokopayCallbackSignature({ merchantId, refId, signature: 'palsu' }), false);
-      assert.equal(verifyTokopayCallbackSignature({ merchantId: 'M-lain', refId, signature: sig }), false);
-      assert.equal(verifyTokopayCallbackSignature({ merchantId, refId: 'ANIMEIN-2', signature: sig }), false);
-      assert.equal(verifyTokopayCallbackSignature({ merchantId, refId: '', signature: sig }), false);
+      assert.equal(verifyTripayCallbackSignature({ rawBody, signature: sig }), true);
+      assert.equal(verifyTripayCallbackSignature({ rawBody, signature: sig.toUpperCase() }), true);
+      assert.equal(verifyTripayCallbackSignature({ rawBody, signature: 'palsu' }), false);
+      assert.equal(verifyTripayCallbackSignature({ rawBody: `${rawBody} `, signature: sig }), false);
+      assert.equal(verifyTripayCallbackSignature({ rawBody, signature: '' }), false);
     } finally {
-      delete process.env.TOKOPAY_MERCHANT_ID;
-      delete process.env.TOKOPAY_SECRET;
+      delete process.env.TRIPAY_PRIVATE_KEY;
     }
-    assert.equal(verifyTokopayCallbackSignature({ merchantId, refId, signature: sig }), false);
+    assert.equal(verifyTripayCallbackSignature({ rawBody, signature: sig }), false);
   });
-  it('mapping status Tokopay -> status internal', () => {
-    assert.equal(mapTokopayStatus('Success'), 'paid');
-    assert.equal(mapTokopayStatus('Completed'), 'paid');
-    assert.equal(mapTokopayStatus('Unpaid'), 'pending');
-    assert.equal(mapTokopayStatus('Proses Callback'), 'pending');
-    assert.equal(mapTokopayStatus('Failed'), 'failed');
-    assert.equal(mapTokopayStatus('status aneh'), 'unknown');
-    assert.equal(mapTokopayStatus(''), 'unknown');
+
+  it('mapping status Tripay -> status internal', () => {
+    assert.equal(mapTripayStatus('PAID'), 'paid');
+    assert.equal(mapTripayStatus('paid'), 'paid');
+    assert.equal(mapTripayStatus('UNPAID'), 'pending');
+    assert.equal(mapTripayStatus('PENDING'), 'pending');
+    assert.equal(mapTripayStatus('FAILED'), 'failed');
+    assert.equal(mapTripayStatus('EXPIRED'), 'expired');
+    assert.equal(mapTripayStatus('REFUND'), 'refund');
+    assert.equal(mapTripayStatus('status aneh'), 'unknown');
+    assert.equal(mapTripayStatus(''), 'unknown');
   });
+
   it('order id merchant unik dan pendek', () => {
     for (let i = 0; i < 20; i++) {
       const id = genMerchantOrderId();
@@ -68,57 +82,102 @@ describe('shop webhook signature (Tokopay)', () => {
   });
 });
 
-describe('Tokopay HTTP (mock fetch)', () => {
-  function setEnv() {
-    process.env.TOKOPAY_MERCHANT_ID = 'M-123';
-    process.env.TOKOPAY_SECRET = 's3cret';
-    process.env.TOKOPAY_CHANNEL = 'QRIS';
+describe('Tripay HTTP (mock fetch)', () => {
+  const ENV_KEYS = [
+    'TRIPAY_MODE', 'TRIPAY_MERCHANT_CODE', 'TRIPAY_API_KEY', 'TRIPAY_PRIVATE_KEY',
+    'TRIPAY_CHANNEL', 'TRIPAY_CALLBACK_URL', 'TRIPAY_RETURN_URL',
+  ];
+
+  function setEnv(overrides = {}) {
+    process.env.TRIPAY_MODE = 'production';
+    process.env.TRIPAY_MERCHANT_CODE = 'T-123';
+    process.env.TRIPAY_API_KEY = 'api-key';
+    process.env.TRIPAY_PRIVATE_KEY = 'private-key';
+    process.env.TRIPAY_CHANNEL = 'QRIS';
+    process.env.TRIPAY_CALLBACK_URL = 'https://kartu.yogaa.web.id/api/shop/webhook';
+    process.env.TRIPAY_RETURN_URL = 'https://kartu.yogaa.web.id/shop';
+    for (const [k, v] of Object.entries(overrides)) process.env[k] = v;
   }
 
   function clearEnv() {
-    delete process.env.TOKOPAY_MERCHANT_ID;
-    delete process.env.TOKOPAY_SECRET;
-    delete process.env.TOKOPAY_CHANNEL;
+    for (const key of ENV_KEYS) delete process.env[key];
   }
 
-  it('create order kirim parameter simple order dan memetakan QR', async () => {
+  it('konfigurasi Tripay dan mode API', () => {
+    clearEnv();
+    assert.equal(isTripayConfigured(), false);
+    setEnv();
+    try {
+      assert.equal(isTripayConfigured(), true);
+      assert.equal(tripayMode(), 'production');
+      assert.equal(tripayApiBase(), 'https://tripay.co.id/api/');
+      process.env.TRIPAY_MODE = 'sandbox';
+      assert.equal(tripayMode(), 'sandbox');
+      assert.equal(tripayApiBase(), 'https://tripay.co.id/api-sandbox/');
+    } finally {
+      clearEnv();
+    }
+  });
+
+  it('create order mengirim form Tripay dan memetakan QR', async () => {
     const originalFetch = globalThis.fetch;
     setEnv();
     let captured = null;
     globalThis.fetch = async (url, opts) => {
       const u = new URL(String(url));
-      captured = { url: u.origin + u.pathname, method: opts.method, params: Object.fromEntries(u.searchParams) };
+      captured = {
+        url: u.origin + u.pathname,
+        method: opts.method,
+        headers: opts.headers,
+        params: Object.fromEntries(new URLSearchParams(String(opts.body))),
+      };
       return new Response(JSON.stringify({
-        status: 'Success',
+        success: true,
+        message: '',
         data: {
-          trx_id: 'TP-1',
-          qr_link: 'https://assets.tokopay.id/qr.png',
+          reference: 'T-1',
+          merchant_ref: 'ANIMEIN-1',
+          payment_name: 'QRIS',
           qr_string: '000201010212',
-          pay_url: 'https://pay.tokopay.id/?token=abc',
-          total_bayar: 5000,
-          total_diterima: 4925,
+          qr_url: 'https://tripay.co.id/qr/T-1.png',
+          checkout_url: 'https://tripay.co.id/checkout/T-1',
+          status: 'UNPAID',
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     };
     try {
-      const tx = await createTokopayTransaction({
+      const tx = await createTripayTransaction({
         orderId: 'ANIMEIN-1',
         amount: 5000,
         customerName: 'Tester',
         customerEmail: 'noreply+1@kartu.yogaa.web.id',
         customerPhone: '081234567890',
+        itemName: 'Top-Up 6.000 XP Animein',
       });
-      assert.equal(captured.url, 'https://api.tokopay.id/v1/order');
-      assert.equal(captured.method, 'GET');
-      assert.equal(captured.params.merchant, 'M-123');
-      assert.equal(captured.params.secret, 's3cret');
-      assert.equal(captured.params.ref_id, 'ANIMEIN-1');
-      assert.equal(captured.params.nominal, '5000');
-      assert.equal(captured.params.metode, 'QRIS');
-      assert.equal(tx.payId, 'TP-1');
-      assert.equal(tx.qrUrl, 'https://assets.tokopay.id/qr.png');
+      assert.equal(captured.url, 'https://tripay.co.id/api/transaction/create');
+      assert.equal(captured.method, 'POST');
+      assert.equal(captured.headers.Authorization, 'Bearer api-key');
+      assert.equal(captured.params.method, 'QRIS');
+      assert.equal(captured.params.merchant_ref, 'ANIMEIN-1');
+      assert.equal(captured.params.amount, '5000');
+      assert.equal(captured.params.customer_name, 'Tester');
+      assert.equal(captured.params.customer_email, 'noreply+1@kartu.yogaa.web.id');
+      assert.equal(captured.params['order_items[0][name]'], 'Top-Up 6.000 XP Animein');
+      assert.equal(captured.params['order_items[0][price]'], '5000');
+      assert.equal(captured.params['order_items[0][quantity]'], '1');
+      assert.equal(captured.params.callback_url, 'https://kartu.yogaa.web.id/api/shop/webhook');
+      assert.equal(captured.params.return_url, 'https://kartu.yogaa.web.id/shop');
+      assert.ok(Number(captured.params.expired_time) > Math.floor(Date.now() / 1000));
+      assert.equal(captured.params.signature, tripayCreateSignature({
+        merchantCode: 'T-123',
+        merchantRef: 'ANIMEIN-1',
+        amount: 5000,
+        privateKey: 'private-key',
+      }));
+      assert.equal(tx.payId, 'T-1');
+      assert.equal(tx.qrUrl, 'https://tripay.co.id/qr/T-1.png');
       assert.equal(tx.qrContent, '000201010212');
-      assert.equal(tx.checkoutUrl, 'https://pay.tokopay.id/?token=abc');
+      assert.equal(tx.checkoutUrl, 'https://tripay.co.id/checkout/T-1');
       assert.equal(tx.channelName, 'QRIS');
     } finally {
       globalThis.fetch = originalFetch;
@@ -126,31 +185,62 @@ describe('Tokopay HTTP (mock fetch)', () => {
     }
   });
 
-  it('cek status memanggil /v1/check-order dengan merchant, secret, ref_id', async () => {
+  it('mode sandbox memakai base API sandbox', async () => {
     const originalFetch = globalThis.fetch;
-    setEnv();
+    setEnv({ TRIPAY_MODE: 'sandbox' });
     let capturedUrl = '';
     globalThis.fetch = async (url) => {
       capturedUrl = String(url);
       return new Response(JSON.stringify({
-        status: 1,
+        success: true,
         data: {
-          reff_id: 'ANIMEIN-1',
-          status: 'Success',
-          jumlah_bayar: 5000,
-          nama_payment_channel: 'QRIS',
+          reference: 'T-SBX',
+          payment_name: 'QRIS',
+          qr_url: 'https://tripay.co.id/qr/sbx.png',
+          status: 'UNPAID',
         },
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     };
     try {
-      const st = await fetchTokopayStatus('ANIMEIN-1');
-      const u = new URL(capturedUrl);
-      assert.equal(u.origin + u.pathname, 'https://api.tokopay.id/v1/check-order');
-      assert.equal(u.searchParams.get('merchant_id'), 'M-123');
-      assert.equal(u.searchParams.get('secret'), 's3cret');
-      assert.equal(u.searchParams.get('ref_id'), 'ANIMEIN-1');
+      await createTripayTransaction({
+        orderId: 'ANIMEIN-SBX',
+        amount: 5000,
+        customerName: 'Tester',
+        customerEmail: 'noreply@example.com',
+        itemName: 'Tes',
+      });
+      assert.equal(capturedUrl, 'https://tripay.co.id/api-sandbox/transaction/create');
+    } finally {
+      globalThis.fetch = originalFetch;
+      clearEnv();
+    }
+  });
+
+  it('cek status memanggil /transaction/detail dengan reference', async () => {
+    const originalFetch = globalThis.fetch;
+    setEnv();
+    let captured = null;
+    globalThis.fetch = async (url, opts) => {
+      const u = new URL(String(url));
+      captured = { url: u.origin + u.pathname, ref: u.searchParams.get('reference'), headers: opts.headers };
+      return new Response(JSON.stringify({
+        success: true,
+        data: {
+          reference: 'T-1',
+          merchant_ref: 'ANIMEIN-1',
+          status: 'PAID',
+          payment_name: 'QRIS',
+          total_amount: 5000,
+        },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+    try {
+      const st = await fetchTripayTransaction('T-1');
+      assert.equal(captured.url, 'https://tripay.co.id/api/transaction/detail');
+      assert.equal(captured.ref, 'T-1');
+      assert.equal(captured.headers.Authorization, 'Bearer api-key');
       assert.equal(st.found, true);
-      assert.equal(mapTokopayStatus(st.data.status), 'paid');
+      assert.equal(mapTripayStatus(st.data.status), 'paid');
     } finally {
       globalThis.fetch = originalFetch;
       clearEnv();
@@ -161,12 +251,11 @@ describe('Tokopay HTTP (mock fetch)', () => {
     const originalFetch = globalThis.fetch;
     setEnv();
     globalThis.fetch = async () => new Response(JSON.stringify({
-      status: 0,
-      rc: 500,
-      error_msg: 'Data Not Found',
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      success: false,
+      message: 'Transaction not found',
+    }), { status: 404, headers: { 'Content-Type': 'application/json' } });
     try {
-      const st = await fetchTokopayStatus('ANIMEIN-1');
+      const st = await fetchTripayTransaction('T-TIDAK-ADA');
       assert.equal(st.found, false);
       assert.match(st.reason, /not found/i);
     } finally {

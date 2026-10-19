@@ -29,7 +29,7 @@ const SECTIONS = [
   },
   {
     title: '7. Harga dan Pembayaran',
-    body: 'Seluruh harga tercantum dalam Rupiah (IDR) di halaman Shop dan sudah termasuk biaya layanan pembayaran. Pembayaran diproses aman melalui Tokopay dan hanya tersedia via QRIS. Pesanan yang tidak dibayar hingga batas waktu yang ditentukan akan otomatis dibatalkan oleh sistem dan tidak ada dana yang ditarik.',
+    body: 'Seluruh harga produk tercantum dalam Rupiah (IDR) di halaman Shop. Pembayaran diproses secara aman melalui Tripay dan hanya tersedia via QRIS. Biaya layanan pembayaran mengikuti ketentuan Tripay; apabila ada biaya tambahan, total pembayaran akan ditampilkan pada halaman pembayaran sebelum Anda menyelesaikan transaksi. Dengan melanjutkan pembayaran, Anda juga tunduk pada syarat dan kebijakan Tripay. Pesanan yang tidak dibayar hingga batas waktu yang ditentukan akan otomatis dibatalkan oleh sistem dan tidak ada dana yang ditarik.',
   },
   {
     title: '8. Pengiriman dan Penyelesaian Pesanan',
@@ -37,7 +37,7 @@ const SECTIONS = [
   },
   {
     title: '9. Pengembalian Dana (Refund)',
-    body: 'Top-Up XP yang sudah masuk ke akun tidak dapat dikembalikan (non-refundable), kecuali terbukti ada kegagalan sistem di pihak kami (misalnya bayar sukses tapi XP tidak masuk setelah 1x24 jam) — dalam hal ini kami akan mengirimkan XP-nya atau mengembalikan dana penuh. Slot Kartu Pajangan yang belum dipakai (kartu masih bawaan dan jatah ubah masih 3/3) dapat dibatalkan dengan refund penuh; slot yang sudah diubah atau kartunya sudah terpasang tidak dapat direfund. Pengajuan refund dilakukan melalui kontak kami di bawah dengan menyertakan bukti pembayaran, dan diproses maksimal 7 hari kerja ke sumber dana asal.',
+    body: 'Top-Up XP yang sudah masuk ke akun tidak dapat dikembalikan (non-refundable), kecuali terbukti ada kegagalan sistem di pihak kami (misalnya bayar sukses tapi XP tidak masuk setelah 1x24 jam) — dalam hal ini kami akan mengirimkan XP-nya atau mengembalikan dana penuh. Slot Kartu Pajangan yang belum dipakai (kartu masih bawaan dan jatah ubah masih 3/3) dapat dibatalkan dengan refund penuh; slot yang sudah diubah atau kartunya sudah terpasang tidak dapat direfund. Pengajuan refund dilakukan melalui kontak kami di bawah dengan menyertakan bukti pembayaran, dan diproses maksimal 7 hari kerja melalui Tripay ke sumber dana asal.',
   },
   {
     title: '10. Pendaftaran Akun',
@@ -49,7 +49,7 @@ const SECTIONS = [
   },
   {
     title: '12. Kebijakan Privasi',
-    body: 'Informasi Anda aman bersama kami. Animein memahami bahwa privasi sangat penting bagi pelanggan. Data yang Anda berikan (username, riwayat pesanan, dan bukti pembayaran) tidak akan disalahgunakan, disalahgunakan, atau dijual kepada pihak lain mana pun. Kami hanya menggunakan informasi pribadi Anda untuk menyelesaikan pesanan Anda. Data pembayaran kartu/bank Anda diproses langsung oleh Tokopay dan tidak kami simpan.',
+    body: 'Informasi Anda aman bersama kami. Animein memahami bahwa privasi sangat penting bagi pelanggan. Data yang Anda berikan (username, riwayat pesanan, dan bukti pembayaran) tidak akan disalahgunakan, disalahgunakan, atau dijual kepada pihak lain mana pun. Kami hanya menggunakan informasi pribadi Anda untuk menyelesaikan pesanan Anda. Data pembayaran kartu/bank Anda diproses langsung oleh Tripay dan/atau penyedia kanal pembayaran yang dipilih, dan tidak kami simpan.',
   },
   {
     title: '13. Ganti Rugi',
@@ -78,7 +78,7 @@ export default function TermsPage() {
           <div className="brand"><h1>Syarat & Ketentuan</h1></div>
           <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 13, color: 'var(--body)' }}>
-              Terakhir diperbarui: 17 Oktober 2026. Halaman ini mengatur penggunaan Situs Book Kartu Animein
+              Terakhir diperbarui: 19 Oktober 2026. Halaman ini mengatur penggunaan Situs Book Kartu Animein
               (<strong>https://kartu.yogaa.web.id</strong>) beserta pembelian produk digital
               Top-Up XP dan Custom Kartu Pajangan. Dengan menggunakan Situs ini, Anda menyetujui seluruh ketentuan di bawah ini.
             </div>
