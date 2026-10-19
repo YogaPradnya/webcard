@@ -1,6 +1,15 @@
 'use client';
 
 import Sidebar from '@/components/Sidebar';
+import { CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
+
+const CONTACT_LINKS = [
+  { label: 'Email CS', value: CS_EMAIL, href: CS_EMAIL_URL, icon: '✉' },
+  { label: 'WhatsApp CS', value: CS_WHATSAPP, href: CS_WHATSAPP_URL, icon: '☎' },
+  { label: 'Grup WhatsApp', value: 'Gabung grup komunitas', href: 'https://chat.whatsapp.com/FpIkzQ28o8o88vJudiN4SK', icon: '◉' },
+  { label: 'Discord', value: 'Gabung server Discord', href: 'https://discord.gg/22EtRJCvfC', icon: '◈' },
+  { label: 'Instagram', value: '@animein.aja', href: 'https://www.instagram.com/animein.aja', icon: '★' },
+];
 
 const SECTIONS = [
   {
@@ -64,8 +73,9 @@ const SECTIONS = [
     body: 'Syarat & Ketentuan ini diatur oleh dan ditafsirkan menurut hukum yang berlaku di Indonesia. Setiap perselisihan diselesaikan terlebih dahulu secara musyawarah; apabila tidak tercapai, diselesaikan melalui jalur hukum sesuai peraturan perundang-undangan Indonesia.',
   },
   {
-    title: '16. Pertanyaan dan Masukan',
-    body: 'Kami menyambut pertanyaan, komentar, dan masukan Anda seputar privasi maupun informasi yang kami kumpulkan dari atau tentang Anda. Hubungi kami melalui: Grup WhatsApp https://chat.whatsapp.com/FpIkzQ28o8o88vJudiN4SK, Discord https://discord.gg/22EtRJCvfC, atau Instagram https://www.instagram.com/animein.aja. Keluhan terkait pesanan harap menyertakan username dan bukti pembayaran agar dapat kami proses cepat.',
+    title: '16. Pertanyaan, Masukan, dan Customer Service',
+    body: 'Kami menyambut pertanyaan, komentar, dan masukan Anda seputar privasi maupun informasi yang kami kumpulkan dari atau tentang Anda. Untuk bantuan pesanan, pembayaran, akun, atau kendala lainnya, hubungi Customer Service Animein melalui email atau WhatsApp di bawah ini. Sertakan username dan bukti pembayaran agar keluhan dapat kami proses dengan cepat. Anda juga dapat bergabung dengan komunitas Animein melalui tautan yang tersedia.',
+    links: CONTACT_LINKS,
   },
 ];
 
@@ -89,6 +99,27 @@ export default function TermsPage() {
               <div style={{ fontSize: 13, color: 'var(--body)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                 {s.body}
               </div>
+              {s.links ? (
+                <div className="contact-grid" style={{ marginTop: 12 }}>
+                  {s.links.map((l) => {
+                    const external = /^https?:/i.test(l.href);
+                    return (
+                      <a
+                        key={`${l.label}-${l.href}`}
+                        className="contact-link"
+                        href={l.href}
+                        {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                      >
+                        <span className="contact-ico" aria-hidden="true">{l.icon}</span>
+                        <span className="contact-copy">
+                          <span className="contact-label">{l.label}</span>
+                          <span className="contact-value">{l.value}</span>
+                        </span>
+                      </a>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           ))}
           <div className="card">

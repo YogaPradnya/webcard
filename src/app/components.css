@@ -301,6 +301,60 @@
   font-size: 22px;
 }
 
+/* Kontak CS di Profil dan Syarat & Ketentuan */
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.contact-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--hairline-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.contact-link:hover {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 var(--hairline-strong);
+}
+
+.contact-ico {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.contact-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.contact-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.contact-value {
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
 .title-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

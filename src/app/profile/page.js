@@ -12,6 +12,7 @@ import { useMe } from '@/hooks/useMe';
 import { useShopEnabled } from '@/hooks/useShopEnabled';
 import { displayBorderColor } from '@/lib/displayBorder';
 import { hashNameLower } from '@/lib/hash';
+import { CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
 
 function avatarColor(name) {
   const pastels = ['#f7eafc', '#dbeafd', '#d7f2e3', '#fffaea', '#e9e3fb', '#ffedd7'];
@@ -277,6 +278,32 @@ export default function ProfilePage() {
                   <Link href="/battle" className="menu-tile"><span className="menu-ico">VS</span>Battle</Link>
                   <Link href="/book" className="menu-tile"><span className="menu-ico">▦</span>Book</Link>
                   {shopOn ? <Link href="/shop" className="menu-tile"><span className="menu-ico">◉</span>Shop</Link> : null}
+                </div>
+              </div>
+
+              <div className="card" style={{ marginTop: 16 }}>
+                <div className="section-title">Bantuan & Customer Service</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                  Ada kendala pesanan, pembayaran, atau akun? Hubungi CS Animein melalui:
+                </div>
+                <div className="contact-grid">
+                  <a className="contact-link" href={CS_EMAIL_URL}>
+                    <span className="contact-ico" aria-hidden="true">✉</span>
+                    <span className="contact-copy">
+                      <span className="contact-label">Email</span>
+                      <span className="contact-value">{CS_EMAIL}</span>
+                    </span>
+                  </a>
+                  <a className="contact-link" href={CS_WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
+                    <span className="contact-ico" aria-hidden="true">☎</span>
+                    <span className="contact-copy">
+                      <span className="contact-label">WhatsApp</span>
+                      <span className="contact-value">{CS_WHATSAPP}</span>
+                    </span>
+                  </a>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
+                  Sertakan username dan bukti pembayaran agar penanganan lebih cepat.
                 </div>
               </div>
 
