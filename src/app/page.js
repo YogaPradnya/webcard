@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import PublicShell from '@/components/PublicShell';
+import cardArt from '@/data/cardArtCloud.json';
+import { optImg } from '@/lib/images';
 import {
   CS_EMAIL,
   CS_EMAIL_URL,
@@ -32,6 +34,23 @@ export const metadata = {
     locale: 'id_ID',
   },
 };
+
+const FEATURED_CARDS = [
+  {
+    name: 'Sung Jinwoo',
+    anime: 'Solo Leveling',
+    tier: 'Mythic',
+    imageUrl: cardArt['sung jinwoo'],
+    className: 'hero-card-a',
+  },
+  {
+    name: 'Gojo Satoru',
+    anime: 'Jujutsu Kaisen',
+    tier: 'Legendary',
+    imageUrl: cardArt['gojo satoru'],
+    className: 'hero-card-b',
+  },
+];
 
 const HOW_TO = [
   {
@@ -94,17 +113,25 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="public-hero-art" aria-hidden="true">
-            <div className="public-hero-card hero-card-a">
-              <span className="hero-card-tier">MYTHIC</span>
-              <span className="hero-card-name">Kartu Anime</span>
-              <span className="hero-card-meta">Gacha • Trade • Battle</span>
-            </div>
-            <div className="public-hero-card hero-card-b">
-              <span className="hero-card-tier">LEGENDARY</span>
-              <span className="hero-card-name">Book Collection</span>
-              <span className="hero-card-meta">265+ kartu anime</span>
-            </div>
+          <div className="public-hero-art">
+            {FEATURED_CARDS.map((card) => (
+              <div className={`public-hero-card ${card.className}`} key={card.name}>
+                {card.imageUrl ? (
+                  <img
+                    className="hero-card-img"
+                    src={optImg(card.imageUrl, 500)}
+                    alt={`Kartu ${card.name} dari ${card.anime}`}
+                    loading="eager"
+                    decoding="async"
+                  />
+                ) : null}
+                <div className="hero-card-body">
+                  <span className="hero-card-tier">{card.tier.toUpperCase()}</span>
+                  <span className="hero-card-name">{card.name}</span>
+                  <span className="hero-card-meta">{card.anime}</span>
+                </div>
+              </div>
+            ))}
             <div className="public-hero-badge">Animein</div>
           </div>
         </section>
