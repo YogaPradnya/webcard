@@ -1,5 +1,5 @@
 import { getDb } from '@/lib/db';
-import { getEffectiveArt } from '@/lib/cards';
+import { getEffectiveArt, invalidateBookCache } from '@/lib/cards';
 import { parseJson, jsonOk, jsonFail, apiHandler, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 
 // POST /api/cards/showcase { charName, showcase: boolean } — atur kartu pajangan dari web.
@@ -42,6 +42,9 @@ async function POST_impl(req, _ctx, session) {
       sql: 'UPDATE user_cards SET is_showcase = ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
       args: [showcase ? 1 : 0, String(session.id), charName],
     });
+    // Profil memakai cache koleksi 30 dtk. Tanpa invalidasi, dropdown dan
+    // hero profil masih menampilkan kartu lama sampai cache kedaluwarsa.
+    invalidateBookCache(session.id);
     return jsonOk({ charName, showcase });
   } catch (e) {
     console.error('[SHOWCASE]', e.message);
