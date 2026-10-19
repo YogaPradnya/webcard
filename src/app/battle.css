@@ -682,6 +682,9 @@
 
 @media (max-width: 720px) {
   .floating-bar {
-    bottom: 72px;
+    /* Duduk di atas bottomnav; ikut tambahan safe-area (home indicator iPhone)
+       supaya bar tidak tertimpa nav. Padding safe-area milik bottomnav saja. */
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    padding-bottom: 10px;
   }
 }
