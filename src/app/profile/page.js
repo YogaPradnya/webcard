@@ -12,7 +12,7 @@ import { useMe } from '@/hooks/useMe';
 import { useShopEnabled } from '@/hooks/useShopEnabled';
 import { displayBorderColor } from '@/lib/displayBorder';
 import { hashNameLower } from '@/lib/hash';
-import { CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
+import { CS_EMAIL, CS_EMAIL_URL, CS_HOURS, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
 
 function avatarColor(name) {
   const pastels = ['#f7eafc', '#dbeafd', '#d7f2e3', '#fffaea', '#e9e3fb', '#ffedd7'];
@@ -302,8 +302,9 @@ export default function ProfilePage() {
                     </span>
                   </a>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8 }}>
-                  Sertakan username dan bukti pembayaran agar penanganan lebih cepat.
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6 }}>
+                  Jam operasional: {CS_HOURS}. Sertakan username dan bukti pembayaran agar penanganan lebih cepat.{' '}
+                  <Link href="/contact" style={{ color: 'var(--link)', fontWeight: 700 }}>Buka halaman kontak</Link>.
                 </div>
               </div>
 

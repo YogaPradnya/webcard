@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import ThemeToggle from './ThemeToggle';
 import { fetchJson } from '@/lib/fetchJson';
 import { useShopEnabled } from '@/hooks/useShopEnabled';
+import { LEGAL_LINKS } from '@/lib/legal';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 export default function Sidebar({ username }) {
@@ -99,27 +100,38 @@ export default function Sidebar({ username }) {
   return (
     <>
       <aside className="sidebar">
-        <div className="sidebar-brand">Book Kartu Animein</div>
+        <Link href="/" className="sidebar-brand">Book Kartu Animein</Link>
         {username ? <div className="sidebar-user">@{username}</div> : null}
         <nav className="sidebar-nav">{desktopLinks}</nav>
         <div className="sidebar-bottom">
           <ThemeToggle />
-          <Link href="/terms" prefetch={false} style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'underline', marginBottom: 8 }}>
-            Syarat & Ketentuan
-          </Link>
-          <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
-            Keluar
-          </button>
+          <div className="sidebar-legal">
+            <div className="sidebar-legal-title">Legal &amp; Bantuan</div>
+            {LEGAL_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} prefetch={false}>{link.label}</Link>
+            ))}
+          </div>
+          {username ? (
+            <button className="btn btn-ghost sidebar-logout" onClick={onLogout}>
+              Keluar
+            </button>
+          ) : (
+            <Link href="/login" className="btn btn-ghost sidebar-logout">Masuk</Link>
+          )}
         </div>
       </aside>
 
       <header className="topbar">
-        <span className="topbar-title">Animein</span>
+        <Link href="/" className="topbar-title">Animein</Link>
         <span className="topbar-spacer" />
         <span className="topbar-toggle"><ThemeToggle /></span>
-        <button className="btn btn-ghost topbar-logout" onClick={onLogout}>
-          Keluar
-        </button>
+        {username ? (
+          <button className="btn btn-ghost topbar-logout" onClick={onLogout}>
+            Keluar
+          </button>
+        ) : (
+          <Link href="/login" className="btn btn-ghost topbar-logout">Masuk</Link>
+        )}
       </header>
 
       <nav className="bottomnav">{mobileLinks}</nav>

@@ -4,7 +4,9 @@ import './shell.css';
 import './battle.css';
 import './components.css';
 import './deco.css';
+import './public.css';
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from '@/lib/site';
 import DecoLayer from '@/components/DecoLayer';
 import ScrollReveal from '@/components/ScrollReveal';
 import Splash from '@/components/Splash';
@@ -29,12 +31,18 @@ const displayFont = Sora({
 });
 
 export const metadata = {
-  title: 'Book Kartu Animein',
-  description: 'Galeri book 265 kartu Animein — trade, battle PvP, grup chat. Login tanpa password via kode pairing.',
-  keywords: ['animein', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu'],
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: ['animein', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu', 'top up xp', 'kartu pajangan'],
   openGraph: {
-    title: 'Book Kartu Animein',
-    description: 'Kumpulkan 265 kartu, trade dengan teman, battle PvP interaktif.',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
     type: 'website',
     locale: 'id_ID',
   },

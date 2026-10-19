@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
-import Rara from '@/components/Rara';
 import { fetchJson, fetchLenient } from '@/lib/fetchJson';
 import { postJson } from '@/lib/postJson';
 import { useMe } from '@/hooks/useMe';
+import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
+import { LEGAL_LINKS } from '@/lib/legal';
 import { idr, paymentLabel, fmtDate } from '@/lib/money';
 
 export default function ShopPage() {
@@ -219,30 +220,10 @@ export default function ShopPage() {
   const maxSlots = catalog?.slot?.maxPerUser || 50;
   const slotRoom = Math.max(0, maxSlots - slots.length);
   const shopOn = Boolean(catalog?.enabled);
+  const paymentReady = Boolean(catalog?.payment?.configured);
+  const canBuy = shopOn && paymentReady;
   const ttlMs = catalog?.payment?.orderTtlMs || 15 * 60 * 1000;
   const qrLeft = qrOrder ? qrOrder.createdAt + ttlMs - nowTick : 0;
-
-  if (!loading && catalog && !shopOn) {
-    return (
-      <div className="layout">
-        <Sidebar username={me?.username} />
-        <div className="layout-main">
-          <div className="page">
-            <div className="brand"><h1>Shop</h1></div>
-            <div className="card">
-              <div className="empty-state">
-                <Rara size={104} className="rara-bob" />
-                <div className="section-title" style={{ margin: 0 }}>Segera hadir 🛠️</div>
-                <div style={{ fontSize: 13, color: 'var(--body)' }}>
-                  Toko Top-Up XP dan Slot Kartu Pajangan sedang disiapkan dan akan segera dibuka.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="layout">
@@ -251,6 +232,22 @@ export default function ShopPage() {
         <div className="page">
           <div className="brand"><h1>Shop</h1></div>
           <ErrorRetry message={error} onRetry={load} />
+          {!canBuy ? (
+            <div className="card" style={{ marginBottom: 16, background: 'var(--pastel-yellow)' }}>
+              <div className="section-title" style={{ marginBottom: 6 }}>
+                {!shopOn ? 'Katalog produk' : 'Pembayaran QRIS belum aktif'}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--body)', lineHeight: 1.7 }}>
+                {!shopOn
+                  ? 'Produk di bawah ini adalah katalog resmi Animein. Pembelian dibuka kembali setelah konfigurasi toko selesai. Untuk pertanyaan, hubungi CS.'
+                  : 'Katalog dan harga tetap bisa dilihat. Pembayaran QRIS sedang disiapkan; tombol pembelian akan aktif setelah konfigurasi Tripay selesai. Untuk pertanyaan, hubungi CS.'}
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10, fontSize: 12 }}>
+                <a href={CS_EMAIL_URL} style={{ color: 'var(--link)', fontWeight: 700 }}>{CS_EMAIL}</a>
+                <a href={CS_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--link)', fontWeight: 700 }}>WhatsApp {CS_WHATSAPP}</a>
+              </div>
+            </div>
+          ) : null}
           {successMsg ? (
             <div className="trade-fair ok" role="status" style={{ marginBottom: 16 }}>{successMsg}</div>
           ) : null}
@@ -348,10 +345,18 @@ export default function ShopPage() {
                     type="button"
                     className="btn"
                     style={{ minHeight: 0, padding: '8px 10px', marginTop: 8, fontSize: 13 }}
-                    disabled={!me || paying === p.id}
+                    disabled={!me || !canBuy || paying === p.id}
                     onClick={() => pay({ kind: 'xp', packId: p.id }, p.id)}
                   >
-                    {!me ? 'Login dulu' : paying === p.id ? '...' : `Beli ${idr(p.priceIdr)}`}
+                    {!me
+                      ? 'Login dulu'
+                      : !shopOn
+                        ? 'Segera hadir'
+                        : !paymentReady
+                          ? 'Pembayaran belum aktif'
+                          : paying === p.id
+                            ? '...'
+                            : `Beli ${idr(p.priceIdr)}`}
                   </button>
                 </div>
               ))}
@@ -374,13 +379,29 @@ export default function ShopPage() {
                   type="button"
                   className="btn"
                   style={{ width: 'auto', padding: '0 20px' }}
-                  disabled={slotRoom <= 0 || paying === 'slot'}
+                  disabled={!canBuy || slotRoom <= 0 || paying === 'slot'}
                   onClick={() => pay({ kind: 'slot', qty: slotQty }, 'slot')}
                 >
-                  {slotRoom <= 0 ? 'Slot penuh (50/50)' : paying === 'slot' ? '...' : `Beli ${idr((catalog?.slot?.priceIdr || 10000) * slotQty)}`}
+                  {slotRoom <= 0
+                    ? 'Slot penuh (50/50)'
+                    : !shopOn
+                      ? 'Segera hadir'
+                      : !paymentReady
+                        ? 'Pembayaran belum aktif'
+                        : paying === 'slot'
+                          ? '...'
+                          : `Beli ${idr((catalog?.slot?.priceIdr || 10000) * slotQty)}`}
                 </button>
               </div>
-            ) : null}
+            ) : (
+              <Link
+                href="/login"
+                className="btn btn-ghost"
+                style={{ width: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 18px' }}
+              >
+                Login untuk membeli slot
+              </Link>
+            )}
             {me && slots.length === 0 ? (
               <div style={{ fontSize: 13, color: 'var(--muted)' }}>Belum punya slot. Beli dulu di atas.</div>
             ) : null}
@@ -467,10 +488,25 @@ export default function ShopPage() {
           ) : null}
 
           <div className="card">
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-              Dengan membeli, Anda menyetujui{' '}
-              <Link href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>Syarat & Ketentuan</Link>{' '}
-              termasuk kebijakan refund produk digital.
+            <div style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.7 }}>
+              Semua produk bersifat digital, tanpa pengiriman fisik. Pembayaran
+              diproses melalui Tripay dengan QRIS. Dengan membeli, kamu menyetujui
+              dokumen legal Animein di bawah ini.
+            </div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, fontSize: 12 }}>
+              {LEGAL_LINKS.map((link) => (
+                <Link key={link.href} href={link.href} style={{ color: 'var(--link)', textDecoration: 'underline', fontWeight: 700 }}>
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+            <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
+              CS Animein:{' '}
+              <a href={CS_EMAIL_URL} style={{ color: 'var(--link)' }}>{CS_EMAIL}</a>
+              {' • '}
+              <a href={CS_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--link)' }}>WhatsApp {CS_WHATSAPP}</a>
+              {' • '}
+              {CS_HOURS}
             </div>
           </div>
         </div>

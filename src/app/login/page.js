@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { fetchJson } from '@/lib/fetchJson';
+import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
+import { LEGAL_LINKS } from '@/lib/legal';
 
 const TNC_KEY = 'animein-tnc-ok';
 
@@ -150,6 +152,10 @@ export default function LoginPage() {
                 <Link href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
                   Syarat & Ketentuan
                 </Link>{' '}
+                dan{' '}
+                <Link href="/privacy" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
+                  Kebijakan Privasi
+                </Link>{' '}
                 Animein.
               </span>
             </label>
@@ -172,12 +178,21 @@ export default function LoginPage() {
           </div>
         )}
       </div>
-      <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--muted)' }}>
-        Dengan masuk, Anda menyetujui{' '}
-        <a href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
-          Syarat & Ketentuan
-        </a>{' '}
-        Animein.
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12 }}>
+          {LEGAL_LINKS.map((link) => (
+            <Link key={link.href} href={link.href} style={{ color: 'var(--link)', textDecoration: 'underline', fontWeight: 700 }}>
+              {link.label}
+            </Link>
+          ))}
+        </div>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+          CS: <a href={CS_EMAIL_URL} style={{ color: 'var(--link)' }}>{CS_EMAIL}</a>
+          {' • '}
+          <a href={CS_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--link)' }}>WhatsApp {CS_WHATSAPP}</a>
+          {' • '}
+          {CS_HOURS}
+        </div>
       </div>
     </div>
   );

@@ -24,6 +24,7 @@
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--ink);
+  text-decoration: none;
 }
 
 [data-theme='light'] .brand h1,

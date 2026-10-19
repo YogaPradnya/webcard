@@ -23,7 +23,7 @@ async function GET_impl() {
       maxPerUser: MAX_SLOTS_PER_USER,
       maxEdits: MAX_EDITS_PER_SLOT,
       borderTypes: SLOT_BORDER_TYPES,
-      desc: '1 slot = 1 kartu pajangan custom (display-only, tampil di profil). Tiap Simpan memakai 1 jatah ubah (maks 3x per slot).',
+      desc: '1 slot = 1 kartu pajangan custom (display-only, tampil di profil). Pengerjaan maksimal 3x24 jam. Tiap Simpan memakai 1 jatah ubah (maks 3x per slot).',
     },
     payment: {
       configured: isTripayConfigured() || sim,

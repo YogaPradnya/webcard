@@ -4,13 +4,23 @@ import { isSchemaReady } from './schema.js';
 import { calcLevel } from './level.js';
 import { cleanHex } from './color.js';
 import { DISPLAY_BORDERS } from './constants.js';
+import {
+  XP_PACKS,
+  SLOT_PRICE_IDR,
+  MAX_SLOTS_PER_USER,
+  MAX_EDITS_PER_SLOT,
+} from './products.js';
 
 // Katalog Shop Animein: Top-Up XP + Slot Kartu Pajangan custom.
 // Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Tripay.
+// Konstanta produk ada di products.js agar landing page publik bisa memakainya
+// tanpa menarik modul server/database.
+export { XP_PACKS, SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, MAX_EDITS_PER_SLOT };
 
-// Feature flag Shop: tampil hanya bila NEXT_PUBLIC_SHOP_ENABLED=true.
-// Matikan (default) sampai kredensial production Tripay siap, agar fitur
-// pembayaran tidak terlihat publik. Nyalakan lokal untuk tes.
+// Feature flag checkout Shop. Katalog produk tetap bisa dilihat publik,
+// tetapi tombol pembelian hanya aktif bila flag ini true dan Tripay siap.
+// Matikan (default) sampai kredensial production Tripay siap.
+// Nyalakan lokal untuk tes.
 export function isShopEnabled() {
   return String(process.env.NEXT_PUBLIC_SHOP_ENABLED || '').toLowerCase() === 'true';
 }
@@ -21,20 +31,10 @@ export function isPaymentSimulationEnabled() {
   return String(process.env.NEXT_PUBLIC_PAYMENT_SIMULATION || '').toLowerCase() === 'true';
 }
 
-export const XP_PACKS = [
-  { id: 'xp-5k', priceIdr: 5000, xp: 6000 },
-  { id: 'xp-10k', priceIdr: 10000, xp: 11500 },
-  { id: 'xp-50k', priceIdr: 50000, xp: 55000 },
-  { id: 'xp-100k', priceIdr: 100000, xp: 125000 },
-];
-
-export const SLOT_PRICE_IDR = 10000;
-export const MAX_SLOTS_PER_USER = 50;
 // Order pending yang tidak dibayar dalam 15 menit otomatis kadaluarsa.
 // (QRIS asli: buka HP + scan + konfirmasi sering >5 menit.)
 export const ORDER_PENDING_TTL_MS = 15 * 60 * 1000;
 // Tiap slot = 1 kartu pajangan custom dengan 3x jatah ubah (tiap Simpan makan 1).
-export const MAX_EDITS_PER_SLOT = 3;
 
 export const SLOT_BORDER_TYPES = DISPLAY_BORDERS;
 
