@@ -2,7 +2,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
 
-// Fallback lama: kode login lahir di WEB, diklaim dari CHAT (.login KODE).
+// Fallback lama: kode login lahir di WEB; endpoint dipertahankan untuk kompatibilitas.
 // UI utama sekarang memakai username/email + password Animein; route kode
 // dipertahankan untuk rollback.
 

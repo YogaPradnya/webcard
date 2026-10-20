@@ -163,10 +163,6 @@ export default function LoginPage() {
             {loading ? 'Memeriksa akun...' : 'Masuk'}
           </button>
         </form>
-        <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6, marginTop: 14 }}>
-          Belum terdaftar? Gunakan akun yang sudah pernah berinteraksi dengan
-          bot terlebih dahulu.
-        </p>
       </div>
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12 }}>
