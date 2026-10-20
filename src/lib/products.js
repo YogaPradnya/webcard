@@ -1,4 +1,4 @@
-// Katalog produk publik KARTU.
+// Katalog produk publik KartuYogaa.
 // Sumber tunggal untuk landing page, Shop, dan API katalog agar harga/isi
 // produk tidak berbeda antar halaman.
 export const XP_PACKS = [

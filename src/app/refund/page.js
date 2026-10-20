@@ -11,7 +11,7 @@ import {
 export const metadata = {
   title: 'Kebijakan Refund',
   description:
-    'Kebijakan pengembalian dana KARTU untuk Top-Up XP dan Slot Kartu Pajangan Custom, termasuk syarat, proses, dan waktu pemrosesan.',
+    'Kebijakan pengembalian dana KartuYogaa untuk Top-Up XP dan Slot Kartu Pajangan Custom, termasuk syarat, proses, dan waktu pemrosesan.',
   alternates: { canonical: '/refund' },
 };
 
@@ -26,7 +26,7 @@ export default function RefundPage() {
       intro={
         <>
           Kebijakan ini menjelaskan kapan pengembalian dana (refund) dapat
-          diajukan untuk produk digital KARTU, cara mengajukannya, dan estimasi
+          diajukan untuk produk digital KartuYogaa, cara mengajukannya, dan estimasi
           waktu pemrosesan. Kebijakan ini merupakan bagian dari{' '}
           <Link href="/terms">Syarat &amp; Ketentuan</Link>.
         </>
@@ -34,7 +34,7 @@ export default function RefundPage() {
     >
       <LegalSection title="1. Ruang Lingkup">
         <p>
-          Kebijakan ini berlaku untuk pembelian produk digital di Shop KARTU,
+          Kebijakan ini berlaku untuk pembelian produk digital di Shop KartuYogaa,
           yaitu Top-Up XP dan Slot Kartu Pajangan Custom, yang pembayarannya
           diproses melalui Tripay menggunakan QRIS. Seluruh produk bersifat
           digital dan tidak memiliki pengiriman fisik.
@@ -54,7 +54,7 @@ export default function RefundPage() {
       <LegalSection title="3. Top-Up XP">
         <p>
           XP yang sudah masuk ke akun tidak dapat dikembalikan (non-refundable),
-          kecuali terdapat kegagalan sistem di pihak KARTU. Contoh kondisi yang
+          kecuali terdapat kegagalan sistem di pihak KartuYogaa. Contoh kondisi yang
           dapat diajukan:
         </p>
         <ul className="legal-list">
@@ -92,7 +92,7 @@ export default function RefundPage() {
 
       <LegalSection title="6. Cara Mengajukan Refund">
         <p>
-          Ajukan refund melalui Customer Service KARTU dengan menyertakan:
+          Ajukan refund melalui Customer Service KartuYogaa dengan menyertakan:
         </p>
         <ul className="legal-list">
           <li>Username Animein.</li>

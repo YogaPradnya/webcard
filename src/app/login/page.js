@@ -234,7 +234,7 @@ export default function LoginPage() {
       <div className="brand login-brand">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="login-brand-logo" src="/logo.png" alt="" width={245} height={275} />
-        <h1 className="visually-hidden">KARTU</h1>
+        <h1 className="visually-hidden">KartuYogaa</h1>
       </div>
       <div className="card">
         <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 20 }}>
@@ -262,7 +262,7 @@ export default function LoginPage() {
                 <Link href="/privacy" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
                   Kebijakan Privasi
                 </Link>{' '}
-                KARTU.
+                KartuYogaa.
               </span>
             </label>
             <button className="btn" onClick={makeCode} disabled={loading || !tnc}>

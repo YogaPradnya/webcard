@@ -239,7 +239,7 @@ export default function ShopPage() {
               </div>
               <div style={{ fontSize: 13, color: 'var(--body)', lineHeight: 1.7 }}>
                 {!shopOn
-                  ? 'Produk di bawah ini adalah katalog resmi KARTU. Pembelian dibuka kembali setelah konfigurasi toko selesai. Untuk pertanyaan, hubungi CS.'
+                  ? 'Produk di bawah ini adalah katalog resmi KartuYogaa. Pembelian dibuka kembali setelah konfigurasi toko selesai. Untuk pertanyaan, hubungi CS.'
                   : 'Katalog dan harga tetap bisa dilihat. Pembayaran QRIS sedang disiapkan; tombol pembelian akan aktif setelah konfigurasi Tripay selesai. Untuk pertanyaan, hubungi CS.'}
               </div>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10, fontSize: 12 }}>
@@ -491,7 +491,7 @@ export default function ShopPage() {
             <div style={{ fontSize: 12, color: 'var(--body)', lineHeight: 1.7 }}>
               Semua produk bersifat digital, tanpa pengiriman fisik. Pembayaran
               diproses melalui Tripay dengan QRIS. Dengan membeli, kamu menyetujui
-              dokumen legal KARTU di bawah ini.
+              dokumen legal KartuYogaa di bawah ini.
             </div>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, fontSize: 12 }}>
               {LEGAL_LINKS.map((link) => (
@@ -501,7 +501,7 @@ export default function ShopPage() {
               ))}
             </div>
             <div style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
-              CS KARTU:{' '}
+              CS KartuYogaa:{' '}
               <a href={CS_EMAIL_URL} style={{ color: 'var(--link)' }}>{CS_EMAIL}</a>
               {' • '}
               <a href={CS_WHATSAPP_URL} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--link)' }}>WhatsApp {CS_WHATSAPP}</a>

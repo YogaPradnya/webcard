@@ -12,7 +12,7 @@ import {
 export const metadata = {
   title: 'Kontak Support',
   description:
-    'Hubungi Customer Service KARTU melalui email atau WhatsApp. Jam operasional 08.00–23.00 WIB untuk bantuan akun, pembayaran, pesanan, dan refund.',
+    'Hubungi Customer Service KartuYogaa melalui email atau WhatsApp. Jam operasional 08.00–23.00 WIB untuk bantuan akun, pembayaran, pesanan, dan refund.',
   alternates: { canonical: '/contact' },
 };
 
@@ -47,7 +47,7 @@ export default function ContactPage() {
       active="/contact"
       intro={
         <>
-          Customer Service KARTU membantu pertanyaan mengenai akun, pembayaran,
+          Customer Service KartuYogaa membantu pertanyaan mengenai akun, pembayaran,
           pesanan, kartu custom, dan refund. Gunakan kanal resmi di halaman ini
           agar permintaanmu tercatat dan diproses dengan benar.
         </>
@@ -94,7 +94,7 @@ export default function ContactPage() {
         </ul>
         <p>
           Jangan mengirim PIN, OTP, password, atau kode rahasia apa pun. CS
-          KARTU tidak akan meminta data tersebut.
+          KartuYogaa tidak akan meminta data tersebut.
         </p>
       </LegalSection>
 

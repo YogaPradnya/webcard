@@ -1,4 +1,4 @@
-# KARTU — Book Kartu Anime
+# KartuYogaa — Book Kartu Anime
 
 Galeri book 265 kartu anime (gacha/trade/battle PvP, shop, misi). Login tanpa password: tekan **Dapatkan Kode**
 di web, ketik `.login KODE` di chat Animein dari akunmu, web langsung masuk.

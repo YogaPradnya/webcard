@@ -11,7 +11,7 @@ import {
   MAX_EDITS_PER_SLOT,
 } from './products.js';
 
-// Katalog Shop KARTU: Top-Up XP + Slot Kartu Pajangan custom.
+// Katalog Shop KartuYogaa: Top-Up XP + Slot Kartu Pajangan custom.
 // Harga dalam Rupiah, XP otomatis masuk setelah pembayaran sukses via Tripay.
 // Konstanta produk ada di products.js agar landing page publik bisa memakainya
 // tanpa menarik modul server/database.
@@ -129,10 +129,10 @@ export async function createTripayTransaction({
   form.set('method', method);
   form.set('merchant_ref', merchantRef);
   form.set('amount', String(amountInt));
-  form.set('customer_name', customerName || 'KARTU User');
+  form.set('customer_name', customerName || 'KartuYogaa User');
   form.set('customer_email', customerEmail || 'noreply@kartu.yogaa.web.id');
   if (customerPhone) form.set('customer_phone', String(customerPhone));
-  form.set('order_items[0][name]', itemName || 'Pembelian KARTU');
+  form.set('order_items[0][name]', itemName || 'Pembelian KartuYogaa');
   form.set('order_items[0][price]', String(amountInt));
   form.set('order_items[0][quantity]', '1');
   form.set('callback_url', tripayCallbackUrl());
@@ -194,8 +194,8 @@ export function createSimulatedTransaction({ orderId, amount }) {
   const amountInt = Math.round(Number(amount) || 0);
   return {
     payId: `SIM-${Date.now()}`,
-    qrContent: `00020101021226590014ID.LINKAJA.WWW01189360091100222033880215${refId}520458125303360540${amountInt}5802ID5910KARTU SHOP6007JAKARTA6304ABCD`,
-    qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=KARTU_SIMULATION_${encodeURIComponent(refId)}`,
+    qrContent: `00020101021226590014ID.LINKAJA.WWW01189360091100222033880215${refId}520458125303360540${amountInt}5802ID5910KartuYogaa SHOP6007JAKARTA6304ABCD`,
+    qrUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=KartuYogaa_SIMULATION_${encodeURIComponent(refId)}`,
     checkoutUrl: '',
     channelName: 'QRIS (Simulasi Dev)',
     status: 'Pending',
@@ -333,7 +333,7 @@ export async function syncOrderFromTripay(orderId) {
 
 export function genMerchantOrderId() {
   const rand = 100000 + randomInt(900000);
-  return `KARTU-${Date.now()}-${rand}`;
+  return `KartuYogaa-${Date.now()}-${rand}`;
 }
 
 export async function ensureShopTables() {

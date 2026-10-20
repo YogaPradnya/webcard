@@ -22,6 +22,6 @@ export const LEGAL_LINKS = [
     href: '/contact',
     label: 'Kontak Support',
     short: 'Kontak',
-    description: 'Hubungi Customer Service KARTU dan kirim bukti pesanan.',
+    description: 'Hubungi Customer Service KartuYogaa dan kirim bukti pesanan.',
   },
 ];
