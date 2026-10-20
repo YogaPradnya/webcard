@@ -15,7 +15,7 @@ export const metadata = {
   alternates: { canonical: '/privacy' },
 };
 
-const UPDATED = '19 Oktober 2026';
+const UPDATED = '20 Oktober 2026';
 
 export default function PrivacyPage() {
   return (
@@ -39,6 +39,12 @@ export default function PrivacyPage() {
           <li>
             <strong>Data akun:</strong> username, user ID Animein, status login,
             dan cookie sesi yang diperlukan untuk menjaga sesi masuk.
+          </li>
+          <li>
+            <strong>Data autentikasi:</strong> username atau email dan password
+            Animein yang kamu masukkan saat login. Password hanya diproses
+            sementara untuk verifikasi ke layanan Animein dan tidak disimpan
+            oleh KartuYogaa.
           </li>
           <li>
             <strong>Data transaksi:</strong> Order ID, jenis produk, jumlah,
@@ -95,15 +101,18 @@ export default function PrivacyPage() {
           Pembayaran diproses melalui <strong>Tripay</strong> dengan metode QRIS.
           Data instrumen pembayaran seperti kartu, rekening, atau akun e-wallet
           diproses oleh Tripay dan/atau penyedia kanal pembayaran yang dipilih.
-          KartuYogaa tidak menyimpan nomor kartu, PIN, password, atau kredensial
-          perbankan pengguna.
+          KartuYogaa tidak menyimpan nomor kartu, PIN, atau kredensial perbankan
+          pengguna. Password Animein hanya diproses sementara untuk verifikasi
+          login dan tidak disimpan.
         </p>
         <p>
           Kami juga menggunakan penyedia layanan teknis untuk hosting, database,
-          penyimpanan gambar (misalnya Cloudinary), dan komunikasi. Penyedia
-          tersebut hanya menerima data yang diperlukan untuk menjalankan
-          layanannya. Tautan ke situs pihak ketiga, termasuk Tripay, memiliki
-          kebijakan privasi masing-masing.
+          penyimpanan gambar (misalnya Cloudinary), dan komunikasi. Untuk login,
+          kredensial diverifikasi melalui layanan <strong>Animein</strong> dan
+          diteruskan oleh layanan dashboard yang di-hosting di
+          <strong>Render</strong>. Penyedia tersebut hanya menerima data yang
+          diperlukan untuk menjalankan layanannya. Tautan ke situs pihak ketiga,
+          termasuk Tripay, memiliki kebijakan privasi masing-masing.
         </p>
       </LegalSection>
 
@@ -112,9 +121,11 @@ export default function PrivacyPage() {
           Data disimpan pada sistem yang kami kelola dan/atau penyedia layanan
           yang bekerja sama dengan KartuYogaa. Kami menggunakan pembatasan akses,
           koneksi terenkripsi (HTTPS), dan langkah teknis lain yang wajar untuk
-          melindungi data. Namun, tidak ada sistem yang dapat menjamin keamanan
-          seratus persen. Jangan pernah mengirim PIN, OTP, password, atau kode
-          rahasia kepada siapa pun, termasuk kepada CS.
+          melindungi data. Password Animein tidak disimpan; kredensial hanya
+          melewati server web dan dashboard secara terenkripsi untuk diverifikasi
+          ke Animein. Namun, tidak ada sistem yang dapat menjamin keamanan
+          seratus persen. Jangan pernah mengirim PIN, OTP, atau password kepada
+          siapa pun melalui kanal di luar halaman login resmi, termasuk kepada CS.
         </p>
       </LegalSection>
 

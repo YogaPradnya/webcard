@@ -1,7 +1,7 @@
 export const metadata = {
   title: 'Masuk',
   description:
-    'Masuk ke KartuYogaa dengan kode login dari chat bot. Tanpa password, aman, dan cepat.',
+    'Masuk ke KartuYogaa dengan username atau email dan password akun Animein yang sudah terdaftar.',
   alternates: { canonical: '/login' },
 };
 

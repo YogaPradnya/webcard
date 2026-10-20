@@ -16,7 +16,7 @@ export const metadata = {
   alternates: { canonical: '/terms' },
 };
 
-const UPDATED = '19 Oktober 2026';
+const UPDATED = '20 Oktober 2026';
 
 export default function TermsPage() {
   return (
@@ -173,11 +173,19 @@ export default function TermsPage() {
 
       <LegalSection title="10. Pendaftaran Akun">
         <p>
-          Untuk membeli, kamu perlu masuk dengan akun Animein melalui kode login
-          di chat bot. Kamu wajib memberikan informasi yang akurat dan bertanggung
-          jawab menjaga kerahasiaan kode login serta seluruh aktivitas pada akun.
-          Kamu dilarang menyalahgunakan atau membagikan akses akun, menyamar
-          sebagai pihak lain, atau memalsukan identitas maupun afiliasi.
+          Untuk membeli, kamu perlu masuk dengan akun Animein yang sudah terdaftar
+          di KartuYogaa menggunakan username atau email dan password Animein.
+          Password hanya diproses sementara untuk verifikasi ke layanan Animein
+          dan tidak disimpan oleh KartuYogaa. Kamu wajib memberikan informasi yang
+          akurat dan bertanggung jawab menjaga kerahasiaan password serta seluruh
+          aktivitas pada akun. Kamu dilarang menyalahgunakan atau membagikan akses
+          akun, menyamar sebagai pihak lain, atau memalsukan identitas maupun
+          afiliasi.
+        </p>
+        <p>
+          Akun Animein yang belum memiliki data di KartuYogaa tidak dapat langsung
+          menggunakan login web. Pengguna perlu berinteraksi dengan bot Animein
+          terlebih dahulu agar data akunnya tercatat.
         </p>
       </LegalSection>
 
@@ -192,9 +200,9 @@ export default function TermsPage() {
       <LegalSection title="12. Kebijakan Privasi">
         <p>
           Kami menghormati privasi pengguna. Data yang kamu berikan digunakan
-          untuk menyelesaikan pesanan, memberikan dukungan, dan menjaga keamanan
-          layanan. Data pembayaran diproses oleh Tripay dan tidak kami simpan
-          secara langsung. Penjelasan lengkap mengenai data yang dikumpulkan,
+          untuk memverifikasi login, menyelesaikan pesanan, memberikan dukungan,
+          dan menjaga keamanan layanan. Data pembayaran diproses oleh Tripay dan
+          tidak kami simpan secara langsung. Penjelasan lengkap mengenai data yang dikumpulkan,
           tujuan penggunaan, penyimpanan, dan hak pengguna tersedia di halaman{' '}
           <Link href="/privacy">Kebijakan Privasi</Link>.
         </p>

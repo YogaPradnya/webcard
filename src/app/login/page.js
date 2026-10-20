@@ -1,168 +1,37 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { fetchJson } from '@/lib/fetchJson';
 import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
 import { LEGAL_LINKS } from '@/lib/legal';
 
 const TNC_KEY = 'animein-tnc-ok';
-const LOGIN_TOKEN_KEY = 'animein-login-token';
-
-function newClientToken() {
-  try {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  } catch {
-    return '';
-  }
-}
-
-function readClientToken() {
-  try {
-    const t = sessionStorage.getItem(LOGIN_TOKEN_KEY) || '';
-    return /^[a-f0-9]{64}$/i.test(t) ? t : '';
-  } catch {
-    return '';
-  }
-}
-
-function writeClientToken(token) {
-  try {
-    if (token) sessionStorage.setItem(LOGIN_TOKEN_KEY, token);
-    else sessionStorage.removeItem(LOGIN_TOKEN_KEY);
-  } catch { /* abaikan */ }
-}
-
-function loginHeaders() {
-  const token = readClientToken();
-  return token ? { 'X-Login-Token': token } : undefined;
-}
+const LOGIN_TIMEOUT_MS = 30000;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [code, setCode] = useState('');
-  const [expiresAt, setExpiresAt] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [checkingNow, setCheckingNow] = useState(false);
-  const [error, setError] = useState('');
-  const [statusMsg, setStatusMsg] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [tnc, setTnc] = useState(false);
-  const pollTimer = useRef(null);
-  const claimedRef = useRef(false);
-
-  async function makeCode() {
-    if (!tnc) {
-      setError('Centang persetujuan Syarat & Ketentuan dulu.');
-      return;
-    }
-    setError('');
-    setStatusMsg('');
-    setCode('');
-    setCopied(false);
-    setLoading(true);
-    claimedRef.current = false;
-    const clientToken = newClientToken();
-    if (clientToken) writeClientToken(clientToken);
-    try {
-      const { ok, data } = await fetchJson('/api/auth/code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tnc: true, ...(clientToken ? { clientToken } : {}) }),
-      });
-      if (!ok || !data.success) {
-        setError(data.message || 'Gagal buat kode.');
-        return;
-      }
-      setCode(data.code);
-      setExpiresAt(data.expiresAt);
-    } catch {
-      setError('Tidak bisa menghubungi server.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function copyCode() {
-    if (!code) return;
-    const text = `.login ${code}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // fallback: select manual
-      setError('Gagal salin otomatis. Salin manual: ' + text);
-    }
-  }
-
-  function completeLogin() {
-    if (claimedRef.current) return;
-    claimedRef.current = true;
-    writeClientToken('');
-    router.replace('/book');
-  }
-
-  async function checkNow() {
-    if (!code) return;
-    setCheckingNow(true);
-    setStatusMsg('');
-    try {
-      const { data } = await fetchJson('/api/auth/code/status', {
-        ms: 10000,
-        headers: loginHeaders(),
-        cache: 'no-store',
-      }).catch(() => ({ data: {} }));
-      if (claimedRef.current) return;
-      if (data.status === 'claimed') {
-        completeLogin();
-        return;
-      }
-      if (data.status === 'expired') {
-        setCode('');
-        setError('Kode kedaluwarsa. Buat kode baru.');
-        return;
-      }
-      setStatusMsg(`Kode ${code} belum diklaim. Pastikan .login ${code} sudah terkirim ke bot Animein.`);
-    } catch {
-      setStatusMsg('Gagal cek status. Coba lagi.');
-    } finally {
-      setCheckingNow(false);
-    }
-  }
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    // Muat status centang TnC + pulihkan kode yang belum diklaim
-    // (cookie/token login tetap ada walau browser di-refresh).
     try {
       if (localStorage.getItem(TNC_KEY) === '1') setTnc(true);
     } catch { /* abaikan */ }
+
+    let cancelled = false;
     (async () => {
       try {
-        const { data } = await fetchJson('/api/auth/code/status', {
-          ms: 10000,
-          headers: loginHeaders(),
-          cache: 'no-store',
-        }).catch(() => ({ data: {} }));
-        if (data.status === 'claimed') {
-          completeLogin();
-          return;
-        }
-        if (data.status === 'pending' && data.code) {
-          setCode(data.code);
-          setExpiresAt(data.expiresAt || 0);
-        }
-      } catch { /* abaikan: tampilkan tombol buat kode */ }
-      finally {
-        setChecking(false);
-      }
+        const res = await fetch('/api/auth/me', { cache: 'no-store' });
+        if (res.ok && !cancelled) router.replace('/book');
+      } catch { /* belum login / server sibuk */ }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => { cancelled = true; };
+  }, [router]);
 
   function onToggleTnc(v) {
     setTnc(v);
@@ -172,58 +41,42 @@ export default function LoginPage() {
     } catch { /* abaikan */ }
   }
 
-  useEffect(() => {
-    if (!code) return;
-    let stopped = false;
-    let inFlight = false;
+  async function onSubmit(e) {
+    e.preventDefault();
+    if (!tnc) {
+      setError('Centang persetujuan Syarat & Ketentuan dulu.');
+      return;
+    }
+    setError('');
+    setLoading(true);
 
-    // Poll rekursif: request berikutnya baru dijadwalkan SETELAH respons datang,
-    // jadi tidak ada tumpukan request saat server lambat (dulu setInterval 2 dtk).
-    const poll = async () => {
-      if (stopped || inFlight || claimedRef.current) return;
-      inFlight = true;
-      try {
-        const { data } = await fetchJson('/api/auth/code/status', {
-          ms: 10000,
-          headers: loginHeaders(),
-          cache: 'no-store',
-        }).catch(() => ({ data: {} }));
-        if (stopped || claimedRef.current) return;
-        if (data.status === 'claimed') {
-          completeLogin();
-          return;
-        }
-        if (data.status === 'expired') {
-          setCode('');
-          setError('Kode kedaluwarsa. Buat kode baru.');
-          return;
-        }
-      } catch {
-        // coba lagi setelah jeda berikut
-      } finally {
-        inFlight = false;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, tnc: true }),
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        setError(data.message || 'Login gagal. Coba lagi.');
+        return;
       }
-      if (!stopped && !claimedRef.current) pollTimer.current = setTimeout(poll, 2000);
-    };
-
-    // Saat pengguna kembali dari chat bot ke browser, cek langsung.
-    // Timer di tab background sering ditunda oleh browser mobile.
-    const onVisible = () => {
-      if (document.visibilityState === 'visible' && !claimedRef.current) {
-        clearTimeout(pollTimer.current);
-        poll();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisible);
-
-    pollTimer.current = setTimeout(poll, 600);
-    return () => {
-      stopped = true;
-      clearTimeout(pollTimer.current);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+      router.replace(data.redirect || '/book');
+    } catch (err) {
+      setError(
+        err?.name === 'AbortError'
+          ? 'Server terlalu lama merespons. Coba lagi beberapa saat lagi.'
+          : 'Tidak bisa menghubungi server.',
+      );
+    } finally {
+      clearTimeout(timer);
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="page deco-wrap" style={{ maxWidth: 420 }}>
@@ -238,62 +91,82 @@ export default function LoginPage() {
       </div>
       <div className="card">
         <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 20 }}>
-          Tekan tombol di bawah untuk dapat kode, lalu ketik <strong>.login KODE</strong> di
-          chat Animein dari akunmu. Tanpa password.
+          Masuk dengan akun Animein yang sudah terdaftar di KartuYogaa.
+          Password hanya dipakai untuk verifikasi dan tidak disimpan. Jangan
+          pernah mengirim password lewat chat atau ke CS.
         </p>
-        {error ? <div className="alert-error">{error}</div> : null}
-        {checking ? (
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memeriksa sesi...</div>
-        ) : !code ? (
-          <>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: 'var(--body)', marginBottom: 16, cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={tnc}
-                onChange={(e) => onToggleTnc(e.target.checked)}
-                style={{ width: 18, height: 18, marginTop: 1, accentColor: 'var(--link)' }}
-              />
-              <span>
-                Saya menyetujui{' '}
-                <Link href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
-                  Syarat & Ketentuan
-                </Link>{' '}
-                dan{' '}
-                <Link href="/privacy" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
-                  Kebijakan Privasi
-                </Link>{' '}
-                KartuYogaa.
-              </span>
-            </label>
-            <button className="btn" onClick={makeCode} disabled={loading || !tnc}>
-              {loading ? 'Membuat...' : 'Dapatkan Kode'}
-            </button>
-          </>
-        ) : (
-          <div>
-            <div className="trade-code-big">{code}</div>
-            <div className="trade-hint">
-              {statusMsg || `Ketik .login ${code} di chat. Menunggu klaim...`}
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn" onClick={copyCode} type="button" style={{ flex: 1 }}>
-                {copied ? 'Tersalin!' : 'Salin .login'}
-              </button>
-              <button className="btn btn-ghost" onClick={makeCode} disabled={loading} type="button" style={{ flex: 1 }}>
-                Kode Baru
-              </button>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ marginTop: 8 }}
-              onClick={checkNow}
-              disabled={checkingNow}
-            >
-              {checkingNow ? 'Memeriksa...' : 'Sudah kirim .login? Cek status'}
-            </button>
+        {error ? <div className="alert-error" role="alert">{error}</div> : null}
+        <form onSubmit={onSubmit}>
+          <div className="field">
+            <label className="label" htmlFor="login-username">Username atau Email Animein</label>
+            <input
+              id="login-username"
+              className="input"
+              type="text"
+              name="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={200}
+              required
+              autoFocus
+            />
           </div>
-        )}
+          <div className="field">
+            <label className="label" htmlFor="login-password">Password Animein</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id="login-password"
+                className="input"
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                maxLength={256}
+                style={{ minWidth: 0 }}
+                required
+              />
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: 'auto', minWidth: 74, padding: '10px 12px' }}
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Sembunyikan password' : 'Tampilkan password'}
+              >
+                {showPassword ? 'Tutup' : 'Lihat'}
+              </button>
+            </div>
+          </div>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, color: 'var(--body)', marginBottom: 16, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={tnc}
+              onChange={(e) => onToggleTnc(e.target.checked)}
+              style={{ width: 18, height: 18, marginTop: 1, accentColor: 'var(--link)' }}
+            />
+            <span>
+              Saya menyetujui{' '}
+              <Link href="/terms" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
+                Syarat & Ketentuan
+              </Link>{' '}
+              dan{' '}
+              <Link href="/privacy" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
+                Kebijakan Privasi
+              </Link>{' '}
+              KartuYogaa.
+            </span>
+          </label>
+          <button className="btn" type="submit" disabled={loading}>
+            {loading ? 'Memeriksa akun...' : 'Masuk'}
+          </button>
+        </form>
+        <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6, marginTop: 14 }}>
+          Belum terdaftar? Gunakan akun Animein yang sudah pernah berinteraksi
+          dengan bot Animein terlebih dahulu.
+        </p>
       </div>
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12 }}>

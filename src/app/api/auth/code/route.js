@@ -7,8 +7,9 @@ function tokenCookie(token, maxAge) {
   return `login_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 
-// POST /api/auth/code { tnc: true } — buat kode login 6 huruf untuk sesi browser ini.
-// Wajib menyetujui TnC dulu (checkbox di UI + validasi server anti by-pass).
+// POST /api/auth/code { tnc: true } — fallback/rollback kode login 6 huruf.
+// UI utama sekarang memakai password Animein; route ini sengaja dipertahankan.
+// Wajib menyetujui TnC dulu (validasi server anti by-pass).
 // Body dibaca toleran (bukan parseJson ketat): body kosong = tidak setuju.
 async function POST_impl(req) {
   try {

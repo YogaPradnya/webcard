@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 
 
-// GET /api/auth/me — username otomatis dari sesi pairing (database bot).
+// GET /api/auth/me — username otomatis dari sesi login (database bot).
 // Tanpa request ke API Animein.
 async function GET_impl(req, _ctx, session) {
 
@@ -19,7 +19,7 @@ async function GET_impl(req, _ctx, session) {
     });
     if (res.rows.length > 0 && res.rows[0].username) username = String(res.rows[0].username);
   } catch {
-    // fallback ke username saat pairing
+    // fallback ke username saat login
   }
   return jsonOk({ id: session.id, username });
 }

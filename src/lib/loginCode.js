@@ -2,8 +2,9 @@ import { randomBytes, createHash } from 'node:crypto';
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
 
-// Kode login lahir di WEB, diklaim dari CHAT (.login KODE).
-// Tanpa password: bukti kepemilikan = senderUserId pengirim di chat.
+// Fallback lama: kode login lahir di WEB, diklaim dari CHAT (.login KODE).
+// UI utama sekarang memakai username/email + password Animein; route kode
+// dipertahankan untuk rollback.
 
 export const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
