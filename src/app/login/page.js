@@ -91,14 +91,14 @@ export default function LoginPage() {
       </div>
       <div className="card">
         <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 20 }}>
-          Masuk dengan akun Animein yang sudah terdaftar di KartuYogaa.
-          Password hanya dipakai untuk verifikasi dan tidak disimpan. Jangan
-          pernah mengirim password lewat chat atau ke CS.
+          Masuk dengan akun yang sudah terdaftar di KartuYogaa. Password hanya
+          dipakai untuk verifikasi dan tidak disimpan. Jangan pernah mengirim
+          password lewat chat atau ke CS.
         </p>
         {error ? <div className="alert-error" role="alert">{error}</div> : null}
         <form onSubmit={onSubmit}>
           <div className="field">
-            <label className="label" htmlFor="login-username">Username atau Email Animein</label>
+            <label className="label" htmlFor="login-username">Username atau Email</label>
             <input
               id="login-username"
               className="input"
@@ -115,7 +115,7 @@ export default function LoginPage() {
             />
           </div>
           <div className="field">
-            <label className="label" htmlFor="login-password">Password Animein</label>
+            <label className="label" htmlFor="login-password">Password</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 id="login-password"
@@ -164,8 +164,8 @@ export default function LoginPage() {
           </button>
         </form>
         <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6, marginTop: 14 }}>
-          Belum terdaftar? Gunakan akun Animein yang sudah pernah berinteraksi
-          dengan bot Animein terlebih dahulu.
+          Belum terdaftar? Gunakan akun yang sudah pernah berinteraksi dengan
+          bot terlebih dahulu.
         </p>
       </div>
       <div className="card" style={{ marginTop: 16 }}>

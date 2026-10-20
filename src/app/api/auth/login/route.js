@@ -24,10 +24,10 @@ function hashUsername(username) {
 
 function failForCode(code) {
   if (code === 'INVALID_CREDENTIALS') {
-    return jsonFail('Username/email atau password Animein salah.', 401, code);
+    return jsonFail('Username/email atau password salah.', 401, code);
   }
   if (code === 'ACCOUNT_INACTIVE') {
-    return jsonFail('Akun Animein tidak aktif.', 403, code);
+    return jsonFail('Akun tidak aktif.', 403, code);
   }
   if (code === 'RATE_LIMITED' || code === 'UPSTREAM_RATE_LIMITED') {
     return jsonFail('Terlalu banyak percobaan. Coba lagi nanti.', 429, 'RATE_LIMITED');
@@ -80,7 +80,7 @@ async function POST_impl(req) {
     });
     if (result.rows.length === 0) {
       return jsonFail(
-        'Akun Animein ini belum terdaftar di KartuYogaa. Silakan chat bot Animein terlebih dahulu.',
+        'Akun ini belum terdaftar di KartuYogaa. Silakan chat bot terlebih dahulu.',
         403,
         'NOT_REGISTERED',
       );
