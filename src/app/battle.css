@@ -783,7 +783,9 @@
 
 @keyframes lunge {
   30% {
-    transform: translateY(-2px) scale(1.02);
+    /* Hanya bergerak, tanpa scale: kartu tidak boleh membesar/menimpa
+       kartu sebelah saat animasi serangan. */
+    transform: translateY(-2px);
   }
 }
 
