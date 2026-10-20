@@ -282,7 +282,7 @@ export default function ProfilePage() {
               <div className="card" style={{ marginTop: 16 }}>
                 <div className="section-title">Bantuan & Customer Service</div>
                 <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
-                  Ada kendala pesanan, pembayaran, atau akun? Hubungi CS Animein melalui:
+                  Ada kendala pesanan, pembayaran, atau akun? Hubungi CS KARTU melalui:
                 </div>
                 <div className="contact-grid">
                   <a className="contact-link" href={CS_EMAIL_URL}>

@@ -12,7 +12,7 @@ import { SITE_DESCRIPTION } from '@/lib/site';
 
 export const metadata = {
   title: 'Syarat & Ketentuan',
-  description: `Syarat dan ketentuan penggunaan Book Kartu Animein, termasuk produk digital, pembayaran QRIS via Tripay, dan aturan akun. ${SITE_DESCRIPTION}`,
+  description: `Syarat dan ketentuan penggunaan KARTU, termasuk produk digital, pembayaran QRIS via Tripay, dan aturan akun. ${SITE_DESCRIPTION}`,
   alternates: { canonical: '/terms' },
 };
 
@@ -26,7 +26,7 @@ export default function TermsPage() {
       active="/terms"
       intro={
         <>
-          Halaman ini mengatur penggunaan Situs Book Kartu Animein
+          Halaman ini mengatur penggunaan Situs KARTU
           (<strong>https://kartu.yogaa.web.id</strong>) beserta pembelian produk
           digital Top-Up XP dan Slot Kartu Pajangan Custom. Dengan mengakses atau
           menggunakan Situs, kamu dianggap telah membaca dan menyetujui seluruh
@@ -36,19 +36,19 @@ export default function TermsPage() {
     >
       <LegalSection title="1. Ketentuan Penggunaan">
         <p>
-          Situs Book Kartu Animein (&quot;Situs&quot;) disediakan untuk pengguna
+          Situs KARTU (&quot;Situs&quot;) disediakan untuk pengguna
           dengan syarat menyetujui seluruh syarat, ketentuan, dan pemberitahuan
           yang tercantum di halaman ini beserta ketentuan tambahan yang berlaku
           pada bagian mana pun dari Situs. Jika kamu tidak menyetujuinya, hentikan
-          penggunaan Situs dan layanan Animein.
+          penggunaan Situs dan layanan KARTU.
         </p>
       </LegalSection>
 
       <LegalSection title="2. Gambaran Layanan">
         <p>
-          Animein adalah platform komunitas anime yang menyediakan chatbot
-          interaktif serta web book, gacha, trade, battle kartu anime, dan shop
-          digital di <strong>https://kartu.yogaa.web.id</strong>.
+          KARTU adalah web book kartu anime yang terhubung dengan platform
+          Animein, menyediakan koleksi kartu, gacha, trade, battle kartu anime,
+          dan shop digital di <strong>https://kartu.yogaa.web.id</strong>.
         </p>
         <p>
           Seluruh produk yang dijual di Situs adalah produk digital. Tidak ada
@@ -59,11 +59,11 @@ export default function TermsPage() {
 
       <LegalSection title="3. Perubahan Situs dan Syarat & Ketentuan">
         <p>
-          Animein berhak mengubah, memodifikasi, memperbarui, atau menghentikan
+          KARTU berhak mengubah, memodifikasi, memperbarui, atau menghentikan
           syarat, ketentuan, konten, informasi, harga, dan materi lain di Situs
           kapan pun tanpa pemberitahuan terlebih dahulu, kecuali diwajibkan lain
           oleh ketentuan yang berlaku. Kami berhak menyesuaikan harga dari waktu
-          ke waktu. Apabila terjadi kesalahan harga, Animein berhak menolak
+          ke waktu. Apabila terjadi kesalahan harga, KARTU berhak menolak
           pesanan tersebut. Dengan tetap menggunakan Situs setelah perubahan,
           kamu dianggap menyetujui perubahan tersebut.
         </p>
@@ -71,7 +71,7 @@ export default function TermsPage() {
 
       <LegalSection title="4. Lisensi Penggunaan">
         <p>
-          Animein memberikan hak non-eksklusif dan tidak dapat dialihkan untuk
+          KARTU memberikan hak non-eksklusif dan tidak dapat dialihkan untuk
           mengakses dan menggunakan Situs semata-mata untuk keperluan pribadi
           selama perjanjian ini berlaku. Kamu dilarang memodifikasi, mengadaptasi,
           membongkar, atau melakukan rekayasa balik terhadap bagian mana pun dari
@@ -82,12 +82,12 @@ export default function TermsPage() {
 
       <LegalSection title="5. Hak Milik">
         <p>
-          Situs, sistem, kartu, data, dan dokumentasinya adalah milik Animein atau
+          Situs, sistem, kartu, data, dan dokumentasinya adalah milik KARTU atau
           pemberi lisensinya. Seluruh materi, merek, dan logo di Situs dilindungi
           hukum hak cipta Indonesia dan hukum yang berlaku. Tidak ada materi yang
           boleh disalin, direproduksi, dimodifikasi, diterbitkan ulang, diunggah,
           dipasang, ditransmisikan, atau didistribusikan tanpa izin tertulis dari
-          Animein.
+          KARTU.
         </p>
       </LegalSection>
 
@@ -153,7 +153,7 @@ export default function TermsPage() {
         <p>
           Pastikan kamu login ke akun yang benar sebelum membayar. XP atau kartu
           yang sudah masuk ke akun yang salah karena kelalaian pengguna bukan
-          tanggung jawab Animein, tetapi kami akan membantu memperbaiki selama
+          tanggung jawab KARTU, tetapi kami akan membantu memperbaiki selama
           masih memungkinkan.
         </p>
       </LegalSection>
@@ -164,7 +164,7 @@ export default function TermsPage() {
           <Link href="/refund">Kebijakan Refund</Link>. Ringkasnya:
         </p>
         <ul className="legal-list">
-          <li>XP yang sudah masuk ke akun tidak dapat dikembalikan, kecuali terbukti ada kegagalan sistem di pihak Animein.</li>
+          <li>XP yang sudah masuk ke akun tidak dapat dikembalikan, kecuali terbukti ada kegagalan sistem di pihak KARTU.</li>
           <li>Slot custom yang belum dipakai dapat dibatalkan dengan refund penuh.</li>
           <li>Slot yang sudah diubah atau kartunya sudah terpasang tidak dapat direfund.</li>
           <li>Refund diproses melalui Tripay ke sumber dana asal, maksimal 7 hari kerja setelah disetujui.</li>
@@ -183,7 +183,7 @@ export default function TermsPage() {
 
       <LegalSection title="11. Komunikasi Elektronik">
         <p>
-          Kamu menyetujui bahwa Animein dapat mengirim pesan elektronik untuk
+          Kamu menyetujui bahwa KARTU dapat mengirim pesan elektronik untuk
           pemberitahuan perubahan Situs, informasi produk atau layanan, status
           pesanan, atau keperluan lain yang dianggap perlu.
         </p>
@@ -202,7 +202,7 @@ export default function TermsPage() {
 
       <LegalSection title="13. Ganti Rugi">
         <p>
-          Kamu setuju untuk mengganti rugi, membela, dan membebaskan Animein dari
+          Kamu setuju untuk mengganti rugi, membela, dan membebaskan KARTU dari
           segala klaim, kewajiban, kerusakan, kerugian, atau biaya pihak ketiga
           (termasuk biaya pengacara yang wajar) yang timbul dari akses atau
           penggunaan Situs oleh kamu, termasuk pelanggaran atas Syarat & Ketentuan
@@ -212,7 +212,7 @@ export default function TermsPage() {
 
       <LegalSection title="14. Batasan Tanggung Jawab">
         <p>
-          Animein tidak bertanggung jawab atas keakuratan, kebenaran, ketepatan
+          KARTU tidak bertanggung jawab atas keakuratan, kebenaran, ketepatan
           waktu, atau isi materi yang disediakan di Situs. Kamu tidak boleh
           berasumsi bahwa materi di Situs selalu diperbarui atau memuat informasi
           terkini. Dalam batas maksimum yang diizinkan hukum, total tanggung jawab
@@ -232,7 +232,7 @@ export default function TermsPage() {
       <LegalSection title="16. Pertanyaan, Masukan, dan Customer Service">
         <p>
           Untuk bantuan pesanan, pembayaran, akun, refund, atau kendala lainnya,
-          hubungi Customer Service Animein. Sertakan username, Order ID, dan bukti
+          hubungi Customer Service KARTU. Sertakan username, Order ID, dan bukti
           pembayaran agar keluhan dapat diproses lebih cepat.
         </p>
         <div className="legal-contact-inline">

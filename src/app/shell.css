@@ -19,12 +19,22 @@
 }
 
 .sidebar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-display);
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 0.5px;
   color: var(--ink);
   text-decoration: none;
+}
+
+.sidebar-brand-mark {
+  width: 28px;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 
 [data-theme='light'] .brand h1,

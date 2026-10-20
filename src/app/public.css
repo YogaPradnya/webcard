@@ -42,17 +42,10 @@
 }
 
 .site-brand-mark {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  border: 1.5px solid var(--hairline-strong);
-  background: var(--accent-grad);
-  color: var(--on-primary);
-  box-shadow: 2px 2px 0 var(--hairline-strong);
-  font-size: 15px;
+  width: 36px;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 
 .site-nav {

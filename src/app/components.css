@@ -132,11 +132,21 @@
 
 /* ===== Navigasi 4 menu (mobile) ===== */
 .topbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 15px;
   font-weight: 800;
   letter-spacing: -0.3px;
   color: var(--ink);
   text-decoration: none;
+}
+
+.topbar-title-mark {
+  width: 24px;
+  height: auto;
+  display: block;
+  object-fit: contain;
 }
 
 .bottomnav .nav-item {
@@ -1238,9 +1248,9 @@
 }
 
 .splash-card img {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  width: 64px;
+  height: auto;
+  border-radius: 0;
 }
 
 .splash-title {

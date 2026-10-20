@@ -37,7 +37,7 @@ export const metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
-  keywords: ['animein', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu', 'top up xp', 'kartu pajangan'],
+  keywords: ['kartu', 'book kartu', 'animein', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu', 'top up xp', 'kartu pajangan'],
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,

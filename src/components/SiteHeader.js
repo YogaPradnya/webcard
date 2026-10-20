@@ -9,7 +9,8 @@ export default function SiteHeader() {
     <header className="site-header">
       <div className="site-header-inner">
         <Link href="/" className="site-brand" aria-label={`${SITE_NAME} — beranda`}>
-          <span className="site-brand-mark" aria-hidden="true">A</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="site-brand-mark" src="/logo-mark.png" alt="" width={36} height={26} />
           <span>{SITE_NAME}</span>
         </Link>
         <nav className="site-nav" aria-label="Navigasi utama">

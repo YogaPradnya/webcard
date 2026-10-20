@@ -1,11 +1,11 @@
 export const metadata = {
   title: 'Shop',
   description:
-    'Katalog produk digital Animein: Top-Up XP dan Slot Kartu Pajangan Custom. Pembayaran QRIS melalui Tripay, produk digital tanpa pengiriman fisik.',
+    'Katalog produk digital KARTU: Top-Up XP dan Slot Kartu Pajangan Custom. Pembayaran QRIS melalui Tripay, produk digital tanpa pengiriman fisik.',
   alternates: { canonical: '/shop' },
   openGraph: {
-    title: 'Shop | Animein',
-    description: 'Top-Up XP dan Slot Kartu Pajangan Custom Animein. Pembayaran QRIS via Tripay.',
+    title: 'Shop | KARTU',
+    description: 'Top-Up XP dan Slot Kartu Pajangan Custom KARTU. Pembayaran QRIS via Tripay.',
     url: '/shop',
     type: 'website',
   },

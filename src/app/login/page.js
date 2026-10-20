@@ -231,8 +231,10 @@ export default function LoginPage() {
       <span className="deco-cloud" style={{ top: 64, right: -4, animationDelay: '1.2s' }} aria-hidden="true" />
       <span className="deco-fish" style={{ top: 150, left: -16 }} aria-hidden="true" />
       <span className="deco-fish" style={{ top: 210, right: -12, animationDelay: '2s' }} aria-hidden="true" />
-      <div className="brand">
-        <h1>Book Kartu Animein</h1>
+      <div className="brand login-brand">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="login-brand-logo" src="/logo.png" alt="" width={245} height={275} />
+        <h1 className="visually-hidden">KARTU</h1>
       </div>
       <div className="card">
         <p style={{ fontSize: 13, color: 'var(--body)', marginBottom: 20 }}>
@@ -260,7 +262,7 @@ export default function LoginPage() {
                 <Link href="/privacy" style={{ color: 'var(--link)', textDecoration: 'underline' }}>
                   Kebijakan Privasi
                 </Link>{' '}
-                Animein.
+                KARTU.
               </span>
             </label>
             <button className="btn" onClick={makeCode} disabled={loading || !tnc}>

@@ -2,7 +2,7 @@
   "name": "animein-card-book",
   "version": "0.1.0",
   "private": true,
-  "description": "Galeri book kartu Animein (login Animein, abu-abu bila belum punya)",
+  "description": "KARTU — galeri book kartu anime (login via Animein, abu-abu bila belum punya)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

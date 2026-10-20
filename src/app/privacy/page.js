@@ -11,7 +11,7 @@ import {
 export const metadata = {
   title: 'Kebijakan Privasi',
   description:
-    'Kebijakan privasi Animein: data yang dikumpulkan, tujuan penggunaan, penyimpanan, pihak ketiga, dan hak pengguna.',
+    'Kebijakan privasi KARTU: data yang dikumpulkan, tujuan penggunaan, penyimpanan, pihak ketiga, dan hak pengguna.',
   alternates: { canonical: '/privacy' },
 };
 
@@ -25,11 +25,11 @@ export default function PrivacyPage() {
       active="/privacy"
       intro={
         <>
-          Kebijakan ini menjelaskan bagaimana Animein mengumpulkan, menggunakan,
-          menyimpan, dan melindungi data pengguna saat mengakses Situs Book Kartu
-          Animein serta menggunakan layanan dan produk digitalnya. Kebijakan ini
-          berlaku untuk situs <strong>https://kartu.yogaa.web.id</strong> dan
-          layanan Animein yang terhubung dengannya.
+          Kebijakan ini menjelaskan bagaimana KARTU mengumpulkan, menggunakan,
+          menyimpan, dan melindungi data pengguna saat mengakses Situs KARTU serta
+          menggunakan layanan dan produk digitalnya. Kebijakan ini berlaku untuk
+          situs <strong>https://kartu.yogaa.web.id</strong> dan layanan Animein
+          yang terhubung dengannya.
         </>
       }
     >
@@ -84,7 +84,7 @@ export default function PrivacyPage() {
         <p>
           Kami memproses data berdasarkan persetujuan pengguna, pelaksanaan
           perjanjian layanan (termasuk pemrosesan pesanan), kewajiban hukum yang
-          berlaku, dan kepentingan sah Animein untuk menjaga keamanan serta
+          berlaku, dan kepentingan sah KARTU untuk menjaga keamanan serta
           keberlangsungan layanan. Kamu dapat menghubungi kami jika ingin
           mengetahui atau menarik persetujuan sesuai ketentuan yang berlaku.
         </p>
@@ -95,7 +95,7 @@ export default function PrivacyPage() {
           Pembayaran diproses melalui <strong>Tripay</strong> dengan metode QRIS.
           Data instrumen pembayaran seperti kartu, rekening, atau akun e-wallet
           diproses oleh Tripay dan/atau penyedia kanal pembayaran yang dipilih.
-          Animein tidak menyimpan nomor kartu, PIN, password, atau kredensial
+          KARTU tidak menyimpan nomor kartu, PIN, password, atau kredensial
           perbankan pengguna.
         </p>
         <p>
@@ -110,7 +110,7 @@ export default function PrivacyPage() {
       <LegalSection title="5. Penyimpanan dan Keamanan">
         <p>
           Data disimpan pada sistem yang kami kelola dan/atau penyedia layanan
-          yang bekerja sama dengan Animein. Kami menggunakan pembatasan akses,
+          yang bekerja sama dengan KARTU. Kami menggunakan pembatasan akses,
           koneksi terenkripsi (HTTPS), dan langkah teknis lain yang wajar untuk
           melindungi data. Namun, tidak ada sistem yang dapat menjamin keamanan
           seratus persen. Jangan pernah mengirim PIN, OTP, password, atau kode
@@ -174,7 +174,7 @@ export default function PrivacyPage() {
 
       <LegalSection title="11. Perubahan Kebijakan">
         <p>
-          Animein dapat memperbarui Kebijakan Privasi ini dari waktu ke waktu.
+          KARTU dapat memperbarui Kebijakan Privasi ini dari waktu ke waktu.
           Versi terbaru akan dipublikasikan di halaman ini dengan tanggal
           pembaruan. Perubahan material dapat diberitahukan melalui Situs atau
           kanal komunikasi yang tersedia. Penggunaan Situs setelah pembaruan
@@ -185,7 +185,7 @@ export default function PrivacyPage() {
       <LegalSection title="12. Hubungi Kami">
         <p>
           Untuk pertanyaan tentang privasi atau permintaan terkait data pribadi,
-          hubungi Customer Service Animein:
+          hubungi Customer Service KARTU:
         </p>
         <div className="legal-contact-inline">
           <a href={CS_EMAIL_URL}>{CS_EMAIL}</a>

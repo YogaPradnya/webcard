@@ -1,4 +1,4 @@
-// Kontak resmi Customer Service Animein.
+// Kontak resmi Customer Service KARTU.
 // Dipakai di halaman legal, landing page, Shop, dan Profil.
 export const CS_EMAIL = 'yogapradnyana898@gmail.com';
 export const CS_EMAIL_URL = `mailto:${CS_EMAIL}`;

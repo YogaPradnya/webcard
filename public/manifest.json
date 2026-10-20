@@ -1,7 +1,7 @@
 {
-  "name": "Book Kartu Animein",
-  "short_name": "Animein",
-  "description": "Galeri 200 kartu Animein — gacha, trade, battle PvP, chat.",
+  "name": "KARTU — Book Kartu Anime",
+  "short_name": "KARTU",
+  "description": "Galeri kartu anime KARTU — gacha, trade, battle PvP, chat.",
   "start_url": "/book",
   "display": "standalone",
   "background_color": "#000000",

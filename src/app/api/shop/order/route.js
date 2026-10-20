@@ -46,7 +46,7 @@ async function POST_impl(req, _ctx, session) {
       amountIdr = pack.priceIdr;
       xpAmount = pack.xp;
       ref = pack.id;
-      itemName = `Top-Up ${xpAmount.toLocaleString('id-ID')} XP Animein`;
+      itemName = `Top-Up ${xpAmount.toLocaleString('id-ID')} XP KARTU`;
     } else if (kind === 'slot') {
       qty = Math.min(10, Math.max(1, parseInt(body.qty, 10) || 1));
       // Kuota gabungan: slot custom + kartu admin, maks 50 total.
@@ -56,7 +56,7 @@ async function POST_impl(req, _ctx, session) {
       }
       amountIdr = SLOT_PRICE_IDR * qty;
       ref = 'display-slot';
-      itemName = `Slot Kartu Pajangan x${qty} Animein`;
+      itemName = `Slot Kartu Pajangan x${qty} KARTU`;
     } else {
       return jsonFail('Jenis order tidak dikenal.', 400);
     }
@@ -69,7 +69,7 @@ async function POST_impl(req, _ctx, session) {
       tx = await createTripayTransaction({
         orderId,
         amount: amountIdr,
-        customerName: session.username || 'Animein User',
+        customerName: session.username || 'KARTU User',
         customerEmail: `noreply+${session.id}@kartu.yogaa.web.id`,
         customerPhone: '081234567890',
         itemName,

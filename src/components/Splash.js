@@ -1,3 +1,5 @@
+import { SITE_NAME } from '@/lib/site';
+
 /*
  * Splash pembuka saat pertama buka web.
  * Murni CSS: auto-fade ±0.65 dtk lalu hilang sendiri (tetap hilang walau JS
@@ -8,8 +10,8 @@ export default function Splash() {
     <div className="splash" aria-hidden="true">
       <div className="splash-card">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/icon-192.png" alt="" width={56} height={56} />
-        <div className="splash-title">Book Kartu Animein</div>
+        <img src="/logo-mark.png" alt="" width={64} height={46} />
+        <div className="splash-title">{SITE_NAME}</div>
         <span className="splash-bar"><i /></span>
       </div>
     </div>

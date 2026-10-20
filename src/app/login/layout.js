@@ -1,7 +1,7 @@
 export const metadata = {
   title: 'Masuk',
   description:
-    'Masuk ke Book Kartu Animein dengan kode login dari chat bot. Tanpa password, aman, dan cepat.',
+    'Masuk ke KARTU dengan kode login dari chat bot. Tanpa password, aman, dan cepat.',
   alternates: { canonical: '/login' },
 };
 

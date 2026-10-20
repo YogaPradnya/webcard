@@ -7,6 +7,7 @@ import ThemeToggle from './ThemeToggle';
 import { fetchJson } from '@/lib/fetchJson';
 import { useShopEnabled } from '@/hooks/useShopEnabled';
 import { LEGAL_LINKS } from '@/lib/legal';
+import { SITE_NAME } from '@/lib/site';
 
 // Cangkang navigasi: sidebar kiri (desktop) + topbar + bottomnav (mobile).
 export default function Sidebar({ username }) {
@@ -100,7 +101,11 @@ export default function Sidebar({ username }) {
   return (
     <>
       <aside className="sidebar">
-        <Link href="/" className="sidebar-brand">Book Kartu Animein</Link>
+        <Link href="/" className="sidebar-brand" aria-label={`${SITE_NAME} — beranda`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="sidebar-brand-mark" src="/logo-mark.png" alt="" width={28} height={20} />
+          <span>{SITE_NAME}</span>
+        </Link>
         {username ? <div className="sidebar-user">@{username}</div> : null}
         <nav className="sidebar-nav">{desktopLinks}</nav>
         <div className="sidebar-bottom">
@@ -122,7 +127,11 @@ export default function Sidebar({ username }) {
       </aside>
 
       <header className="topbar">
-        <Link href="/" className="topbar-title">Animein</Link>
+        <Link href="/" className="topbar-title" aria-label={`${SITE_NAME} — beranda`}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="topbar-title-mark" src="/logo-mark.png" alt="" width={24} height={17} />
+          <span>{SITE_NAME}</span>
+        </Link>
         <span className="topbar-spacer" />
         <span className="topbar-toggle"><ThemeToggle /></span>
         {username ? (

@@ -22,11 +22,11 @@ import {
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, SITE_URL } from '@/lib/site';
 
 export const metadata = {
-  title: 'Animein — Book Kartu Anime, Gacha, Trade & Battle',
+  title: 'KARTU — Book Kartu Anime, Gacha, Trade & Battle',
   description: SITE_DESCRIPTION,
   alternates: { canonical: '/' },
   openGraph: {
-    title: 'Animein — Book Kartu Anime',
+    title: 'KARTU — Book Kartu Anime',
     description: SITE_DESCRIPTION,
     url: SITE_URL,
     siteName: SITE_NAME,
@@ -100,7 +100,7 @@ export default function HomePage() {
             <h1>Koleksi kartu anime. Gacha, trade, dan battle.</h1>
             <p className="public-lead">
               {SITE_TAGLINE} Login tanpa password, kumpulkan kartu, tantang pemain lain,
-              dan lengkapi koleksimu di Book Kartu Animein.
+              dan lengkapi koleksimu di KARTU.
             </p>
             <div className="public-actions">
               <Link className="btn" href="/login">Masuk / Buka Book</Link>
@@ -132,7 +132,7 @@ export default function HomePage() {
                 </div>
               </div>
             ))}
-            <div className="public-hero-badge">Animein</div>
+            <div className="public-hero-badge">KARTU</div>
           </div>
         </section>
 
@@ -151,7 +151,7 @@ export default function HomePage() {
               <div className="public-product-top">
                 <div>
                   <div className="public-product-kicker">Top-Up</div>
-                  <h3>XP Animein</h3>
+                  <h3>XP</h3>
                 </div>
                 <span className="public-badge">Instan</span>
               </div>
@@ -254,7 +254,7 @@ export default function HomePage() {
               <div className="public-eyebrow">Customer Service</div>
               <h2>Butuh bantuan?</h2>
               <p>
-                Hubungi CS Animein untuk kendala akun, pembayaran, pesanan, atau refund.
+                Hubungi CS KARTU untuk kendala akun, pembayaran, pesanan, atau refund.
                 Sertakan username, Order ID, dan bukti pembayaran agar lebih cepat diproses.
               </p>
               <div className="public-contact-hours">{CS_HOURS}</div>
