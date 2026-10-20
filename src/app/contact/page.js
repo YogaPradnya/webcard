@@ -16,26 +16,20 @@ export const metadata = {
   alternates: { canonical: '/contact' },
 };
 
-const UPDATED = '19 Oktober 2026';
+const UPDATED = '20 Oktober 2026';
 
 const COMMUNITY = [
   {
     label: 'Grup WhatsApp',
-    value: 'Gabung grup komunitas Animein',
+    value: 'Gabung grup komunitas',
     href: 'https://chat.whatsapp.com/FpIkzQ28o8o88vJudiN4SK',
     icon: '◉',
   },
   {
     label: 'Discord',
-    value: 'Gabung server Discord Animein',
+    value: 'Gabung server Discord',
     href: 'https://discord.gg/22EtRJCvfC',
     icon: '◈',
-  },
-  {
-    label: 'Instagram',
-    value: '@animein.aja',
-    href: 'https://www.instagram.com/animein.aja',
-    icon: '★',
   },
 ];
 
@@ -86,7 +80,7 @@ export default function ContactPage() {
           saat menghubungi CS:
         </p>
         <ul className="legal-list">
-          <li>Username Animein yang digunakan.</li>
+          <li>Username yang digunakan.</li>
           <li>Order ID atau referensi pembayaran.</li>
           <li>Tanggal, nominal, dan metode pembayaran.</li>
           <li>Bukti pembayaran atau tangkapan layar status pesanan.</li>
@@ -119,7 +113,7 @@ export default function ContactPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title="4. Komunitas Animein">
+      <LegalSection title="4. Komunitas">
         <p>
           Selain CS, kamu dapat bergabung dengan komunitas untuk informasi,
           diskusi, dan pengumuman:

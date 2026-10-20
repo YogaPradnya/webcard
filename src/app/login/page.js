@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
 import { LEGAL_LINKS } from '@/lib/legal';
 
-const TNC_KEY = 'animein-tnc-ok';
+const TNC_KEY = 'kartuyogaa-tnc-ok';
 const LOGIN_TIMEOUT_MS = 30000;
 
 export default function LoginPage() {

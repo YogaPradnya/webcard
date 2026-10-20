@@ -55,8 +55,8 @@ const FEATURED_CARDS = [
 const HOW_TO = [
   {
     step: '01',
-    title: 'Masuk dengan akun Animein',
-    body: 'Buka halaman login, lalu masukkan username atau email dan password akun Animein yang sudah terdaftar di KartuYogaa.',
+    title: 'Masuk dengan akun',
+    body: 'Buka halaman login, lalu masukkan username atau email dan password akun yang sudah terdaftar di KartuYogaa.',
   },
   {
     step: '02',
@@ -99,7 +99,7 @@ export default function HomePage() {
             <div className="public-eyebrow">Komunitas anime digital</div>
             <h1>Koleksi kartu anime. Gacha, trade, dan battle.</h1>
             <p className="public-lead">
-              {SITE_TAGLINE} Masuk dengan akun Animein, kumpulkan kartu, tantang pemain lain,
+              {SITE_TAGLINE} Masuk dengan akun, kumpulkan kartu, tantang pemain lain,
               dan lengkapi koleksimu di KartuYogaa.
             </p>
             <div className="public-actions">
@@ -107,7 +107,7 @@ export default function HomePage() {
               <Link className="btn btn-ghost" href="/shop">Lihat Shop</Link>
             </div>
             <div className="public-trust">
-              <span>Login akun Animein</span>
+              <span>Login akun</span>
               <span>QRIS via Tripay</span>
               <span>Produk digital</span>
             </div>
@@ -141,8 +141,9 @@ export default function HomePage() {
             <div className="public-eyebrow">Produk</div>
             <h2>Produk digital yang dijual</h2>
             <p>
-              Semua produk digunakan di platform Animein. Tidak ada barang fisik dan
-              tidak ada pengiriman fisik. Pembelian memerlukan akun Animein.
+              Semua produk digunakan di platform KartuYogaa. Tidak ada barang fisik dan
+              tidak ada pengiriman fisik. Pembelian memerlukan akun yang sudah
+              terdaftar.
             </p>
           </div>
 

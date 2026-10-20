@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 
-const KEY = 'animein-theme';
+const KEY = 'kartuyogaa-theme';
 // Event internal: tombol tema di sidebar & topbar (dua instance) saling sinkron
 // plus tab lain lewat event 'storage'.
-const EVT = 'animein-theme-change';
+const EVT = 'kartuyogaa-theme-change';
 
 function getInitial() {
   if (typeof window === 'undefined') return 'light';

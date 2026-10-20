@@ -15,7 +15,7 @@ export const metadata = {
   alternates: { canonical: '/refund' },
 };
 
-const UPDATED = '19 Oktober 2026';
+const UPDATED = '20 Oktober 2026';
 
 export default function RefundPage() {
   return (
@@ -95,7 +95,7 @@ export default function RefundPage() {
           Ajukan refund melalui Customer Service KartuYogaa dengan menyertakan:
         </p>
         <ul className="legal-list">
-          <li>Username Animein.</li>
+          <li>Username.</li>
           <li>Order ID atau referensi pembayaran.</li>
           <li>Tanggal dan nominal pembayaran.</li>
           <li>Bukti pembayaran yang jelas.</li>

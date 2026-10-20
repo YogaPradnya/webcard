@@ -46,9 +46,9 @@ export default function TermsPage() {
 
       <LegalSection title="2. Gambaran Layanan">
         <p>
-          KartuYogaa adalah web book kartu anime yang terhubung dengan platform
-          Animein, menyediakan koleksi kartu, gacha, trade, battle kartu anime,
-          dan shop digital di <strong>https://kartu.yogaa.web.id</strong>.
+          KartuYogaa adalah web book kartu anime yang terhubung dengan layanan bot
+          dan platform digital, menyediakan koleksi kartu, gacha, trade, battle
+          kartu anime, dan shop digital di <strong>https://kartu.yogaa.web.id</strong>.
         </p>
         <p>
           Seluruh produk yang dijual di Situs adalah produk digital. Tidak ada
@@ -95,9 +95,9 @@ export default function TermsPage() {
         <p>Produk digital yang dijual di Situs:</p>
         <h3>Top-Up XP</h3>
         <p>
-          XP adalah saldo digital untuk aktivitas di Animein, termasuk gacha kartu,
-          battle, dan kebutuhan lain di chatbot maupun web. Pilihan paket di
-          halaman Shop:
+          XP adalah saldo digital untuk aktivitas di KartuYogaa, termasuk gacha
+          kartu, battle, dan kebutuhan lain di chatbot maupun web. Pilihan paket
+          di halaman Shop:
         </p>
         <ul className="legal-list">
           <li>Rp5.000 → 6.000 XP</li>
@@ -173,19 +173,19 @@ export default function TermsPage() {
 
       <LegalSection title="10. Pendaftaran Akun">
         <p>
-          Untuk membeli, kamu perlu masuk dengan akun Animein yang sudah terdaftar
-          di KartuYogaa menggunakan username atau email dan password Animein.
-          Password hanya diproses sementara untuk verifikasi ke layanan Animein
-          dan tidak disimpan oleh KartuYogaa. Kamu wajib memberikan informasi yang
+          Untuk membeli, kamu perlu masuk dengan akun yang sudah terdaftar di
+          KartuYogaa menggunakan username atau email dan password. Password hanya
+          diproses sementara untuk verifikasi ke penyedia layanan autentikasi dan
+          tidak disimpan oleh KartuYogaa. Kamu wajib memberikan informasi yang
           akurat dan bertanggung jawab menjaga kerahasiaan password serta seluruh
           aktivitas pada akun. Kamu dilarang menyalahgunakan atau membagikan akses
           akun, menyamar sebagai pihak lain, atau memalsukan identitas maupun
           afiliasi.
         </p>
         <p>
-          Akun Animein yang belum memiliki data di KartuYogaa tidak dapat langsung
-          menggunakan login web. Pengguna perlu berinteraksi dengan bot Animein
-          terlebih dahulu agar data akunnya tercatat.
+          Akun yang belum memiliki data di KartuYogaa tidak dapat langsung
+          menggunakan login web. Pengguna perlu berinteraksi dengan bot terlebih
+          dahulu agar data akunnya tercatat.
         </p>
       </LegalSection>
 

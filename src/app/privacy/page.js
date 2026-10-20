@@ -28,7 +28,7 @@ export default function PrivacyPage() {
           Kebijakan ini menjelaskan bagaimana KartuYogaa mengumpulkan, menggunakan,
           menyimpan, dan melindungi data pengguna saat mengakses Situs KartuYogaa serta
           menggunakan layanan dan produk digitalnya. Kebijakan ini berlaku untuk
-          situs <strong>https://kartu.yogaa.web.id</strong> dan layanan Animein
+          situs <strong>https://kartu.yogaa.web.id</strong> dan layanan digital
           yang terhubung dengannya.
         </>
       }
@@ -37,14 +37,14 @@ export default function PrivacyPage() {
         <p>Kami dapat mengumpulkan data berikut:</p>
         <ul className="legal-list">
           <li>
-            <strong>Data akun:</strong> username, user ID Animein, status login,
-            dan cookie sesi yang diperlukan untuk menjaga sesi masuk.
+            <strong>Data akun:</strong> username, user ID, status login, dan
+            cookie sesi yang diperlukan untuk menjaga sesi masuk.
           </li>
           <li>
             <strong>Data autentikasi:</strong> username atau email dan password
-            Animein yang kamu masukkan saat login. Password hanya diproses
-            sementara untuk verifikasi ke layanan Animein dan tidak disimpan
-            oleh KartuYogaa.
+            yang kamu masukkan saat login. Password hanya diproses sementara untuk
+            verifikasi oleh penyedia layanan autentikasi dan tidak disimpan oleh
+            KartuYogaa.
           </li>
           <li>
             <strong>Data transaksi:</strong> Order ID, jenis produk, jumlah,
@@ -102,13 +102,13 @@ export default function PrivacyPage() {
           Data instrumen pembayaran seperti kartu, rekening, atau akun e-wallet
           diproses oleh Tripay dan/atau penyedia kanal pembayaran yang dipilih.
           KartuYogaa tidak menyimpan nomor kartu, PIN, atau kredensial perbankan
-          pengguna. Password Animein hanya diproses sementara untuk verifikasi
-          login dan tidak disimpan.
+          pengguna. Password hanya diproses sementara untuk verifikasi login dan
+          tidak disimpan.
         </p>
         <p>
           Kami juga menggunakan penyedia layanan teknis untuk hosting, database,
           penyimpanan gambar (misalnya Cloudinary), dan komunikasi. Untuk login,
-          kredensial diverifikasi melalui layanan <strong>Animein</strong> dan
+          kredensial diverifikasi melalui penyedia layanan autentikasi dan
           diteruskan oleh layanan dashboard yang di-hosting di
           <strong>Render</strong>. Penyedia tersebut hanya menerima data yang
           diperlukan untuk menjalankan layanannya. Tautan ke situs pihak ketiga,
@@ -121,11 +121,12 @@ export default function PrivacyPage() {
           Data disimpan pada sistem yang kami kelola dan/atau penyedia layanan
           yang bekerja sama dengan KartuYogaa. Kami menggunakan pembatasan akses,
           koneksi terenkripsi (HTTPS), dan langkah teknis lain yang wajar untuk
-          melindungi data. Password Animein tidak disimpan; kredensial hanya
-          melewati server web dan dashboard secara terenkripsi untuk diverifikasi
-          ke Animein. Namun, tidak ada sistem yang dapat menjamin keamanan
-          seratus persen. Jangan pernah mengirim PIN, OTP, atau password kepada
-          siapa pun melalui kanal di luar halaman login resmi, termasuk kepada CS.
+          melindungi data. Password tidak disimpan; kredensial hanya melewati
+          server web dan dashboard secara terenkripsi untuk diverifikasi oleh
+          penyedia layanan autentikasi. Namun, tidak ada sistem yang dapat
+          menjamin keamanan seratus persen. Jangan pernah mengirim PIN, OTP, atau
+          password kepada siapa pun melalui kanal di luar halaman login resmi,
+          termasuk kepada CS.
         </p>
       </LegalSection>
 

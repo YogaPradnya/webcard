@@ -37,7 +37,7 @@ export const metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   description: SITE_DESCRIPTION,
-  keywords: ['kartu', 'book kartu', 'animein', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu', 'top up xp', 'kartu pajangan'],
+  keywords: ['kartu', 'book kartu', 'kartu yogaa', 'kartu anime', 'gacha', 'trade kartu', 'battle kartu', 'top up xp', 'kartu pajangan'],
   openGraph: {
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
@@ -70,7 +70,7 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k='animein-theme';var s=localStorage.getItem(k);if(s!=='light'&&s!=='dark'){s=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
+            __html: `(function(){try{var k='kartuyogaa-theme';var s=localStorage.getItem(k);if(s!=='light'&&s!=='dark'){s=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',s);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`,
           }}
         />
         <script
