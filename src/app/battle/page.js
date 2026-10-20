@@ -169,9 +169,10 @@ export default function BattlePage() {
         const x2 = fb.left + fb.width / 2 - ra.left;
         const y2 = fb.top + fb.height / 2 - ra.top;
         const dot = document.createElement('span');
+        const tone = String(color || '#a3e636');
         dot.className = 'projectile';
-        dot.style.background = String(color || '#a3e636');
-        dot.style.boxShadow = '2px 2px 0 #0a0a0a';
+        dot.style.background = tone;
+        dot.style.boxShadow = `0 0 14px ${tone}, 0 0 3px #ffffff`;
         dot.style.left = `${x1}px`;
         dot.style.top = `${y1}px`;
         arena.appendChild(dot);
@@ -183,12 +184,59 @@ export default function BattlePage() {
           ],
           { duration: D, easing: 'cubic-bezier(0.3,0.7,0.4,1)' }
         );
-        anim.onfinish = () => { dot.remove(); resolve(); };
-        setTimeout(() => { dot.remove(); resolve(); }, dur + 300);
+        let finished = false;
+        const finish = () => {
+          if (finished) return;
+          finished = true;
+          dot.remove();
+          impactBurst(x2, y2, color);
+          resolve();
+        };
+        anim.onfinish = finish;
+        setTimeout(finish, dur + 300);
       } catch {
         resolve();
       }
     });
+  }
+
+  // Ledakan kecil di titik target: shockwave + percikan, tanpa library.
+  function impactBurst(x, y, color) {
+    try {
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+      const arena = arenaRef.current;
+      if (!arena) return;
+      const tone = String(color || '#a3e636');
+      const ring = document.createElement('span');
+      ring.className = 'impact-ring';
+      ring.style.left = `${x}px`;
+      ring.style.top = `${y}px`;
+      ring.style.borderColor = tone;
+      arena.appendChild(ring);
+      setTimeout(() => ring.remove(), 650);
+
+      for (let i = 0; i < 8; i++) {
+        const spark = document.createElement('i');
+        spark.className = 'impact-spark';
+        spark.style.left = `${x}px`;
+        spark.style.top = `${y}px`;
+        spark.style.background = tone;
+        spark.style.color = tone;
+        arena.appendChild(spark);
+        const angle = (Math.PI * 2 * i) / 8 + Math.random() * 0.35;
+        const distance = 16 + Math.random() * 22;
+        spark.animate(
+          [
+            { transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+            {
+              transform: `translate(calc(-50% + ${Math.cos(angle) * distance}px), calc(-50% + ${Math.sin(angle) * distance}px)) scale(0.15)`,
+              opacity: 0,
+            },
+          ],
+          { duration: 360 + Math.random() * 220, easing: 'cubic-bezier(.2,.8,.25,1)' }
+        ).onfinish = () => spark.remove();
+      }
+    } catch { /* efek dekoratif, jangan ganggu battle */ }
   }
 
   function shakeArena() {
@@ -1228,6 +1276,55 @@ export default function BattlePage() {
     ));
   }, [iWon, st?.code]);
 
+  const winBurstRef = useRef(false);
+  useEffect(() => {
+    if (!iWon) {
+      winBurstRef.current = false;
+      return;
+    }
+    if (winBurstRef.current) return;
+    winBurstRef.current = true;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let cancelled = false;
+    import('canvas-confetti')
+      .then(({ default: fireConfetti }) => {
+        if (cancelled) return;
+        const colors = ['#a3e636', '#ffd94a', '#ffb7d5', '#7fb0ec'];
+        fireConfetti({
+          particleCount: 110,
+          spread: 78,
+          startVelocity: 38,
+          origin: { y: 0.58 },
+          colors,
+          scalar: 1.05,
+          ticks: 180,
+          zIndex: 90,
+        });
+        setTimeout(() => {
+          if (!cancelled) {
+            fireConfetti({
+              particleCount: 60,
+              angle: 60,
+              spread: 55,
+              origin: { x: 0, y: 0.7 },
+              colors,
+              zIndex: 90,
+            });
+            fireConfetti({
+              particleCount: 60,
+              angle: 120,
+              spread: 55,
+              origin: { x: 1, y: 0.7 },
+              colors,
+              zIndex: 90,
+            });
+          }
+        }, 220);
+      })
+      .catch(() => { /* fallback: confetti DOM tetap tampil */ });
+    return () => { cancelled = true; };
+  }, [iWon, st?.code]);
+
   if (loading) {
     return <PageSkeleton username={me?.username} title="Battle Kartu" />;
   }
@@ -1828,9 +1925,9 @@ export default function BattlePage() {
               </div>
 
               {st.status === 'finished' || st.battle.over ? (
-                <div className="card result-card" ref={resultRef} style={{ marginBottom: 16 }}>
+                <div className={`card result-card ${iWon ? 'result-win' : 'result-lose'}`} ref={resultRef} style={{ marginBottom: 16 }}>
                   {iWon ? <div className="confetti" aria-hidden="true">{confetti}</div> : null}
-                  <div className="section-title">
+                  <div className="section-title result-title">
                     {iWon ? '🏆 Menang!' : st.winner === 'AI' && st.mode === 'ai' ? 'Kalah' : 'Kalah'}
                     {st.result?.reason ? <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--muted)', marginLeft: 8 }}>({st.result.reason})</span> : null}
                   </div>

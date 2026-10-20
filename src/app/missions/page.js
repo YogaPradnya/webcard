@@ -38,21 +38,47 @@ export default function MissionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meLoading]);
 
+  // Sinkronkan state saat tab aktif lagi, supaya tombol klaim tidak basi.
+  useEffect(() => {
+    if (!me) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
   async function onClaim(period, missionId) {
     setClaiming(`${period}:${missionId}`);
     setError('');
     setToast('');
+    const mark = (list) => (list || []).map((m) => (
+      m.id === missionId ? { ...m, claimed: true, canClaim: false, done: true, count: m.target } : m
+    ));
     try {
       const { ok, data: d } = await postJson('/api/missions/claim', { period, missionId });
+      const alreadyClaimed = Boolean(d?.alreadyClaimed)
+        || (!ok && /sudah diklaim/i.test(String(d?.message || '')));
       if (!ok || !d.success) {
+        if (alreadyClaimed) {
+          setData((prev) => {
+            if (!prev) return prev;
+            if (period === 'weekly') return { ...prev, weekly: mark(prev.weekly) };
+            return { ...prev, daily: mark(prev.daily) };
+          });
+          setToast('Misi ini sudah diklaim. XP-nya sudah masuk sebelumnya.');
+          await load();
+          return;
+        }
         setError(d.message || 'Gagal klaim.');
+        await load();
         return;
       }
-      setToast(`+${d.xp} XP masuk! 🎉`);
+      setToast(d.alreadyClaimed
+        ? 'Misi ini sudah diklaim. XP-nya sudah masuk sebelumnya.'
+        : `+${d.xp} XP masuk! 🎉`);
       // Update optimistik tanpa reload penuh.
-      const mark = (list) => (list || []).map((m) => (
-        m.id === missionId ? { ...m, claimed: true, canClaim: false, done: true, count: m.target } : m
-      ));
       setData((prev) => {
         if (!prev) return prev;
         if (period === 'weekly') return { ...prev, weekly: mark(prev.weekly) };
@@ -65,6 +91,7 @@ export default function MissionsPage() {
       } catch { /* abaikan */ }
     } catch {
       setError('Tidak bisa menghubungi server.');
+      await load();
     } finally {
       setClaiming('');
     }

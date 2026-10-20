@@ -65,11 +65,10 @@ async function GET_impl(req, _ctx, session) {
     settleWithin(getShowcaseSource(session.id), SECTION_TIMEOUT_MS, 'showcaseSource'),
     settleWithin((async () => { await ensureShopTables(); return listUserSlots(session.id); })(), SECTION_TIMEOUT_MS, 'slots'),
     settleWithin((async () => {
-      const status = await getMissionStatus(session.id);
-      // Catat login SETELAH read agar tidak berebut lock; tidak ditahan
-      // di response (recordEvent sudah dedupe 1x/hari dan menelan error).
-      void recordEvent(session.id, session.username, 'login', 1).catch(() => {});
-      return status;
+      // Catat login dulu supaya misi "Buka web hari ini" langsung 1/1 pada
+      // load pertama. recordEvent dedupe 1x/hari dan menelan error sendiri.
+      await recordEvent(session.id, session.username, 'login', 1).catch(() => {});
+      return getMissionStatus(session.id);
     })(), SECTION_TIMEOUT_MS, 'missions'),
     settleWithin(pvpLeaderboardTop5(session.id), SECTION_TIMEOUT_MS, 'leaderboard'),
   ]);

@@ -87,40 +87,78 @@ export default function ProfilePage() {
     }
   }
 
+  async function syncMissions() {
+    const mData = await fetchLenient('/api/missions');
+    if (mData.success) {
+      setDailyMissions(mData.daily || []);
+      setWeeklyMissions(mData.weekly || []);
+    }
+    return mData;
+  }
+
   useEffect(() => {
     if (!me) return; // tunggu sesi (useMe menendang ke /login bila belum login)
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
+  // Tab yang lama dibiarkan terbuka (mis. klaim dari HP) bisa punya state
+  // tombol klaim yang basi. Sinkronkan saat tab kembali terlihat.
+  useEffect(() => {
+    if (!me) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') syncMissions().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
+
   async function onClaimMission(period, missionId) {
     setMissionClaiming(`${period}:${missionId}`);
     setMissionToast('');
-    try {
-      const { ok, data } = await postJson('/api/missions/claim', { period, missionId });
-      if (!ok || !data.success) {
-        setError(data.message || 'Gagal klaim misi.');
-        return;
-      }
-      setMissionToast(`+${data.xp} XP masuk! 🎉`);
-      // Update optimistik: tandai diklaim tanpa reload penuh (tidak kelap-kelip).
-      const mark = (list) => (list || []).map((m) => (
-        m.id === missionId ? { ...m, claimed: true, canClaim: false, done: true, count: m.target } : m
-      ));
+    setError('');
+    const mark = (list) => (list || []).map((m) => (
+      m.id === missionId ? { ...m, claimed: true, canClaim: false, done: true, count: m.target } : m
+    ));
+    const markLocal = () => {
       if (period === 'daily') setDailyMissions((prev) => mark(prev));
       else setWeeklyMissions((prev) => mark(prev));
+    };
+    try {
+      const { ok, data } = await postJson('/api/missions/claim', { period, missionId });
+      const alreadyClaimed = Boolean(data?.alreadyClaimed)
+        || (!ok && /sudah diklaim/i.test(String(data?.message || '')));
+      if (!ok || !data.success) {
+        if (alreadyClaimed) {
+          markLocal();
+          setMissionToast('Misi ini sudah diklaim. XP-nya sudah masuk sebelumnya.');
+          await syncMissions().catch(() => {});
+          return;
+        }
+        setError(data.message || 'Gagal klaim misi.');
+        await syncMissions().catch(() => {});
+        return;
+      }
+      markLocal();
+      setMissionToast(data.alreadyClaimed
+        ? 'Misi ini sudah diklaim. XP-nya sudah masuk sebelumnya.'
+        : `+${data.xp} XP masuk! 🎉`);
       if (data.newXp != null) {
         setProfile((p) => (p ? { ...p, xp: data.newXp } : p));
       }
-      // Sinkron ringan di background: misi + XP profil saja (tanpa /api/cards yang berat).
+      // Sinkron ringan: misi + XP profil (tanpa /api/cards yang berat).
       try {
-        const [mData, pData] = await Promise.all([fetchLenient('/api/missions'), fetchLenient('/api/profile')]);
-        if (mData.success) {
+        const [mData, pData] = await Promise.all([syncMissions(), fetchLenient('/api/profile')]);
+        if (mData?.success) {
           setDailyMissions(mData.daily || []);
           setWeeklyMissions(mData.weekly || []);
         }
         if (pData.success && pData.profile) setProfile(pData.profile);
       } catch { /* abaikan: state optimistik sudah benar */ }
+    } catch {
+      setError('Tidak bisa menghubungi server. Coba lagi.');
+      await syncMissions().catch(() => {});
     } finally {
       setMissionClaiming('');
     }

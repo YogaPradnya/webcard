@@ -25,9 +25,7 @@ export const WEEKLY_MISSIONS = [
   { id: 'trade_5', label: 'Trade 5x', target: 5, xp: 500, event: 'trade' },
 ];
 
-export async function ensureMissionTables() {
-  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
-  const db = getDb();
+async function ensureMissionTablesOn(db) {
   await db.execute(`
     CREATE TABLE IF NOT EXISTS mission_progress (
       user_id TEXT NOT NULL,
@@ -47,6 +45,11 @@ export async function ensureMissionTables() {
       PRIMARY KEY (user_id, period, mission_id)
     )
   `);
+}
+
+export async function ensureMissionTables() {
+  if (isSchemaReady()) return; // DDL sudah diurus migrasi (0 round-trip).
+  await ensureMissionTablesOn(getDb());
 }
 
 // Dedupe login harian lintas-bundle: /api/missions & /api/profile/summary
@@ -158,12 +161,19 @@ export async function getMissionStatus(userId) {
 // Klaim XP misi yang sudah selesai & belum diklaim.
 // INSERT claims dulu sebagai mutex (cegah double-click), baru tambah XP.
 export async function claimMission(userId, username, periodKind, missionId) {
+  await ensureMissionTables();
+  return claimMissionWithDb(getDb(), userId, username, periodKind, missionId);
+}
+
+// Versi yang bisa diuji dengan DB injection. Duplicate claim sengaja
+// dikembalikan sebagai sukses idempoten supaya double-click/retry tidak
+// memunculkan error 400 dan UI bisa langsung menyembunyikan tombol.
+export async function claimMissionWithDb(db, userId, username, periodKind, missionId, opts = {}) {
   const list = periodKind === 'weekly' ? WEEKLY_MISSIONS : DAILY_MISSIONS;
   const m = list.find((x) => x.id === String(missionId));
   if (!m) return { ok: false, error: 'Misi tidak dikenal.' };
   const period = periodKind === 'weekly' ? `w:${jakartaWeekKey()}` : `d:${jakartaDateKey()}`;
-  await ensureMissionTables();
-  const db = getDb();
+  if (opts.ensureTables) await ensureMissionTablesOn(db);
   const progRes = await db.execute({
     sql: 'SELECT count FROM mission_progress WHERE user_id = ? AND period = ? AND mission_id = ?',
     args: [String(userId), period, m.id],
@@ -175,8 +185,25 @@ export async function claimMission(userId, username, periodKind, missionId) {
       sql: 'INSERT INTO mission_claims (user_id, period, mission_id, xp, claimed_at) VALUES (?, ?, ?, ?, ?)',
       args: [String(userId), period, m.id, m.xp, Date.now()],
     });
-  } catch {
-    return { ok: false, error: 'Sudah diklaim.' };
+  } catch (insertError) {
+    // Bedakan "sudah diklaim" dari gangguan DB. Kalau row klaim memang ada,
+    // kembalikan 200 idempoten; kalau tidak, biarkan route melaporkan 500.
+    const existing = await db.execute({
+      sql: 'SELECT xp FROM mission_claims WHERE user_id = ? AND period = ? AND mission_id = ?',
+      args: [String(userId), period, m.id],
+    }).catch(() => null);
+    if (existing?.rows?.length) {
+      const { getUserXp } = await import('./userCardsRepo.js');
+      const newXp = await getUserXp(db, userId);
+      return {
+        ok: true,
+        alreadyClaimed: true,
+        xp: 0,
+        claimedXp: Number(existing.rows[0].xp) || m.xp,
+        newXp,
+      };
+    }
+    return { ok: false, error: 'Gagal klaim misi.', status: 500, cause: insertError };
   }
   const { getUserXp } = await import('./userCardsRepo.js');
   const curXp = await getUserXp(db, userId);

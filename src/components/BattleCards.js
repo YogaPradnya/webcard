@@ -40,7 +40,7 @@ export function HpBar({ hp, maxHp }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pct]);
   return (
-    <div style={{ position: 'relative', background: 'var(--hairline)', borderRadius: 9999, height: 8, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
+    <div style={{ position: 'relative', background: 'var(--hairline)', borderRadius: 9999, height: 6, overflow: 'hidden' }} className={pct <= 20 && hp > 0 ? 'hp-low' : ''}>
       <div className="hp-ghost" style={{ position: 'absolute', inset: 0, right: 'auto', width: `${ghost}%`, background: '#ffffff', opacity: 0.85, transition: 'width 0.3s' }} />
       <div style={{ position: 'absolute', inset: 0, right: 'auto', width: `${pct}%`, background: color, transition: 'width 0.5s' }} />
     </div>
@@ -70,12 +70,14 @@ export function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTo
       style={tappable ? { cursor: 'pointer' } : undefined}
       title={f.name}
     >
-      {art ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="fighter-img" src={optImg(art, 200)} srcSet={srcSetImg(art)} sizes={IMG_SIZES_CARD} alt={f.name} loading="lazy" decoding="async" />
-      ) : (
-        <div className="fighter-img" />
-      )}
+      <div className="fighter-art">
+        {art ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="fighter-img" src={optImg(art, 200)} srcSet={srcSetImg(art)} sizes={IMG_SIZES_CARD} alt={f.name} loading="lazy" decoding="async" />
+        ) : (
+          <div className="fighter-img fighter-img-empty" aria-hidden="true" />
+        )}
+      </div>
       <div className="fighter-body">
         <div className="fighter-name">{f.name}</div>
         <div className="fighter-hp">

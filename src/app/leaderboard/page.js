@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import RetryAlert from '@/components/RetryAlert';
@@ -15,6 +15,29 @@ const TABS = [
 
 const LB_CONFETTI = ['#a3e636', '#ffd94a', '#ffb7d5', '#7fb0ec'];
 
+function initials(name) {
+  const clean = String(name || '?').trim().replace(/^@/, '');
+  return Array.from(clean).slice(0, 2).join('').toUpperCase() || '?';
+}
+
+function podiumMain(u, tab) {
+  if (tab === 'pvp') return `WR ${Number(u.winRate) || 0}%`;
+  if (tab === 'collector') return `${Number(u.owned) || 0} kartu`;
+  return `Lv ${Number(u.level) || 1}`;
+}
+
+function podiumSub(u, tab) {
+  if (tab === 'pvp') return `${Number(u.wins) || 0}W · ${Number(u.losses) || 0}L`;
+  if (tab === 'collector') return 'total koleksi';
+  return `${Number(u.xp) || 0} XP`;
+}
+
+function rowScore(u, tab) {
+  if (tab === 'pvp') return `${u.wins}W - ${u.losses}L | WR ${u.winRate}%`;
+  if (tab === 'collector') return `${u.owned} kartu`;
+  return `Lv ${u.level} • ${u.xp} XP`;
+}
+
 export default function LeaderboardPage() {
   const router = useRouter();
   const [me, setMe] = useState(null);
@@ -23,10 +46,14 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [q, setQ] = useState('');
+  const celebratedTabsRef = useRef(new Set());
 
-  const shown = q.trim()
+  const isSearching = Boolean(q.trim());
+  const shown = isSearching
     ? lb.filter((u) => String(u.username || '').toLowerCase().includes(q.trim().toLowerCase()))
     : lb;
+  const podium = isSearching ? [] : shown.slice(0, 3);
+  const rest = isSearching ? shown : shown.slice(3);
 
   async function load(t = tab) {
     setLoading(true);
@@ -51,9 +78,8 @@ export default function LeaderboardPage() {
           return;
         }
         setMe(meData);
-        await load('pvp');
       } finally {
-        // loading diatur di load()
+        // loading akan dimulai oleh effect tab setelah sesi siap.
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +88,32 @@ export default function LeaderboardPage() {
   useEffect(() => {
     if (me) load(tab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
+  }, [tab, me]);
+
+  // Sparkle podium sekali per tab. Sengaja kecil dan tidak menghalangi UI.
+  useEffect(() => {
+    if (loading || !shown.length || isSearching) return;
+    if (celebratedTabsRef.current.has(tab)) return;
+    celebratedTabsRef.current.add(tab);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    let cancelled = false;
+    import('canvas-confetti')
+      .then(({ default: fireConfetti }) => {
+        if (cancelled) return;
+        fireConfetti({
+          particleCount: 46,
+          spread: 95,
+          startVelocity: 28,
+          origin: { x: 0.5, y: 0.24 },
+          colors: LB_CONFETTI,
+          scalar: 0.9,
+          ticks: 150,
+          zIndex: 40,
+        });
+      })
+      .catch(() => { /* dekorasi opsional */ });
+    return () => { cancelled = true; };
+  }, [loading, shown.length, isSearching, tab]);
 
   return (
     <div className="layout">
@@ -119,36 +170,52 @@ export default function LeaderboardPage() {
                 )}
               </div>
             ) : (
-              shown.map((u, i) => (
-                <div className={`user-row${i < 3 ? ` lb-${i + 1}` : ''}`} key={`${u.username}-${i}`}>
-                  {i < 3 ? (
-                    <span className={`lb-medal m${i + 1}`} aria-hidden="true">{i + 1}</span>
-                  ) : (
-                    <span style={{ fontWeight: 700, width: 28 }}>{i + 1}.</span>
-                  )}
-                  <span style={{ fontWeight: 700 }}>
-                    @{u.username}
-                    {u.isMe ? ' (kamu)' : ''}
-                  </span>
-                  <span style={{ marginLeft: 'auto', color: 'var(--body)', fontSize: 12 }}>
-                    {tab === 'pvp' ? `${u.wins}W - ${u.losses}L | WR ${u.winRate}%` : tab === 'collector' ? `${u.owned} kartu` : `Lv ${u.level} • ${u.xp} XP`}
-                  </span>
-                  {i === 0 && !q.trim() ? (
-                    <span className="lb-confetti" aria-hidden="true">
-                      {Array.from({ length: 8 }).map((_, ci) => (
-                        <i
-                          key={ci}
-                          style={{
-                            left: `${6 + ci * 12}%`,
-                            background: LB_CONFETTI[ci % LB_CONFETTI.length],
-                            animationDelay: `${ci * 130}ms`,
-                          }}
-                        />
-                      ))}
-                    </span>
-                  ) : null}
-                </div>
-              ))
+              <>
+                {!isSearching ? (
+                  <div className="podium-stage" role="list" aria-label="Podium tiga besar">
+                    {[2, 1, 3].map((place) => {
+                      const u = podium[place - 1];
+                      if (!u) return <div key={`empty-${place}`} className="podium-entry is-empty" aria-hidden="true" />;
+                      return (
+                        <div
+                          key={`${u.username}-${place}`}
+                          className={`podium-entry place-${place}${u.isMe ? ' is-me' : ''}`}
+                          role="listitem"
+                          title={`Peringkat ${place}: @${u.username}`}
+                        >
+                          <div className="podium-person">
+                            {place === 1 ? <span className="podium-crown" aria-hidden="true">👑</span> : null}
+                            <span className="podium-avatar" aria-hidden="true">{initials(u.username)}</span>
+                            <span className="podium-name">@{u.username}</span>
+                            {u.isMe ? <span className="podium-me">KAMU</span> : null}
+                            <span className="podium-score">{podiumMain(u, tab)}</span>
+                            <span className="podium-sub">{podiumSub(u, tab)}</span>
+                          </div>
+                          <div className="podium-base" aria-hidden="true"><span>{place}</span></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+
+                {rest.length > 0 ? (
+                  <div className="lb-list">
+                    {rest.map((u, i) => {
+                      const rank = isSearching ? i + 1 : i + 4;
+                      return (
+                        <div className={`lb-row${u.isMe ? ' is-me' : ''}`} key={`${u.username}-${rank}`}>
+                          <span className="lb-rank">{rank}</span>
+                          <span className="lb-name">
+                            @{u.username}
+                            {u.isMe ? ' (kamu)' : ''}
+                          </span>
+                          <span className="lb-score">{rowScore(u, tab)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </div>

@@ -18,10 +18,16 @@ async function POST_impl(req, _ctx, session) {
       if (replay.hit) return NextResponse.json(replay.body, { status: replay.status });
     }
     const r = await claimMission(session.id, session.username, period, body.missionId);
-    if (!r.ok) return jsonFail(r.error, 400);
-    const out = { success: true, xp: r.xp, newXp: r.newXp };
-    if (idemKey) await saveIdempotency(db, idemKey, session.id, 'missions/claim', 200, out);
-    return jsonOk({ xp: r.xp, newXp: r.newXp });
+    if (!r.ok) return jsonFail(r.error, r.status || 400);
+    const payload = {
+      xp: r.xp,
+      newXp: r.newXp,
+      ...(r.alreadyClaimed ? { alreadyClaimed: true, claimedXp: r.claimedXp } : {}),
+    };
+    if (idemKey) {
+      await saveIdempotency(db, idemKey, session.id, 'missions/claim', 200, { success: true, ...payload });
+    }
+    return jsonOk(payload);
   } catch (e) {
     console.error('[MISSION CLAIM]', e.message);
     return jsonFail('Gagal klaim misi.', 500);
