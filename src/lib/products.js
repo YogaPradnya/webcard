@@ -17,6 +17,6 @@ export const PRODUCT_NOTES = [
   'Semua produk bersifat digital. Tidak ada barang fisik dan tidak ada pengiriman fisik.',
   'Pembayaran diproses melalui Tripay dengan metode QRIS. Biaya layanan, bila ada, ditampilkan pada halaman pembayaran.',
   'Top-Up XP dikirim otomatis setelah pembayaran berstatus sukses.',
-  'Bonus Top-Up Bulanan: total Top-Up XP yang berhasil dalam satu bulan kalender (WIB) dihitung untuk 3 bar: Rp50.000 = 1 Epic; Rp100.000 = 1 Legendary; Rp500.000 = 1 Mythic + 2 Legendary. Bonus diklaim manual di halaman Shop. Progres direset setiap tanggal 1; bar yang penuh tapi belum diklaim masih bisa diklaim sampai tanggal 3 bulan berikutnya. Bonus mengikuti stok; bila stok tier habis, sistem memberikan tier di bawahnya.',
+  'Bonus Top-Up Bulanan: total Top-Up XP yang berhasil dalam satu bulan kalender (WIB) dihitung untuk 3 bar: Rp50.000 = 1 Epic; Rp100.000 = 1 Legendary; Rp500.000 = 1 Mythic + 2 Legendary. Bonus diklaim manual di halaman Shop. Progres direset setiap tanggal 1; bar yang penuh tapi belum diklaim masih bisa diklaim sampai tanggal 3 bulan berikutnya. Bonus mengikuti stok; bila stok tier habis, sistem memberikan tier di bawahnya. Khusus Mythic, jumlah pemilik tidak dibatasi — kartu Mythic bisa didapat banyak pengguna.',
   'Kartu Pajangan Custom diproses maksimal 3x24 jam setelah pembayaran terverifikasi.',
 ];

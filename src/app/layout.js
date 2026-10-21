@@ -7,14 +7,9 @@ import './deco.css';
 import './public.css';
 import { Plus_Jakarta_Sans, Sora } from 'next/font/google';
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from '@/lib/site';
-import DecoLayer from '@/components/DecoLayer';
 import ScrollReveal from '@/components/ScrollReveal';
 import Splash from '@/components/Splash';
 import RouteProgress from '@/components/RouteProgress';
-
-/* Tema musiman hiasan: biarkan '' untuk otomatis dari tanggal,
-   atau isi 'sakura' | 'halloween' | 'natal' untuk memaksa (buat testing). */
-const SEASON_OVERRIDE = '';
 
 const bodyFont = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -83,18 +78,12 @@ export default function RootLayout({ children }) {
             __html: `(function(){try{if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(function(){})}}catch(e){}})();`,
           }}
         />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(){try{var ov=${JSON.stringify(SEASON_OVERRIDE)};var s=ov;if(!s){var d=new Date();var m=d.getMonth()+1;var day=d.getDate();if((m===3&&day>=21)||(m===4&&day<=20))s='sakura';else if(m===10)s='halloween';else if(m===12)s='natal';}document.documentElement.setAttribute('data-season',s||'none');}catch(e){}})();`,
-          }}
-        />
       </head>
       <body>
         <RouteProgress />
         <Splash />
         {children}
         <ScrollReveal />
-        <DecoLayer />
       </body>
     </html>
   );

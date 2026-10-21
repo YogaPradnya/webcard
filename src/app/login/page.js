@@ -79,11 +79,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="page deco-wrap" style={{ maxWidth: 420 }}>
-      <span className="deco-cloud" style={{ top: 24, left: -8 }} aria-hidden="true" />
-      <span className="deco-cloud" style={{ top: 64, right: -4, animationDelay: '1.2s' }} aria-hidden="true" />
-      <span className="deco-fish" style={{ top: 150, left: -16 }} aria-hidden="true" />
-      <span className="deco-fish" style={{ top: 210, right: -12, animationDelay: '2s' }} aria-hidden="true" />
+    <div className="page" style={{ maxWidth: 420 }}>
       <div className="brand login-brand">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="login-brand-logo" src="/logo.png" alt="" width={245} height={275} />

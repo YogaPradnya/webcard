@@ -16,7 +16,7 @@ export const metadata = {
   alternates: { canonical: '/terms' },
 };
 
-const UPDATED = '21 Oktober 2026';
+const UPDATED = '22 Oktober 2026';
 
 export default function TermsPage() {
   return (
@@ -114,7 +114,9 @@ export default function TermsPage() {
           lewat tombol Klaim di halaman Shop. Progres direset setiap tanggal 1;
           bar yang sudah penuh tetapi belum diklaim masih bisa diklaim sampai
           tanggal 3 bulan berikutnya. Bonus mengikuti stok; bila stok tier yang
-          diminta habis, sistem memberikan kartu dari tier di bawahnya.
+          diminta habis, sistem memberikan kartu dari tier di bawahnya. Khusus
+          kartu Mythic, tidak ada batas pemilik — kartu Mythic bisa dimiliki
+          banyak pengguna dan tetap bisa didapatkan pengguna lain.
         </p>
         <p>
           Setelah pembayaran terverifikasi sukses, XP otomatis masuk ke akun yang

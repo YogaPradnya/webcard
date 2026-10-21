@@ -20,6 +20,8 @@ export { calcLevel, jakartaDateKey };
 
 // Engine gacha web — port setia logika bot (src/database/cardsRepo.js) dengan aturan web:
 // - Mythic UNIK per user (tidak bisa duplikat, downgrade seperti bot).
+// - Stok pemilik per kartu: Epic 50, Legendary 10. Mythic TANPA batas pemilik
+//   (satu kartu Mythic bisa dimiliki banyak orang, bonus/gacha tidak mengunci).
 // - Epic/Legendary/Rare/Common MENUMPUK via quantity (maks 999, evo full manual).
 // - TANPA limit harian (limit hanya berlaku di bot). total_pulls tetap dicatat.
 // - 10x = 9x cost (diskon 10%).
@@ -38,8 +40,11 @@ export const TEN_DISCOUNT_NUM = 9; // 10x bayar 9x harga satuan (diskon 10%)
 export const CONVERT_XP_REWARD = { Common: 50, Rare: 150, Epic: 400, Legendary: 1000, Mythic: 2500 };
 
 const BASE_POWER = { Common: 40, Rare: 70, Epic: 100, Legendary: 150, Mythic: 200 };
-const STOCK_LIMITS = { Common: Infinity, Rare: Infinity, Epic: 50, Legendary: 10, Mythic: 1 };
-const DEFAULT_STOCKS = { Mythic: 1, Legendary: 10, Epic: 50 };
+// Stok global per kartu = jumlah pemilik. Mythic sengaja TIDAK dibatasi:
+// kartu Mythic bisa dimiliki banyak orang (tidak terkunci oleh bonus/gacha).
+// Legendary/Epic tetap terbatas dan turun tier bila habis.
+const STOCK_LIMITS = { Common: Infinity, Rare: Infinity, Epic: 50, Legendary: 10 };
+const DEFAULT_STOCKS = { Legendary: 10, Epic: 50 };
 // Username yang diabaikan dari hitungan stok global (akun tes/admin).
 // Env STOCK_EXCLUDE_USERNAMES="yogaa,admin" (koma). Default: yogaa.
 // Parser & klausa SQL kini di lib/exclusions.js (dipakai juga filter
