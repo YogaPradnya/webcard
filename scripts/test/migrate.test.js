@@ -15,14 +15,15 @@ const EXPECTED_TABLES = [
   'mission_progress', 'mission_claims',
   'web_login_codes', 'user_profile_prefs', 'web_rate_limits', 'web_rate_counts',
   'idempotency_keys',
+  'topup_bonus_claims',
 ];
 
 describe('migrasi skema', () => {
-  it('11 file versioned berurutan tanpa lompat', () => {
+  it('12 file versioned berurutan tanpa lompat', () => {
     const all = loadMigrations();
-    assert.equal(all.length, 11);
-    assert.deepEqual(all.map((m) => m.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    assert.equal(getExpectedVersion(), 11);
+    assert.equal(all.length, 12);
+    assert.deepEqual(all.map((m) => m.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    assert.equal(getExpectedVersion(), 12);
   });
   it('apply di DB kosong membuat semua tabel + idempoten', async () => {
     const db = createClient({ url: ':memory:' });
@@ -30,7 +31,7 @@ describe('migrasi skema', () => {
     await db.execute('CREATE TABLE user_cards (user_id TEXT, char_name TEXT)');
     await db.execute('CREATE TABLE user_stats (user_id TEXT PRIMARY KEY, username TEXT)');
     const first = await applyMigrations(db);
-    assert.equal(first.length, 11);
+    assert.equal(first.length, 12);
     const tables = await db.execute({ sql: "SELECT name FROM sqlite_master WHERE type = 'table'", args: [] });
     const names = new Set(tables.rows.map((r) => String(r.name)));
     for (const t of [...EXPECTED_TABLES, 'schema_version']) assert.ok(names.has(t), `hilang: ${t}`);
@@ -40,7 +41,7 @@ describe('migrasi skema', () => {
     // Rerun: tidak ada yang di-apply lagi.
     const second = await applyMigrations(db);
     assert.equal(second.length, 0);
-    assert.equal(await getAppliedVersion(db), 11);
+    assert.equal(await getAppliedVersion(db), 12);
     const ok = await assertSchemaReady(db);
     assert.equal(ok.ok, true);
   });
@@ -86,8 +87,8 @@ describe('migrasi skema', () => {
     await db.execute({ sql: 'INSERT OR REPLACE INTO schema_version (version, applied_at) VALUES (7, ?)', args: [Date.now()] });
     // Inilah yang meledak di produksi: sekarang harus tuntas tanpa throw.
     const applied = await applyMigrations(db);
-    assert.deepEqual(applied, [8, 9, 10, 11]);
-    assert.equal(await getAppliedVersion(db), 11);
+    assert.deepEqual(applied, [8, 9, 10, 11, 12]);
+    assert.equal(await getAppliedVersion(db), 12);
     await assertSchemaReady(db);
   });
 });

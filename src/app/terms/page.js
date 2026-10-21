@@ -16,7 +16,7 @@ export const metadata = {
   alternates: { canonical: '/terms' },
 };
 
-const UPDATED = '20 Oktober 2026';
+const UPDATED = '21 Oktober 2026';
 
 export default function TermsPage() {
   return (
@@ -107,10 +107,14 @@ export default function TermsPage() {
           <li>Rp500.000 → 650.000 XP</li>
         </ul>
         <p>
-          Bonus kartu untuk Top-Up: Rp50.000 = 1 Epic; Rp100.000 = 1 Legendary;
-          Rp500.000 = 1 Mythic + 2 Legendary. Bonus diberikan otomatis setelah
-          pembayaran terverifikasi sukses, selama stok tier tersedia. Bila stok
-          tier yang diminta habis, sistem memberikan kartu dari tier di bawahnya.
+          Bonus Top-Up Bulanan dihitung dari total nominal Top-Up XP yang
+          berhasil dibayar dalam satu bulan kalender (WIB), bukan per paket.
+          Tersedia 3 bar bonus: total Rp50.000 = 1 Epic; Rp100.000 = 1
+          Legendary; Rp500.000 = 1 Mythic + 2 Legendary. Bonus diambil manual
+          lewat tombol Klaim di halaman Shop. Progres direset setiap tanggal 1;
+          bar yang sudah penuh tetapi belum diklaim masih bisa diklaim sampai
+          tanggal 3 bulan berikutnya. Bonus mengikuti stok; bila stok tier yang
+          diminta habis, sistem memberikan kartu dari tier di bawahnya.
         </p>
         <p>
           Setelah pembayaran terverifikasi sukses, XP otomatis masuk ke akun yang

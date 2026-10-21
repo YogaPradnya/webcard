@@ -10,13 +10,45 @@ import { useMe } from '@/hooks/useMe';
 import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
 import { LEGAL_LINKS } from '@/lib/legal';
 import { idr, paymentLabel, fmtDate } from '@/lib/money';
-import { XP_PACKS } from '@/lib/products';
 
-function bonusCardsLabel(cards) {
-  return Object.entries(cards || {})
-    .filter(([, qty]) => Number(qty) > 0)
-    .map(([rarity, qty]) => `${Number(qty)} ${rarity}`)
-    .join(' + ');
+function BonusBar({ m, busy, onClaim }) {
+  const pct = Math.max(0, Math.min(100, Number(m.progressPct) || 0));
+  const barColor = m.claimed ? 'var(--success, #22c55e)' : m.canClaim ? 'var(--link)' : 'var(--muted)';
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 700 }}>{m.amountLabel} · {m.rewardLabel}</span>
+        <span style={{ color: 'var(--muted)' }}>{idr(m.totalIdr)} / {idr(m.amountIdr)}</span>
+      </div>
+      <div style={{ height: 10, borderRadius: 999, background: 'var(--hairline-soft)', overflow: 'hidden', margin: '4px 0 6px' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: barColor, transition: 'width .3s ease' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12 }}>
+        {m.claimed ? (
+          <span style={{ color: 'var(--success, #22c55e)', fontWeight: 800 }}>
+            ✓ Diklaim{m.legacyClaimed ? ' (bonus paket lama)' : ''}
+          </span>
+        ) : m.canClaim ? (
+          <button
+            type="button"
+            className="btn"
+            style={{ width: 'auto', minHeight: 0, padding: '6px 14px', fontSize: 12 }}
+            disabled={busy}
+            onClick={() => onClaim(m)}
+          >
+            {busy ? 'Memproses...' : `Klaim ${m.rewardLabel}`}
+          </button>
+        ) : (
+          <span style={{ color: 'var(--muted)' }}>Belum tercapai</span>
+        )}
+        {m.claimed && m.claimedCards?.length > 0 ? (
+          <span style={{ color: 'var(--muted)' }}>
+            Kartu: {m.claimedCards.map((c) => `${c.charName} (${c.rarity})`).join(', ')}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export default function ShopPage() {
@@ -35,6 +67,8 @@ export default function ShopPage() {
   const [nowTick, setNowTick] = useState(Date.now());
   const [qrOrder, setQrOrder] = useState(null);
   const [simulating, setSimulating] = useState('');
+  const [bonus, setBonus] = useState(null);
+  const [claiming, setClaiming] = useState('');
   const ordersRef = useRef([]);
   const refreshInFlight = useRef(false);
   const hasPending = orders.some((o) => o.status === 'pending' || o.status === 'processing');
@@ -55,13 +89,15 @@ export default function ShopPage() {
     if (refreshInFlight.current) return;
     refreshInFlight.current = true;
     try {
-      const [oData, pData] = await Promise.all([
+      const [oData, pData, bData] = await Promise.all([
         fetchLenient('/api/shop/orders'),
         fetchLenient('/api/profile'),
+        fetchLenient('/api/shop/bonus'),
       ]);
       if (pData.success && Number.isFinite(Number(pData.profile?.xp))) {
         setMyXp(Number(pData.profile.xp));
       }
+      if (bData.success) setBonus(bData.bonus || null);
       if (!oData.success) return;
       const next = Array.isArray(oData.orders) ? oData.orders : [];
       const prev = ordersRef.current || [];
@@ -71,12 +107,10 @@ export default function ShopPage() {
         const what = becamePaid.kind === 'xp'
           ? `+${Number(becamePaid.xpAmount || 0).toLocaleString('id-ID')} XP`
           : `+${becamePaid.qty || 1} slot pajangan`;
-        const bonus = bonusCardsLabel(
-          XP_PACKS.find((pack) => pack.id === becamePaid.ref)?.bonusCards,
-        );
-        setSuccessMsg(
-          `Pembayaran lunas! ${what} sudah masuk.${bonus ? ` Bonus kartu: ${bonus}.` : ''} 🎉`,
-        );
+        const tail = becamePaid.kind === 'xp'
+          ? ' Cek section Bonus Top-Up Bulanan di bawah untuk klaim kartunya.'
+          : '';
+        setSuccessMsg(`Pembayaran lunas! ${what} sudah masuk.${tail} 🎉`);
       }
       ordersRef.current = next;
       setOrders(next);
@@ -168,16 +202,59 @@ export default function ShopPage() {
     }
   }
 
+  async function claimBonus(m) {
+    if (claiming || !me || !m?.id) return;
+    const key = `${m.period}:${m.id}`;
+    setClaiming(key);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const { ok, data } = await postJson(
+        '/api/shop/bonus/claim',
+        { milestoneId: m.id, period: m.period },
+        { ms: 22000 },
+      );
+      if (!ok || !data.success) {
+        setError(data.message || 'Gagal klaim bonus.');
+        return;
+      }
+      if (data.pending) {
+        setSuccessMsg('Klaim sedang diproses. Cek lagi sebentar lagi ya.');
+      } else if (data.alreadyClaimed && data.legacy) {
+        setSuccessMsg('Bonus milestone ini sudah pernah masuk lewat bonus paket lama.');
+      } else if (data.alreadyClaimed) {
+        setSuccessMsg('Bonus milestone ini sudah diklaim sebelumnya. Kartunya sudah masuk.');
+      } else {
+        const cards = (data.cards || []).map((c) => `${c.charName} (${c.rarity})`).join(', ');
+        setSuccessMsg(`Bonus berhasil diklaim!${cards ? ` Kartu: ${cards}.` : ''} 🎉`);
+      }
+    } catch {
+      setError('Tidak bisa menghubungi server.');
+    } finally {
+      setClaiming('');
+      try {
+        const bData = await fetchLenient('/api/shop/bonus');
+        if (bData.success) setBonus(bData.bonus || null);
+      } catch { /* best-effort */ }
+    }
+  }
+
   async function load(opts = {}) {
     if (!opts.quiet) setError('');
     try {
       const catData = await fetchLenient('/api/shop/packages');
       if (catData.success) setCatalog(catData);
       if (me) {
-        const [sData, oData, pData] = await Promise.all([fetchLenient('/api/shop/slots'), fetchLenient('/api/shop/orders'), fetchLenient('/api/profile')]);
+        const [sData, oData, pData, bData] = await Promise.all([
+          fetchLenient('/api/shop/slots'),
+          fetchLenient('/api/shop/orders'),
+          fetchLenient('/api/profile'),
+          fetchLenient('/api/shop/bonus'),
+        ]);
         if (sData.success) setSlots(sData.slots || []);
         if (oData.success) setOrders(oData.orders || []);
         if (pData.success && Number.isFinite(Number(pData.profile?.xp))) setMyXp(Number(pData.profile.xp));
+        if (bData.success) setBonus(bData.bonus || null);
       }
     } catch {
       if (!opts.quiet) setError('Tidak bisa menghubungi server.');
@@ -419,7 +496,7 @@ export default function ShopPage() {
             <div className="section-title">Top-Up XP{myXp != null ? ` (kamu: ${myXp.toLocaleString('id-ID')} XP)` : ''}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
               XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS (scan dari aplikasi bank / e-wallet).
-              Bonus kartu 50k/100k/500k juga masuk otomatis setelah pembayaran sukses.
+              Bonus kartunya dihitung dari total Top-Up bulanan — lihat section Bonus Top-Up Bulanan di bawah.
             </div>
             <div className="title-grid">
               {(catalog?.xpPacks || []).map((p) => (
@@ -427,7 +504,6 @@ export default function ShopPage() {
                   <div className="title-name">{p.xp.toLocaleString('id-ID')} XP</div>
                   <div className="title-desc">
                     {idr(p.priceIdr)} • bonus {p.bonusPct}%
-                    {bonusCardsLabel(p.bonusCards) ? ` • kartu ${bonusCardsLabel(p.bonusCards)}` : ''}
                   </div>
                   <button
                     type="button"
@@ -449,6 +525,54 @@ export default function ShopPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="section-title">Bonus Top-Up Bulanan</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+              Total Top-Up XP yang berhasil di bulan berjalan dihitung otomatis — tidak harus satu paket.
+              Bar yang penuh bisa diklaim. Bonus mengikuti stok; bila stok tier habis, sistem memberi tier di bawahnya.
+            </div>
+            {!me ? (
+              <div style={{ fontSize: 13 }}>
+                Login untuk melihat progres dan klaim bonus.{' '}
+                <Link href="/login" style={{ color: 'var(--link)', fontWeight: 800 }}>Masuk di sini</Link>
+              </div>
+            ) : !bonus ? (
+              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Memuat bonus…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 13, marginBottom: 2 }}>
+                  Total bulan <b>{bonus.periodLabel}</b>: <b>{idr(bonus.totalIdr)}</b>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                  Reset otomatis tanggal 1 ({bonus.nextPeriodLabel}). Bar yang penuh tapi belum diklaim masih bisa diklaim sampai tanggal 3 bulan berikutnya.
+                </div>
+                {bonus.milestones.map((m) => (
+                  <BonusBar
+                    key={m.period + ':' + m.id}
+                    m={m}
+                    busy={claiming === `${m.period}:${m.id}`}
+                    onClaim={claimBonus}
+                  />
+                ))}
+                {bonus.grace && bonus.grace.canClaimCount > 0 ? (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 8, color: '#b8860b' }}>
+                      Masa tenggang — bonus {bonus.grace.periodLabel} masih bisa diklaim sampai {bonus.grace.untilLabel}
+                    </div>
+                    {bonus.grace.milestones.filter((m) => m.canClaim).map((m) => (
+                      <BonusBar
+                        key={m.period + ':' + m.id}
+                        m={m}
+                        busy={claiming === `${m.period}:${m.id}`}
+                        onClaim={claimBonus}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </>
+            )}
           </div>
 
           <div className="card" style={{ marginBottom: 16 }}>

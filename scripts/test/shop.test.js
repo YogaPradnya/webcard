@@ -9,7 +9,7 @@ import {
 } from '../../src/lib/shop.js';
 
 describe('shop katalog', () => {
-  it('5 paket XP sesuai spek + bonus kartu 50k/100k/500k', () => {
+  it('5 paket XP sesuai spek (bonus kartu lewat bar bulanan, bukan per paket)', () => {
     assert.deepEqual(
       XP_PACKS.map((p) => [p.priceIdr, p.xp]),
       [[5000, 6000], [10000, 11500], [50000, 55000], [100000, 125000], [500000, 650000]],
@@ -17,9 +17,9 @@ describe('shop katalog', () => {
     assert.equal(findPack('xp-5k')?.xp, 6000);
     assert.equal(findPack('xp-100k')?.xp, 125000);
     assert.equal(findPack('xp-500k')?.xp, 650000);
-    assert.deepEqual(findPack('xp-50k')?.bonusCards, { Epic: 1 });
-    assert.deepEqual(findPack('xp-100k')?.bonusCards, { Legendary: 1 });
-    assert.deepEqual(findPack('xp-500k')?.bonusCards, { Mythic: 1, Legendary: 2 });
+    assert.equal('bonusCards' in findPack('xp-50k'), false);
+    assert.equal('bonusCards' in findPack('xp-100k'), false);
+    assert.equal('bonusCards' in findPack('xp-500k'), false);
     assert.equal(findPack('ngaco'), null);
   });
   it('aturan slot: Rp10rb, maks 50/user, 3 jatah ubah', () => {

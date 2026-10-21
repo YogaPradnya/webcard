@@ -584,7 +584,6 @@ export async function fulfillPaidOrder(order, payment = {}) {
     };
   }
 
-  let bonus = null;
   if (fresh.kind === 'xp') {
     try {
       await addXpToUser(fresh.userId, fresh.username, fresh.xpAmount);
@@ -594,28 +593,9 @@ export async function fulfillPaidOrder(order, payment = {}) {
       await claimRelease(db, orderId, fresh.status);
       return { fulfilled: false, reason: `gagal tambah XP: ${e.message}` };
     }
-
-    // Bonus kartu mengikuti paket yang dibeli. Kegagalan bonus TIDAK boleh
-    // menggagalkan XP (produk utama sudah masuk); kartu bonus ditulis dalam
-    // satu statement agar tidak butuh transaction() di request path.
-    const bonusCards = findPack(fresh.ref)?.bonusCards;
-    if (bonusCards && Object.keys(bonusCards).length > 0) {
-      try {
-        const { grantCardBonus } = await import('./gacha.js');
-        bonus = await grantCardBonus(fresh.userId, fresh.username, bonusCards);
-        const requested = Object.values(bonusCards)
-          .reduce((sum, n) => sum + Math.max(0, Math.floor(Number(n) || 0)), 0);
-        if ((bonus?.granted?.length || 0) < requested) {
-          console.warn(
-            '[SHOP FULFILL] Bonus kartu tidak lengkap:',
-            orderId,
-            `${bonus?.granted?.length || 0}/${requested}`,
-          );
-        }
-      } catch (e) {
-        console.error('[SHOP FULFILL] Gagal bonus kartu:', orderId, e.message);
-      }
-    }
+    // Bonus kartu TIDAK lagi otomatis per paket. Sejak fitur Bonus Top-Up
+    // Bulanan, kartu keluar lewat klaim manual di /api/shop/bonus/claim
+    // (total Top-Up XP bulan berjalan). Lihat src/lib/topupBonus.js.
   } else if (fresh.kind === 'slot') {
     const have = await countUserSlots(fresh.userId);
     const room = Math.max(0, MAX_SLOTS_PER_USER - have);
@@ -670,7 +650,7 @@ export async function fulfillPaidOrder(order, payment = {}) {
     } catch { /* misi non-kritis */ }
   }
 
-  return { fulfilled: true, alreadyPaid: false, bonus };
+  return { fulfilled: true, alreadyPaid: false };
 }
 
 // Eksekusi pembayaran simulasi (hanya berlaku bila mode simulasi aktif)
