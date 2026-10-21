@@ -311,17 +311,15 @@ export async function syncOrderFromTripay(orderId) {
       return { status: order.status, reason: 'nominal kurang' };
     }
     const r = await fulfillPaidOrder(order, { paymentType: channel });
-    if (!r.fulfilled && r.reason !== 'bukan pending/expired') {
-      return { status: order.status, reason: r.reason };
-    }
-    return { status: 'paid' };
+    if (r.fulfilled || r.alreadyPaid) return { status: 'paid' };
+    return { status: r.reason === 'sedang diproses' ? 'processing' : order.status, reason: r.reason };
   }
   if (mapped === 'failed') {
-    if (order.status === 'pending') await setOrderStatus(orderId, 'failed');
+    await transitionOrderStatus(orderId, 'failed', ['pending', 'expired']);
     return { status: 'failed' };
   }
   if (mapped === 'expired') {
-    if (order.status === 'pending') await setOrderStatus(orderId, 'expired');
+    await transitionOrderStatus(orderId, 'expired', ['pending']);
     return { status: 'expired' };
   }
   if (mapped === 'refund') {
@@ -390,17 +388,40 @@ export async function ensureShopTables() {
   try { await db.execute('ALTER TABLE user_display_slots ADD COLUMN description TEXT DEFAULT \'\''); } catch { /* sudah ada */ }
 }
 
-export async function createOrder({ userId, username, kind, ref, qty, amountIdr, xpAmount, pay = {} }) {
-  const db = getDb();
+// Buat baris order pending LEBIH DULU, sebelum memanggil Tripay.
+// Ini menutup race callback-vs-insert: callback yang datang cepat selalu
+// menemukan order di DB, jadi pembayaran tidak pernah "hilang" hanya karena
+// baris order belum sempat dibuat.
+export async function createPendingOrder({ orderId, userId, username, kind, ref, qty, amountIdr, xpAmount }) {
   await ensureShopTables();
-  const orderId = genMerchantOrderId();
+  const db = getDb();
+  const id = String(orderId || genMerchantOrderId());
   const now = Date.now();
   await db.execute({
     sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
-    args: [orderId, String(userId), String(username || ''), kind, String(ref || ''), Number(qty) || 1, amountIdr, xpAmount || 0,
-      pay.payId || '', pay.qrUrl || '', pay.qrContent || '', pay.checkoutUrl || '', pay.channelName || '', now, now],
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', '', '', '', '', '', ?, ?)`,
+    args: [id, String(userId), String(username || ''), String(kind), String(ref || ''), Number(qty) || 1,
+      Number(amountIdr) || 0, Number(xpAmount) || 0, now, now],
   });
+  return id;
+}
+
+// Simpan data pembayaran (reference/QR) setelah transaksi Tripay dibuat.
+export async function setOrderPayment(orderId, pay = {}) {
+  await getDb().execute({
+    sql: `UPDATE shop_orders
+          SET pay_id = ?, qr_url = ?, qr_content = ?, checkout_url = ?, pay_channel = ?, updated_at = ?
+          WHERE order_id = ?`,
+    args: [String(pay.payId || ''), String(pay.qrUrl || ''), String(pay.qrContent || ''),
+      String(pay.checkoutUrl || ''), String(pay.channelName || ''), Date.now(), String(orderId)],
+  });
+}
+
+// API lama: buat order + data pembayaran dalam satu panggilan.
+export async function createOrder({ userId, username, kind, ref, qty, amountIdr, xpAmount, pay = {} }) {
+  const orderId = genMerchantOrderId();
+  await createPendingOrder({ orderId, userId, username, kind, ref, qty, amountIdr, xpAmount });
+  if (pay && Object.keys(pay).length > 0) await setOrderPayment(orderId, pay);
   return orderId;
 }
 
@@ -431,7 +452,24 @@ export async function setOrderStatus(orderId, status) {
   });
 }
 
+// Transisi status yang aman dari race: hanya ubah bila status saat ini masih
+// salah satu dari `allowed`. Dipakai untuk failed/expired agar callback PAID
+// yang menang balapan tidak ditimpa kembali menjadi gagal/kadaluarsa.
+export async function transitionOrderStatus(orderId, status, allowed = []) {
+  const from = (Array.isArray(allowed) ? allowed : []).map(String);
+  if (from.length === 0) return 0;
+  const placeholders = from.map(() => '?').join(', ');
+  const res = await getDb().execute({
+    sql: `UPDATE shop_orders SET status = ?, updated_at = ? WHERE order_id = ? AND status IN (${placeholders})`,
+    args: [String(status), Date.now(), String(orderId), ...from],
+  });
+  return Number(res.rowsAffected || 0);
+}
+
 // Tandai pending yang lebih tua dari TTL sebagai expired. Return jumlah yang diubah.
+// Catatan: GET /api/shop/orders TIDAK memanggil ini lagi (GET murni baca);
+// listUserOrders menampilkan status expired secara efektif. Fungsi ini
+// disediakan untuk cron/admin/backfill bila ingin merapikan status di DB.
 export async function expireStalePendingOrders(userId) {
   const res = await getDb().execute({
     sql: `UPDATE shop_orders SET status = 'expired', updated_at = ?
@@ -446,34 +484,53 @@ export async function listUserOrders(userId, limit = 10) {
     sql: 'SELECT order_id, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, paid_at, payment_type, created_at FROM shop_orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
     args: [String(userId), Math.min(20, Math.max(1, Number(limit) || 10))],
   });
-  return (res.rows || []).map((r) => ({
-    orderId: String(r.order_id),
-    kind: String(r.kind),
-    ref: String(r.ref || ''),
-    qty: Number(r.qty) || 1,
-    amountIdr: Number(r.amount_idr) || 0,
-    xpAmount: Number(r.xp_amount) || 0,
-    status: String(r.status),
-    payId: String(r.pay_id || ''),
-    qrUrl: String(r.qr_url || ''),
-    qrContent: String(r.qr_content || ''),
-    checkoutUrl: String(r.checkout_url || ''),
-    payChannel: String(r.pay_channel || ''),
-    paidAt: Number(r.paid_at) || 0,
-    paymentType: String(r.payment_type || ''),
-    createdAt: Number(r.created_at) || 0,
-  }));
+  const now = Date.now();
+  return (res.rows || []).map((r) => {
+    const createdAt = Number(r.created_at) || 0;
+    let status = String(r.status);
+    // GET order tidak boleh menulis ke DB. Tampilkan pending lama sebagai
+    // expired secara efektif; callback PAID tetap boleh memenuhinya.
+    if (status === 'pending' && createdAt > 0 && createdAt < now - ORDER_PENDING_TTL_MS) {
+      status = 'expired';
+    }
+    return {
+      orderId: String(r.order_id),
+      kind: String(r.kind),
+      ref: String(r.ref || ''),
+      qty: Number(r.qty) || 1,
+      amountIdr: Number(r.amount_idr) || 0,
+      xpAmount: Number(r.xp_amount) || 0,
+      status,
+      payId: String(r.pay_id || ''),
+      qrUrl: String(r.qr_url || ''),
+      qrContent: String(r.qr_content || ''),
+      checkoutUrl: String(r.checkout_url || ''),
+      payChannel: String(r.pay_channel || ''),
+      paidAt: Number(r.paid_at) || 0,
+      paymentType: String(r.payment_type || ''),
+      createdAt,
+    };
+  });
 }
 
+// Tambah XP secara ATOMIC (xp = xp + delta), bukan baca-lalu-tulis.
+// Ini mencegah top-up web menimpa XP yang baru ditambahkan bot / request lain.
 async function addXpToUser(userId, username, amount) {
   const db = getDb();
-  const cur = await db.execute({ sql: 'SELECT xp FROM user_stats WHERE user_id = ?', args: [String(userId)] });
-  const curXp = cur.rows.length > 0 ? Number(cur.rows[0].xp) || 0 : 0;
-  const newXp = curXp + (Number(amount) || 0);
+  const delta = Math.round(Number(amount) || 0);
+  const res = await db.execute({
+    sql: `INSERT INTO user_stats (user_id, username, xp, level)
+          VALUES (?, ?, MAX(0, ?), ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            xp = MAX(0, user_stats.xp + ?),
+            username = excluded.username
+          RETURNING xp`,
+    args: [String(userId), String(username || ''), delta, calcLevel(Math.max(0, delta)), delta],
+  });
+  const newXp = Number(res.rows?.[0]?.xp) || 0;
   await db.execute({
-    sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level, username = excluded.username`,
-    args: [String(userId), String(username || ''), newXp, calcLevel(newXp)],
+    sql: 'UPDATE user_stats SET level = ? WHERE user_id = ?',
+    args: [calcLevel(newXp), String(userId)],
   });
   return newXp;
 }
@@ -490,40 +547,97 @@ export async function countUserSlots(userId) {
 // Menerima status 'pending' (normal) maupun 'expired' (rekonsiliasi: Tripay
 // bilang PAID padahal lokal keburu kadaluarsa — uang sudah kepotong, jadi tetap dipenuhi).
 // payment: { paymentType } dari Tripay (nama channel, disimpan untuk detail transaksi).
-// Return { fulfilled: true } atau { fulfilled: false, reason }.
+// Return { fulfilled: true, alreadyPaid? } atau { fulfilled: false, reason }.
+function claimRelease(db, orderId, status) {
+  return db.execute({
+    sql: `UPDATE shop_orders SET status = ?, updated_at = ?
+          WHERE order_id = ? AND status = 'processing'`,
+    args: [String(status || 'pending'), Date.now(), String(orderId)],
+  }).catch(() => {});
+}
+
 export async function fulfillPaidOrder(order, payment = {}) {
   const db = getDb();
   await ensureShopTables();
-  const fresh = await getOrder(order.orderId);
-  if (!fresh || (fresh.status !== 'pending' && fresh.status !== 'expired')) {
-    return { fulfilled: false, reason: 'bukan pending/expired' };
+  const orderId = String(order?.orderId || '');
+  if (!orderId) return { fulfilled: false, reason: 'order tidak valid' };
+
+  const fresh = await getOrder(orderId);
+  if (!fresh) return { fulfilled: false, reason: 'order tidak ditemukan' };
+  if (fresh.status === 'paid') return { fulfilled: true, alreadyPaid: true };
+  if (fresh.status !== 'pending' && fresh.status !== 'expired') {
+    return {
+      fulfilled: false,
+      reason: fresh.status === 'processing' ? 'sedang diproses' : 'bukan pending/expired',
+    };
   }
+
+  // KLAIM ATOMIK: hanya satu pemanggil (callback / auto-check / simulasi)
+  // yang boleh memproses order ini. Yang kalah balapan tidak menyentuh XP.
+  const claimed = await transitionOrderStatus(orderId, 'processing', ['pending', 'expired']);
+  if (claimed !== 1) {
+    const latest = await getOrder(orderId);
+    if (latest?.status === 'paid') return { fulfilled: true, alreadyPaid: true };
+    return {
+      fulfilled: false,
+      reason: latest?.status === 'processing' ? 'sedang diproses' : 'bukan pending/expired',
+    };
+  }
+
   if (fresh.kind === 'xp') {
-    await addXpToUser(fresh.userId, fresh.username, fresh.xpAmount);
+    try {
+      await addXpToUser(fresh.userId, fresh.username, fresh.xpAmount);
+    } catch (e) {
+      // Belum ada efek samping yang dikonfirmasi: lepas klaim agar callback
+      // Tripay / Cek Status bisa mencoba lagi.
+      await claimRelease(db, orderId, fresh.status);
+      return { fulfilled: false, reason: `gagal tambah XP: ${e.message}` };
+    }
   } else if (fresh.kind === 'slot') {
     const have = await countUserSlots(fresh.userId);
     const room = Math.max(0, MAX_SLOTS_PER_USER - have);
-    const grant = Math.min(room, fresh.qty);
-    const now = Date.now();
-    for (let i = 0; i < grant; i++) {
-      await db.execute({
-        sql: `INSERT INTO user_display_slots (user_id, username, name, created_at, updated_at)
-              VALUES (?, ?, 'Kartu Custom', ?, ?)`,
-        args: [fresh.userId, fresh.username, now, now],
-      });
+    if (room < fresh.qty) {
+      await claimRelease(db, orderId, fresh.status);
+      return { fulfilled: false, reason: 'slot penuh (maks 50)' };
     }
-    if (grant < fresh.qty) return { fulfilled: false, reason: 'slot penuh (maks 50)' };
+    const now = Date.now();
+    let granted = 0;
+    try {
+      for (let i = 0; i < fresh.qty; i++) {
+        await db.execute({
+          sql: `INSERT INTO user_display_slots (user_id, username, name, created_at, updated_at)
+                VALUES (?, ?, 'Kartu Custom', ?, ?)`,
+          args: [fresh.userId, fresh.username, now, now],
+        });
+        granted++;
+      }
+    } catch (e) {
+      // Sebagian slot sudah masuk: jangan lepas klaim (bisa dobel saat retry).
+      if (granted === 0) await claimRelease(db, orderId, fresh.status);
+      return { fulfilled: false, reason: `gagal tambah slot: ${e.message}` };
+    }
   } else {
+    await claimRelease(db, orderId, fresh.status);
     return { fulfilled: false, reason: 'jenis tak dikenal' };
   }
-  await setOrderStatus(fresh.orderId, 'paid');
+
+  // Finalisasi status + paid_at + payment_type dalam SATU statement.
+  // Bila ini gagal setelah XP/slot masuk, JANGAN lepas klaim: retry akan
+  // menggandakan hadiah. Biarkan 'processing' untuk rekonsiliasi admin.
+  const paidAt = Date.now();
+  const paymentType = String(payment.paymentType || fresh.payChannel || 'QRIS');
   try {
     await db.execute({
-      sql: 'UPDATE shop_orders SET paid_at = ?, payment_type = ? WHERE order_id = ?',
-      args: [Date.now(), String(payment.paymentType || fresh.payChannel || 'QRIS'), fresh.orderId],
+      sql: `UPDATE shop_orders
+            SET status = 'paid', paid_at = ?, payment_type = ?, updated_at = ?
+            WHERE order_id = ?`,
+      args: [paidAt, paymentType, paidAt, orderId],
     });
-  } catch { /* kolom lama: abaikan, status paid tetap sah */ }
-  return { fulfilled: true };
+  } catch (e) {
+    console.error('[SHOP FULFILL] Gagal finalisasi status paid:', orderId, e.message);
+    return { fulfilled: false, reason: 'hadiah sudah masuk, gagal menandai lunas' };
+  }
+  return { fulfilled: true, alreadyPaid: false };
 }
 
 // Eksekusi pembayaran simulasi (hanya berlaku bila mode simulasi aktif)
@@ -540,10 +654,10 @@ export async function simulateOrderPayment(orderId, userId) {
     return { status: 'paid', alreadyPaid: true };
   }
   const res = await fulfillPaidOrder(order, { paymentType: 'QRIS (Simulasi Dev)' });
-  if (!res.fulfilled && res.reason !== 'bukan pending/expired') {
+  if (!res.fulfilled && !res.alreadyPaid) {
     throw new Error(res.reason || 'Gagal memenuhi order');
   }
-  return { status: 'paid', fulfilled: true };
+  return { status: 'paid', fulfilled: true, alreadyPaid: Boolean(res.alreadyPaid) };
 }
 
 export async function listUserSlots(userId) {

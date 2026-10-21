@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { PageSkeleton, ErrorRetry } from '@/components/PageState';
@@ -27,6 +27,9 @@ export default function ShopPage() {
   const [nowTick, setNowTick] = useState(Date.now());
   const [qrOrder, setQrOrder] = useState(null);
   const [simulating, setSimulating] = useState('');
+  const ordersRef = useRef([]);
+  const refreshInFlight = useRef(false);
+  const hasPending = orders.some((o) => o.status === 'pending' || o.status === 'processing');
 
   useEffect(() => {
     const t = setInterval(() => setNowTick(Date.now()), 1000);
@@ -37,6 +40,37 @@ export default function ShopPage() {
     const s = Math.max(0, Math.ceil(ms / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
+
+  // Refresh ringan: order + XP saja (tanpa katalog/slot). Dipakai polling
+  // selama ada order pending dan saat tab kembali aktif.
+  const refreshOrders = useCallback(async () => {
+    if (refreshInFlight.current) return;
+    refreshInFlight.current = true;
+    try {
+      const [oData, pData] = await Promise.all([
+        fetchLenient('/api/shop/orders'),
+        fetchLenient('/api/profile'),
+      ]);
+      if (pData.success && Number.isFinite(Number(pData.profile?.xp))) {
+        setMyXp(Number(pData.profile.xp));
+      }
+      if (!oData.success) return;
+      const next = Array.isArray(oData.orders) ? oData.orders : [];
+      const prev = ordersRef.current || [];
+      const becamePaid = prev.find((p) => p.status !== 'paid'
+        && next.some((n) => n.orderId === p.orderId && n.status === 'paid'));
+      if (becamePaid) {
+        const what = becamePaid.kind === 'xp'
+          ? `+${Number(becamePaid.xpAmount || 0).toLocaleString('id-ID')} XP`
+          : `+${becamePaid.qty || 1} slot pajangan`;
+        setSuccessMsg(`Pembayaran lunas! ${what} sudah masuk. 🎉`);
+      }
+      ordersRef.current = next;
+      setOrders(next);
+    } catch { /* polling best-effort */ } finally {
+      refreshInFlight.current = false;
+    }
+  }, []);
 
   // Buka panel QR dari data order (hasil buat order baru / baris order lama).
   function openQr({ orderId, qrUrl, qrContent, checkoutUrl, channel, amountIdr, label, createdAt }) {
@@ -114,11 +148,8 @@ export default function ShopPage() {
     if (paidFound) {
       await load({ quiet: true });
     } else if (quiet) {
-      // Auto-cek: cukup segarkan daftar order (hemat request).
-      try {
-        const oData = await fetchLenient('/api/shop/orders');
-        if (oData.success) setOrders(oData.orders || []);
-      } catch { /* abaikan */ }
+      // Auto-cek: segarkan order + XP (hemat request, tanpa katalog/slot).
+      await refreshOrders();
     } else {
       await load({ quiet: true });
     }
@@ -147,9 +178,49 @@ export default function ShopPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me]);
 
-  // Auto-cek berkala selama panel QR terbuka (callback tak menjangkau localhost).
+  // Jaga ref tetap sinkron bila order diubah oleh load()/checkOrder().
+  useEffect(() => {
+    ordersRef.current = orders;
+  }, [orders]);
+
+  // Saat tab kembali aktif/fokus, langsung tarik status terbaru. Ini menutup
+  // kasus browser yang selama ini menampilkan order basi sampai reload.
+  useEffect(() => {
+    if (!me) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refreshOrders();
+    };
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [me, refreshOrders]);
+
+  // Polling ringan selama masih ada order pending/processing. Berhenti sendiri
+  // setelah semua lunas/kadaluarsa; tidak perlu WebSocket untuk kebutuhan ini.
+  useEffect(() => {
+    if (!me || !hasPending) return undefined;
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'hidden') refreshOrders();
+    }, 5000);
+    return () => clearInterval(t);
+  }, [me, hasPending, refreshOrders]);
+
+  // Tutup panel QR bila order-nya sudah lunas lewat polling/callback.
   useEffect(() => {
     if (!qrOrder?.orderId) return;
+    if (orders.some((o) => o.orderId === qrOrder.orderId && o.status === 'paid')) {
+      setQrOrder(null);
+    }
+  }, [orders, qrOrder?.orderId]);
+
+  // Auto-cek berkala selama panel QR terbuka (callback tak menjangkau localhost).
+  // Cek pertama langsung, jangan tunggu 5 detik.
+  useEffect(() => {
+    if (!qrOrder?.orderId) return;
+    checkOrder(qrOrder.orderId, { quiet: true });
     const t = setInterval(() => { checkOrder(qrOrder.orderId, { quiet: true }); }, 5000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -431,8 +502,8 @@ export default function ShopPage() {
                   <span style={{ fontWeight: 700 }}>{o.kind === 'xp' ? `Top-Up ${Number(o.xpAmount).toLocaleString('id-ID')} XP` : `Slot x${o.qty}`}</span>
                   <span style={{ color: 'var(--muted)', fontSize: 12, marginLeft: 8 }}>{idr(o.amountIdr)}</span>
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : o.status === 'pending' ? '#b8860b' : o.status === 'refund' ? '#b8860b' : 'var(--error)' }}>
-                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'expired' ? 'Kadaluarsa' : o.status === 'refund' ? 'Refund' : 'Gagal'}
+                    <span style={{ fontSize: 12, fontWeight: 800, color: o.status === 'paid' ? 'var(--success)' : (o.status === 'pending' || o.status === 'processing' || o.status === 'refund') ? '#b8860b' : 'var(--error)' }}>
+                      {o.status === 'paid' ? 'Lunas' : o.status === 'pending' ? `Menunggu bayar${left > 0 ? ` • ${fmtSisa(left)}` : ''}` : o.status === 'processing' ? 'Memproses...' : o.status === 'expired' ? 'Kadaluarsa' : o.status === 'refund' ? 'Refund' : 'Gagal'}
                     </span>
                     <span style={{ fontSize: 11, color: 'var(--muted)' }}>{open ? '▲' : '▼'}</span>
                     {o.status === 'pending' ? (

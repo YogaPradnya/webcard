@@ -1,5 +1,5 @@
 import { jsonOk, jsonFail, apiHandler, READ_TIMEOUT_MS } from '@/lib/apiHandler';
-import { listUserOrders, ensureShopTables, expireStalePendingOrders } from '@/lib/shop';
+import { listUserOrders, ensureShopTables } from '@/lib/shop';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,11 +11,9 @@ export const runtime = 'nodejs';
 async function GET_impl(req, _ctx, session) {
   try {
     await ensureShopTables();
-    // Paralel: expire tidak mengubah urutan list secara signifikan.
-    const [, orders] = await Promise.all([
-      expireStalePendingOrders(session.id),
-      listUserOrders(session.id, 10),
-    ]);
+    // GET murni baca: status pending yang sudah lewat TTL ditampilkan sebagai
+    // expired oleh listUserOrders tanpa menulis ke DB.
+    const orders = await listUserOrders(session.id, 10);
     return jsonOk({ orders });
   } catch (e) {
     console.error('[SHOP ORDERS]', e.message);

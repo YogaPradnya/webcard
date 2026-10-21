@@ -3,6 +3,7 @@ import { checkRateCount } from '@/lib/rateLimit';
 import {
   SLOT_PRICE_IDR, MAX_SLOTS_PER_USER, findPack, genMerchantOrderId,
   createTripayTransaction, createSimulatedTransaction, countUserSlots,
+  createPendingOrder, setOrderPayment, setOrderStatus,
   ensureShopTables, isShopEnabled, isTripayConfigured, isPaymentSimulationEnabled,
 } from '@/lib/shop';
 import { countDisplayCards } from '@/lib/display';
@@ -62,26 +63,47 @@ async function POST_impl(req, _ctx, session) {
     }
     // merchant_ref Tripay = order_id kita (dipakai verifikasi callback & cek status).
     const orderId = genMerchantOrderId();
-    let tx;
-    if (isPaymentSimulationEnabled()) {
-      tx = createSimulatedTransaction({ orderId, amount: amountIdr });
-    } else {
-      tx = await createTripayTransaction({
-        orderId,
-        amount: amountIdr,
-        customerName: session.username || 'KartuYogaa User',
-        customerEmail: `noreply+${session.id}@kartu.yogaa.web.id`,
-        customerPhone: '081234567890',
-        itemName,
-      });
-    }
-    const now = Date.now();
-    await getDb().execute({
-      sql: `INSERT INTO shop_orders (order_id, user_id, username, kind, ref, qty, amount_idr, xp_amount, status, pay_id, qr_url, qr_content, checkout_url, pay_channel, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)`,
-      args: [orderId, String(session.id), String(session.username || ''), kind, ref, qty, amountIdr, xpAmount,
-        tx.payId, tx.qrUrl, tx.qrContent, tx.checkoutUrl, tx.channelName, now, now],
+
+    // PENTING: baris order dibuat SEBELUM memanggil Tripay. Callback yang
+    // datang sangat cepat harus selalu menemukan order di DB. Kalau pembuatan
+    // transaksi gagal, order ditandai failed (bukan dihapus) agar terlihat di riwayat.
+    await createPendingOrder({
+      orderId,
+      userId: session.id,
+      username: session.username || '',
+      kind,
+      ref,
+      qty,
+      amountIdr,
+      xpAmount,
     });
+
+    let tx;
+    try {
+      if (isPaymentSimulationEnabled()) {
+        tx = createSimulatedTransaction({ orderId, amount: amountIdr });
+      } else {
+        tx = await createTripayTransaction({
+          orderId,
+          amount: amountIdr,
+          customerName: session.username || 'KartuYogaa User',
+          customerEmail: `noreply+${session.id}@kartu.yogaa.web.id`,
+          customerPhone: '081234567890',
+          itemName,
+        });
+      }
+    } catch (e) {
+      await setOrderStatus(orderId, 'failed').catch(() => {});
+      throw e;
+    }
+
+    try {
+      await setOrderPayment(orderId, tx);
+    } catch (e) {
+      // Transaksi sudah dibuat dan QR tetap bisa ditampilkan; callback masih
+      // bisa menemukan order lewat merchant_ref meski data QR gagal disimpan.
+      console.error('[SHOP ORDER] Gagal simpan data pembayaran:', orderId, e.message);
+    }
     const out = {
       success: true,
       orderId,

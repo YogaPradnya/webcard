@@ -1,6 +1,6 @@
 import {
   verifyTripayCallbackSignature, mapTripayStatus, tripayChannelName,
-  getOrder, setOrderStatus, fulfillPaidOrder, ensureShopTables,
+  getOrder, setOrderStatus, transitionOrderStatus, fulfillPaidOrder, ensureShopTables,
 } from '@/lib/shop';
 import { apiHandler, jsonFail, WRITE_TIMEOUT_MS } from '@/lib/apiHandler';
 import { NextResponse } from 'next/server';
@@ -14,6 +14,7 @@ function ack() {
 }
 
 async function POST_impl(req) {
+  const started = Date.now();
   let rawBody;
   try {
     rawBody = await req.text();
@@ -23,7 +24,7 @@ async function POST_impl(req) {
 
   const signature = req.headers.get('x-callback-signature') || '';
   if (!verifyTripayCallbackSignature({ rawBody, signature })) {
-    console.warn('[SHOP WEBHOOK] Signature Tripay tidak valid');
+    console.warn(`[SHOP WEBHOOK] Signature Tripay tidak valid took=${Date.now() - started}ms`);
     return jsonFail('Signature tidak valid.', 403);
   }
 
@@ -47,28 +48,34 @@ async function POST_impl(req) {
     return jsonFail('Payload tidak valid.', 400);
   }
 
+  let matched = false;
+  let outcome = 'error';
   try {
     await ensureShopTables();
     const order = await getOrder(orderId);
     if (!order) {
-      // Order lama/non-Tripay — hentikan retry.
-      console.warn('[SHOP WEBHOOK] Order tidak ditemukan:', orderId);
+      // Order tidak dikenal — ack agar Tripay berhenti retry, tapi catat loud.
+      outcome = 'order-not-found';
       return ack();
     }
+    matched = true;
 
     // Pastikan reference yang dikirim Tripay sama dengan yang disimpan saat create.
+    // Bila payId belum tersimpan (callback balapan dengan setOrderPayment),
+    // lewati cek ini: order tetap diverifikasi lewat merchant_ref + nominal.
     if (order.payId && String(order.payId) !== reference) {
-      console.warn('[SHOP WEBHOOK] Reference tidak cocok:', orderId, reference, order.payId);
+      outcome = 'reference-mismatch';
       return ack();
     }
 
     // Callback open payment bukan untuk order closed payment kita.
     if (body?.is_closed_payment != null && Number(body.is_closed_payment) !== 1) {
-      console.warn('[SHOP WEBHOOK] Bukan closed payment:', orderId);
+      outcome = 'not-closed-payment';
       return ack();
     }
 
     const mapped = mapTripayStatus(status);
+    outcome = mapped;
 
     // Refund perlu ditangani walau order sudah paid. Jangan otomatis menarik
     // XP/slot (bisa sudah terpakai); tandai untuk review admin.
@@ -76,43 +83,70 @@ async function POST_impl(req) {
       if (order.status === 'paid') {
         await setOrderStatus(orderId, 'refund');
         console.warn('[SHOP WEBHOOK] Refund diterima, cek manual:', orderId);
+        outcome = 'refund';
+      } else {
+        outcome = 'refund-ignored';
       }
       return ack();
     }
 
     // Anti double-kirim: order yang sudah paid/failed/refund diabaikan.
-    if (order.status !== 'pending' && order.status !== 'expired') return ack();
+    // Khusus PAID saat order masih 'processing' (callback balapan dengan
+    // auto-check), minta Tripay retry agar pembayaran tidak hilang bila
+    // pemroses pertama gagal.
+    if (order.status !== 'pending' && order.status !== 'expired') {
+      if (order.status === 'processing' && mapped === 'paid') {
+        outcome = 'paid:in-progress';
+        return jsonFail('Pesanan sedang diproses.', 500);
+      }
+      outcome = `ignored:${order.status}`;
+      return ack();
+    }
 
     if (mapped === 'paid') {
       // Callback memuat total_amount (termasuk fee customer); bandingkan dengan
       // harga dasar, bukan amount_received yang sudah dipotong fee merchant.
       const paid = Number(body?.total_amount ?? 0) || 0;
       if (!paid || paid < Number(order.amountIdr)) {
-        console.warn('[SHOP WEBHOOK] Nominal kurang:', orderId, paid, order.amountIdr);
+        outcome = `paid:nominal-kurang(${paid}<${order.amountIdr})`;
         return ack();
       }
       const channel = tripayChannelName(
         body?.payment_method || body?.payment_method_code || order.payChannel,
       );
       const r = await fulfillPaidOrder(order, { paymentType: channel });
-      if (!r.fulfilled) console.warn('[SHOP WEBHOOK] Gagal penuhi:', orderId, r.reason);
+      if (!r.fulfilled && !r.alreadyPaid) {
+        outcome = `paid:gagal(${r.reason || 'unknown'})`;
+        console.warn('[SHOP WEBHOOK] Gagal penuhi:', orderId, r.reason);
+      } else {
+        outcome = r.alreadyPaid ? 'paid:already' : 'paid:fulfilled';
+      }
       return ack();
     }
 
     if (mapped === 'failed') {
-      if (order.status === 'pending') await setOrderStatus(orderId, 'failed');
+      await transitionOrderStatus(orderId, 'failed', ['pending', 'expired']);
+      outcome = 'failed';
       return ack();
     }
 
     if (mapped === 'expired') {
-      if (order.status === 'pending') await setOrderStatus(orderId, 'expired');
+      await transitionOrderStatus(orderId, 'expired', ['pending']);
+      outcome = 'expired';
       return ack();
     }
 
+    outcome = `ignored:${mapped}`;
     return ack();
   } catch (e) {
+    outcome = 'error';
     console.error('[SHOP WEBHOOK]', e.message);
     return jsonFail('Gagal proses webhook.', 500);
+  } finally {
+    const took = Date.now() - started;
+    const line = `[SHOP WEBHOOK] order=${orderId || '-'} ref=${reference || '-'} status=${status || '-'} matched=${matched} outcome=${outcome} took=${took}ms`;
+    if (took > 3000 || outcome === 'error' || !matched) console.warn(line);
+    else console.log(line);
   }
 }
 
