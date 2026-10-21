@@ -140,19 +140,17 @@
   }
 }
 
-/* Flip kartu milik sendiri: ketuk untuk lihat stat di baliknya */
+/* Flip kartu milik sendiri: ketuk untuk lihat stat di baliknya.
+   Tiap sisi berputar sendiri, bukan mengandalkan preserve-3d pada
+   pembungkus. Ini tetap tampil di browser yang mem-flatten context 3D
+   (mis. WebKit saat kartu punya transform dari reveal/hover). */
 .flip-inner {
   position: relative;
   width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-}
-
-.card-item.flipped .flip-inner {
-  transform: rotateY(180deg);
+  perspective: 1000px;
 }
 
 .flip-front,
@@ -161,6 +159,7 @@
   position: relative;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+  transition: transform 0.6s;
 }
 
 /* Sisi depan mengikuti tinggi kartu agar meta (tombol pajangan) bisa
@@ -169,6 +168,11 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  transform: rotateY(0deg);
+}
+
+.card-item.flipped .flip-front {
+  transform: rotateY(180deg);
 }
 
 .flip-back {
@@ -182,6 +186,10 @@
   flex-direction: column;
   gap: 4px;
   overflow: hidden;
+}
+
+.card-item.flipped .flip-back {
+  transform: rotateY(360deg);
 }
 
 .flip-stat {
@@ -565,6 +573,11 @@
   .card-item.owned:active,
   .chip:active {
     transform: none;
+  }
+
+  .flip-front,
+  .flip-back {
+    transition: none;
   }
 }
 

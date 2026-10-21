@@ -629,36 +629,42 @@ export default function BookPage() {
                   ) : null}
                 </div>
               </div>
-              {c.owned && c.stats ? (
+              {c.owned ? (
                 <div className="flip-back" style={{ borderTop: `3px solid ${TIER_COLORS[c.tier]}` }}>
-                  <span className={`flip-role role-${c.stats.role}`}>{c.stats.role}</span>
-                  <div className="flip-stat">
-                    HP <b>{c.stats.hp}</b>
-                  </div>
-                  <div className="flip-stat">
-                    ATK <b>{c.stats.basic}</b>
-                  </div>
-                  <div className="flip-stat">{c.stats.skillName}</div>
-                  <div className="flip-stat">
-                    Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
-                  </div>
-                  <div className="flip-stat">
-                    Efek <b className={effectTone(c.stats.effect)}>{EFFECT_LABELS[c.stats.effect] || c.stats.effect}</b>
-                  </div>
-                  {c.stats.skill2Name ? (
+                  {c.stats ? (
                     <>
-                      <div className="flip-stat">{c.stats.skill2Name} ★5</div>
+                      <span className={`flip-role role-${c.stats.role}`}>{c.stats.role}</span>
                       <div className="flip-stat">
-                        Skill2 <b>{c.stats.skill2}</b> / Cons <b>{c.stats.cons2}</b>
+                        HP <b>{c.stats.hp}</b>
                       </div>
                       <div className="flip-stat">
-                        Efek <b className={effectTone(c.stats.effect2)}>{EFFECT_LABELS[c.stats.effect2] || c.stats.effect2}</b>
+                        ATK <b>{c.stats.basic}</b>
+                      </div>
+                      <div className="flip-stat">{c.stats.skillName}</div>
+                      <div className="flip-stat">
+                        Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
+                      </div>
+                      <div className="flip-stat">
+                        Efek <b className={effectTone(c.stats.effect)}>{EFFECT_LABELS[c.stats.effect] || c.stats.effect}</b>
+                      </div>
+                      {c.stats.skill2Name ? (
+                        <>
+                          <div className="flip-stat">{c.stats.skill2Name} ★5</div>
+                          <div className="flip-stat">
+                            Skill2 <b>{c.stats.skill2}</b> / Cons <b>{c.stats.cons2}</b>
+                          </div>
+                          <div className="flip-stat">
+                            Efek <b className={effectTone(c.stats.effect2)}>{EFFECT_LABELS[c.stats.effect2] || c.stats.effect2}</b>
+                          </div>
+                        </>
+                      ) : null}
+                      <div className="flip-stat" style={{ color: 'var(--muted)' }}>
+                        {c.tier}
                       </div>
                     </>
-                  ) : null}
-                  <div className="flip-stat" style={{ color: 'var(--muted)' }}>
-                    {c.tier}
-                  </div>
+                  ) : (
+                    <div className="flip-stat" style={{ color: 'var(--muted)' }}>Stat belum tersedia.</div>
+                  )}
                 </div>
               ) : null}
             </div>

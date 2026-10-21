@@ -1628,24 +1628,28 @@ export default function BattlePage() {
                               <div className="card-anime">{c.tier}</div>
                             </div>
                           </div>
-                          {c.stats ? (
-                            <div className="flip-back">
-                              <span className={`flip-role role-${c.stats.role}`}>{c.stats.role}</span>
-                              <div className="flip-stat">
-                                HP <b>{c.stats.hp}</b>
-                              </div>
-                              <div className="flip-stat">
-                                ATK <b className="fx-dmg">{c.stats.basic}</b>
-                              </div>
-                              <div className="flip-stat">{c.stats.skillName}</div>
-                              <div className="flip-stat">
-                                Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
-                              </div>
-                              <div className="flip-stat">
-                                Efek <b className={effectTone(c.stats.effect)}>{c.stats.effect}</b>
-                              </div>
-                            </div>
-                          ) : null}
+                          <div className="flip-back">
+                            {c.stats ? (
+                              <>
+                                <span className={`flip-role role-${c.stats.role}`}>{c.stats.role}</span>
+                                <div className="flip-stat">
+                                  HP <b>{c.stats.hp}</b>
+                                </div>
+                                <div className="flip-stat">
+                                  ATK <b className="fx-dmg">{c.stats.basic}</b>
+                                </div>
+                                <div className="flip-stat">{c.stats.skillName}</div>
+                                <div className="flip-stat">
+                                  Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
+                                </div>
+                                <div className="flip-stat">
+                                  Efek <b className={effectTone(c.stats.effect)}>{c.stats.effect}</b>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="flip-stat" style={{ color: 'var(--muted)' }}>Stat belum tersedia.</div>
+                            )}
+                          </div>
                         </div>
                         <button
                           type="button"
