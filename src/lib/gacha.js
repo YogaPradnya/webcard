@@ -174,7 +174,10 @@ async function getCard(db, userId, charName) {
 
 // Pilih kartu tersedia: lewati milik sendiri bila unik (L/M) + stok global habis.
 // Downgrade otomatis ke tier bawah. Return { picked, rarity, stockLeft } atau null.
-async function pickAvailableCard(db, userId, startRarity, pools, rng, stockLimits) {
+// opts.excludeNames dipakai hadiah top-up agar 2 kartu dalam 1 order tidak
+// memilih karakter yang sama.
+async function pickAvailableCard(db, userId, startRarity, pools, rng, stockLimits, opts = {}) {
+  const excludeNames = opts.excludeNames || null;
   let r = startRarity;
   while (r) {
     const pool = pools[r] || [];
@@ -183,6 +186,7 @@ async function pickAvailableCard(db, userId, startRarity, pools, rng, stockLimit
       if (pool.length === 0) break;
       const cand = pool[Math.floor(rng() * pool.length)];
       if (!cand) continue;
+      if (excludeNames?.has(String(cand.name || '').toLowerCase())) continue;
       if (isUniqueRarityWeb(r)) {
         let owned = null;
         try {
@@ -202,6 +206,97 @@ async function pickAvailableCard(db, userId, startRarity, pools, rng, stockLimit
     r = RARITY_DOWNGRADE[r];
   }
   return null;
+}
+
+// Hadiah kartu langsung dari Top-Up (bukan hasil roll gacha).
+// Memilih kartu tersedia pada tier yang diminta; bila stok tier habis,
+// turun ke tier bawahnya seperti gacha. Semua kartu ditulis dalam SATU
+// statement agar tetap aman tanpa transaksi/batch tulis di request path.
+export async function grantCardBonus(userId, username, bonusCards) {
+  const requested = Object.entries(bonusCards || {})
+    .map(([rarity, qty]) => [rarity, Math.max(0, Math.floor(Number(qty) || 0))])
+    .filter(([rarity, qty]) => qty > 0 && RARITY_LIST.includes(rarity));
+  if (requested.length === 0) return { granted: [], requested: [] };
+
+  await ensureQuantityColumn();
+  const db = getDb();
+  const { config, pool, art } = await getGachaSettings();
+  const pools = groupPoolByTier(pool);
+  const stockLimits = { ...STOCK_LIMITS, ...(config.stocks || {}) };
+  const rng = Math.random;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const exclude = new Set();
+    const selected = [];
+    for (const [rarity, count] of requested) {
+      for (let i = 0; i < count; i++) {
+        let selection = null;
+        let existing = null;
+        for (let tries = 0; tries < 20; tries++) {
+          selection = await pickAvailableCard(
+            db, userId, rarity, pools, rng, stockLimits, { excludeNames: exclude },
+          );
+          if (!selection) break;
+          existing = await getCard(db, userId, selection.picked.name);
+          // Kalau copy sudah penuh, cari kartu lain (jangan hanguskan bonus).
+          if (existing && Math.max(1, Number(existing.quantity) || 1) >= MAX_CARD_COPIES) {
+            exclude.add(String(selection.picked.name).toLowerCase());
+            selection = null;
+            continue;
+          }
+          break;
+        }
+        if (!selection) break;
+        const picked = selection.picked;
+        exclude.add(String(picked.name).toLowerCase());
+        const level = existing?.level || 1;
+        selected.push({
+          charName: picked.name,
+          anime: picked.anime,
+          rarity: selection.rarity,
+          level,
+          power: existing?.power || calcPower(selection.rarity, level, picked.name),
+          imageUrl: existing?.imageUrl || resolveArt(art, picked.name),
+          isNew: !existing,
+          quantity: existing
+            ? Math.min(MAX_CARD_COPIES, Math.max(1, Number(existing.quantity) || 1) + 1)
+            : 1,
+          requestedRarity: rarity,
+          downgraded: selection.rarity !== rarity,
+        });
+      }
+    }
+    if (selected.length === 0) return { granted: [], requested };
+
+    const placeholders = selected
+      .map(() => '(?, ?, ?, ?, ?, 1, ?, ?, 1, CURRENT_TIMESTAMP)')
+      .join(', ');
+    const args = [];
+    for (const c of selected) {
+      args.push(
+        String(userId), String(username || ''), c.charName,
+        String(c.anime || ''), c.rarity, c.power, c.imageUrl,
+      );
+    }
+    try {
+      await db.execute({
+        sql: `INSERT INTO user_cards (user_id, username, char_name, anime, rarity, level, power, image_url, quantity, pulled_at)
+              VALUES ${placeholders}
+              ON CONFLICT(user_id, char_name) DO UPDATE SET
+                quantity = MIN(${MAX_CARD_COPIES}, COALESCE(user_cards.quantity, 1) + 1),
+                username = excluded.username`,
+        args,
+      });
+      invalidateBookCache(userId);
+      return { granted: selected, requested };
+    } catch (e) {
+      const msg = String(e?.message || e).toLowerCase();
+      // Balapan stok/unik: statement tunggal sudah rollback, pilih ulang.
+      if (attempt < 2 && msg.includes('unique')) continue;
+      throw e;
+    }
+  }
+  return { granted: [], requested };
 }
 
 async function getPityState(db, userId) {

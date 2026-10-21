@@ -23,6 +23,7 @@ export const WEEKLY_MISSIONS = [
   { id: 'pvp_25', label: 'Battle vs teman 25x', target: 25, xp: 1500, event: 'pvp' },
   { id: 'pvp_win_5', label: 'Menang vs teman 5x', target: 5, xp: 1000, event: 'pvp_win' },
   { id: 'trade_5', label: 'Trade 5x', target: 5, xp: 500, event: 'trade' },
+  { id: 'topup_1', label: 'Top-Up 1x', target: 1, xp: 500, event: 'topup' },
 ];
 
 async function ensureMissionTablesOn(db) {
@@ -67,7 +68,7 @@ function loginDedupe(userId) {
 }
 
 // Catat event game ke progres periode berjalan (harian + mingguan sekaligus).
-// event: 'gacha' | 'battle' | 'pvp' | 'pvp_win' | 'trade' | 'login'. n = jumlah.
+// event: 'gacha' | 'battle' | 'pvp' | 'pvp_win' | 'trade' | 'topup' | 'login'. n = jumlah.
 export async function recordEvent(userId, username, event, n = 1) {
   const amount = Math.max(1, Math.floor(Number(n) || 1));
   let dedupe = null;

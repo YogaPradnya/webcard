@@ -10,11 +10,13 @@ const {
   listUserOrders, ensureShopTables, transitionOrderStatus,
 } = await import('../../src/lib/shop.js');
 const { getDb } = await import('../../src/lib/db.js');
+const { ensureMissionTables, jakartaWeekKey } = await import('../../src/lib/missions.js');
 
 const db = getDb();
 
 before(async () => {
   await ensureShopTables();
+  await ensureMissionTables();
   await db.execute(`
     CREATE TABLE IF NOT EXISTS user_stats (
       user_id TEXT PRIMARY KEY,
@@ -24,12 +26,32 @@ before(async () => {
       custom_title TEXT DEFAULT NULL
     )
   `);
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS user_cards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL DEFAULT '',
+      char_name TEXT NOT NULL,
+      anime TEXT NOT NULL DEFAULT '',
+      rarity TEXT NOT NULL DEFAULT 'Common',
+      level INTEGER DEFAULT 1,
+      power INTEGER DEFAULT 0,
+      image_url TEXT DEFAULT NULL,
+      is_showcase INTEGER DEFAULT 0,
+      quantity INTEGER DEFAULT 1,
+      pulled_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+  await db.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_cards_user_char ON user_cards (user_id, char_name)');
 });
 
 beforeEach(async () => {
   await db.execute('DELETE FROM shop_orders');
   await db.execute('DELETE FROM user_display_slots');
   await db.execute('DELETE FROM user_stats');
+  await db.execute('DELETE FROM user_cards');
+  await db.execute('DELETE FROM mission_progress');
+  await db.execute('DELETE FROM mission_claims');
 });
 
 async function makeXpOrder(overrides = {}) {
@@ -193,5 +215,109 @@ describe('shop fulfill atomik', () => {
     const changed = await transitionOrderStatus(orderId, 'failed', ['pending', 'expired']);
     assert.equal(changed, 0);
     assert.equal((await getOrder(orderId)).status, 'paid');
+  });
+
+  it('top-up 50k memberi 1 kartu Epic dan mencatat misi topup mingguan', async () => {
+    const orderId = await makeXpOrder({
+      orderId: 'order-xp-50k',
+      ref: 'xp-50k',
+      amountIdr: 50000,
+      xpAmount: 55000,
+    });
+    const r = await fulfillPaidOrder(await getOrder(orderId), { paymentType: 'QRIS' });
+    assert.equal(r.fulfilled, true);
+    assert.equal(r.bonus.granted.length, 1);
+    assert.equal(r.bonus.granted[0].rarity, 'Epic');
+
+    const xp = await db.execute({
+      sql: 'SELECT xp FROM user_stats WHERE user_id = ?',
+      args: ['user-1'],
+    });
+    assert.equal(Number(xp.rows[0].xp), 55000);
+
+    const cards = await db.execute({
+      sql: 'SELECT rarity, quantity FROM user_cards WHERE user_id = ?',
+      args: ['user-1'],
+    });
+    assert.equal(cards.rows.length, 1);
+    assert.equal(cards.rows[0].rarity, 'Epic');
+    assert.equal(Number(cards.rows[0].quantity), 1);
+
+    const mission = await db.execute({
+      sql: 'SELECT count FROM mission_progress WHERE user_id = ? AND period = ? AND mission_id = ?',
+      args: ['user-1', `w:${jakartaWeekKey()}`, 'topup_1'],
+    });
+    assert.equal(mission.rows.length, 1);
+    assert.equal(Number(mission.rows[0].count), 1);
+  });
+
+  it('top-up 100k memberi 1 kartu Legendary', async () => {
+    const orderId = await makeXpOrder({
+      orderId: 'order-xp-100k',
+      ref: 'xp-100k',
+      amountIdr: 100000,
+      xpAmount: 125000,
+    });
+    const r = await fulfillPaidOrder(await getOrder(orderId), { paymentType: 'QRIS' });
+    assert.equal(r.fulfilled, true);
+    assert.equal(r.bonus.granted.length, 1);
+    assert.equal(r.bonus.granted[0].rarity, 'Legendary');
+
+    const cards = await db.execute({
+      sql: 'SELECT rarity FROM user_cards WHERE user_id = ?',
+      args: ['user-1'],
+    });
+    assert.deepEqual(cards.rows.map((row) => row.rarity), ['Legendary']);
+  });
+
+  it('top-up 500k memberi 1 Mythic + 2 Legendary', async () => {
+    const orderId = await makeXpOrder({
+      orderId: 'order-xp-500k',
+      ref: 'xp-500k',
+      amountIdr: 500000,
+      xpAmount: 650000,
+    });
+    const r = await fulfillPaidOrder(await getOrder(orderId), { paymentType: 'QRIS' });
+    assert.equal(r.fulfilled, true);
+    assert.equal(r.bonus.granted.length, 3);
+
+    const cards = await db.execute({
+      sql: 'SELECT rarity FROM user_cards WHERE user_id = ? ORDER BY rarity',
+      args: ['user-1'],
+    });
+    const counts = {};
+    for (const row of cards.rows) counts[row.rarity] = (counts[row.rarity] || 0) + 1;
+    assert.deepEqual(counts, { Legendary: 2, Mythic: 1 });
+  });
+
+  it('bonus kartu 500k tidak dobel saat fulfillment balapan', async () => {
+    const orderId = await makeXpOrder({
+      orderId: 'order-xp-500k-race',
+      ref: 'xp-500k',
+      amountIdr: 500000,
+      xpAmount: 650000,
+    });
+    const order = await getOrder(orderId);
+    const results = await Promise.all([
+      fulfillPaidOrder(order, { paymentType: 'QRIS' }),
+      fulfillPaidOrder(order, { paymentType: 'QRIS' }),
+    ]);
+    assert.equal(results.filter((r) => r.fulfilled && !r.alreadyPaid).length, 1);
+
+    const xp = await db.execute({
+      sql: 'SELECT xp FROM user_stats WHERE user_id = ?',
+      args: ['user-1'],
+    });
+    assert.equal(Number(xp.rows[0].xp), 650000);
+
+    const cards = await db.execute({
+      sql: 'SELECT rarity, quantity FROM user_cards WHERE user_id = ?',
+      args: ['user-1'],
+    });
+    const units = cards.rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+    assert.equal(units, 3);
+    const counts = {};
+    for (const row of cards.rows) counts[row.rarity] = (counts[row.rarity] || 0) + (Number(row.quantity) || 0);
+    assert.deepEqual(counts, { Legendary: 2, Mythic: 1 });
   });
 });

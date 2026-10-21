@@ -10,6 +10,14 @@ import { useMe } from '@/hooks/useMe';
 import { CS_HOURS, CS_EMAIL, CS_EMAIL_URL, CS_WHATSAPP, CS_WHATSAPP_URL } from '@/lib/contact';
 import { LEGAL_LINKS } from '@/lib/legal';
 import { idr, paymentLabel, fmtDate } from '@/lib/money';
+import { XP_PACKS } from '@/lib/products';
+
+function bonusCardsLabel(cards) {
+  return Object.entries(cards || {})
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([rarity, qty]) => `${Number(qty)} ${rarity}`)
+    .join(' + ');
+}
 
 export default function ShopPage() {
   const { me } = useMe(false); // katalog publik; data user hanya bila login
@@ -63,7 +71,12 @@ export default function ShopPage() {
         const what = becamePaid.kind === 'xp'
           ? `+${Number(becamePaid.xpAmount || 0).toLocaleString('id-ID')} XP`
           : `+${becamePaid.qty || 1} slot pajangan`;
-        setSuccessMsg(`Pembayaran lunas! ${what} sudah masuk. 🎉`);
+        const bonus = bonusCardsLabel(
+          XP_PACKS.find((pack) => pack.id === becamePaid.ref)?.bonusCards,
+        );
+        setSuccessMsg(
+          `Pembayaran lunas! ${what} sudah masuk.${bonus ? ` Bonus kartu: ${bonus}.` : ''} 🎉`,
+        );
       }
       ordersRef.current = next;
       setOrders(next);
@@ -406,12 +419,16 @@ export default function ShopPage() {
             <div className="section-title">Top-Up XP{myXp != null ? ` (kamu: ${myXp.toLocaleString('id-ID')} XP)` : ''}</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
               XP otomatis masuk setelah pembayaran sukses. Bayar via QRIS (scan dari aplikasi bank / e-wallet).
+              Bonus kartu 50k/100k/500k juga masuk otomatis setelah pembayaran sukses.
             </div>
             <div className="title-grid">
               {(catalog?.xpPacks || []).map((p) => (
                 <div key={p.id} className="title-tile earned">
                   <div className="title-name">{p.xp.toLocaleString('id-ID')} XP</div>
-                  <div className="title-desc">{idr(p.priceIdr)} • bonus {p.bonusPct}%</div>
+                  <div className="title-desc">
+                    {idr(p.priceIdr)} • bonus {p.bonusPct}%
+                    {bonusCardsLabel(p.bonusCards) ? ` • kartu ${bonusCardsLabel(p.bonusCards)}` : ''}
+                  </div>
                   <button
                     type="button"
                     className="btn"

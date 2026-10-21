@@ -23,6 +23,9 @@ describe('misi', () => {
     assert.equal(w.gacha_15.target, 15);
     assert.equal(w.battle_15.target, 15);
     assert.equal(w.pvp_25.target, 25);
+    assert.equal(w.topup_1.target, 1);
+    assert.equal(w.topup_1.event, 'topup');
+    assert.ok(w.topup_1.xp > 0);
   });
   it('weekKey = Senin minggu berjalan', () => {
     // 2026-10-13 Selasa -> Senin 2026-10-12; 2026-10-18 Minggu -> Senin 2026-10-12; 2026-10-19 Senin -> dirinya

@@ -104,7 +104,14 @@ export default function TermsPage() {
           <li>Rp10.000 → 11.500 XP</li>
           <li>Rp50.000 → 55.000 XP</li>
           <li>Rp100.000 → 125.000 XP</li>
+          <li>Rp500.000 → 650.000 XP</li>
         </ul>
+        <p>
+          Bonus kartu untuk Top-Up: Rp50.000 = 1 Epic; Rp100.000 = 1 Legendary;
+          Rp500.000 = 1 Mythic + 2 Legendary. Bonus diberikan otomatis setelah
+          pembayaran terverifikasi sukses, selama stok tier tersedia. Bila stok
+          tier yang diminta habis, sistem memberikan kartu dari tier di bawahnya.
+        </p>
         <p>
           Setelah pembayaran terverifikasi sukses, XP otomatis masuk ke akun yang
           digunakan saat melakukan pembelian.

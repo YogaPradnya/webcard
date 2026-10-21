@@ -584,6 +584,7 @@ export async function fulfillPaidOrder(order, payment = {}) {
     };
   }
 
+  let bonus = null;
   if (fresh.kind === 'xp') {
     try {
       await addXpToUser(fresh.userId, fresh.username, fresh.xpAmount);
@@ -592,6 +593,28 @@ export async function fulfillPaidOrder(order, payment = {}) {
       // Tripay / Cek Status bisa mencoba lagi.
       await claimRelease(db, orderId, fresh.status);
       return { fulfilled: false, reason: `gagal tambah XP: ${e.message}` };
+    }
+
+    // Bonus kartu mengikuti paket yang dibeli. Kegagalan bonus TIDAK boleh
+    // menggagalkan XP (produk utama sudah masuk); kartu bonus ditulis dalam
+    // satu statement agar tidak butuh transaction() di request path.
+    const bonusCards = findPack(fresh.ref)?.bonusCards;
+    if (bonusCards && Object.keys(bonusCards).length > 0) {
+      try {
+        const { grantCardBonus } = await import('./gacha.js');
+        bonus = await grantCardBonus(fresh.userId, fresh.username, bonusCards);
+        const requested = Object.values(bonusCards)
+          .reduce((sum, n) => sum + Math.max(0, Math.floor(Number(n) || 0)), 0);
+        if ((bonus?.granted?.length || 0) < requested) {
+          console.warn(
+            '[SHOP FULFILL] Bonus kartu tidak lengkap:',
+            orderId,
+            `${bonus?.granted?.length || 0}/${requested}`,
+          );
+        }
+      } catch (e) {
+        console.error('[SHOP FULFILL] Gagal bonus kartu:', orderId, e.message);
+      }
     }
   } else if (fresh.kind === 'slot') {
     const have = await countUserSlots(fresh.userId);
@@ -637,7 +660,17 @@ export async function fulfillPaidOrder(order, payment = {}) {
     console.error('[SHOP FULFILL] Gagal finalisasi status paid:', orderId, e.message);
     return { fulfilled: false, reason: 'hadiah sudah masuk, gagal menandai lunas' };
   }
-  return { fulfilled: true, alreadyPaid: false };
+
+  // Misi mingguan "Top-Up 1x" hanya dihitung setelah order benar-benar paid.
+  // recordEvent menelan error sendiri; jangan sampai menggagalkan pembayaran.
+  if (fresh.kind === 'xp') {
+    try {
+      const { recordEvent } = await import('./missions.js');
+      await recordEvent(fresh.userId, fresh.username, 'topup', 1);
+    } catch { /* misi non-kritis */ }
+  }
+
+  return { fulfilled: true, alreadyPaid: false, bonus };
 }
 
 // Eksekusi pembayaran simulasi (hanya berlaku bila mode simulasi aktif)
