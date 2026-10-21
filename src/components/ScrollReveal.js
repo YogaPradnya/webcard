@@ -30,8 +30,14 @@ function groupIndex(el) {
 /*
  * Animasi elemen masuk viewport (scroll reveal).
  * Kelas `js-reveal` dipasang inline script di <head> supaya elemen sudah
- * tersembunyi sejak paint pertama (tanpa kedip); komponen ini hanya
- * menambahkan `.reveal-in` ketika elemen mulai terlihat.
+ * tersembunyi sejak paint pertama (tanpa kedip); komponen ini menandai
+ * elemen dengan `data-reveal="in"` ketika mulai terlihat.
+ *
+ * Status reveal sengaja disimpan di data-attribute, bukan class: beberapa
+ * kartu mengubah className saat di-flip/dipilih. Kalau statusnya class,
+ * React akan menimpa dan menghapusnya -> opacity kembali 0 (kartu hilang).
+ * Class `.reveal-in` tetap ditambahkan untuk kompatibilitas CSS lama.
+ *
  * Tidak aktif saat prefers-reduced-motion (script head tidak memasang class).
  *
  * Perbaikan utama dari versi sebelumnya:
@@ -50,12 +56,22 @@ export default function ScrollReveal() {
 
     const tracked = new WeakSet();
 
+    function isRevealed(el) {
+      return el.dataset.reveal === 'in' || el.classList.contains('reveal-in');
+    }
+
+    function markRevealed(el) {
+      el.dataset.reveal = 'in';
+      // Kompatibilitas dengan CSS versi lama yang masih memakai class.
+      el.classList.add('reveal-in');
+    }
+
     const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
           const el = entry.target;
-          el.classList.add('reveal-in');
+          markRevealed(el);
           io.unobserve(el);
         }
       },
@@ -67,7 +83,7 @@ export default function ScrollReveal() {
     function track(el) {
       if (!(el instanceof HTMLElement) || tracked.has(el)) return;
       tracked.add(el);
-      if (el.classList.contains('reveal-in')) return;
+      if (isRevealed(el)) return;
       const idx = Math.min(groupIndex(el), STAGGER_MAX - 1);
       if (idx > 0) el.style.setProperty('--reveal-delay', `${idx * STAGGER_MS}ms`);
       io.observe(el);
@@ -93,9 +109,7 @@ export default function ScrollReveal() {
     const safetyTimer = setTimeout(() => {
       const all = document.querySelectorAll(REVEAL_SELECTOR);
       all.forEach((el) => {
-        if (!el.classList.contains('reveal-in')) {
-          el.classList.add('reveal-in');
-        }
+        if (!isRevealed(el)) markRevealed(el);
       });
     }, 450);
 

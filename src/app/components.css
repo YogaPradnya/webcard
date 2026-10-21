@@ -1306,7 +1306,9 @@
 /* ===== Reveal saat scroll (halus & elegan) =====
    `js-reveal` dipasang inline script di <head> (hanya bila motion diizinkan),
    jadi elemen sudah tersembunyi sejak paint pertama. JS (ScrollReveal)
-   menambahkan .reveal-in ketika elemen masuk viewport.
+   menambahkan data-reveal="in" ketika elemen masuk viewport. Data-attribute
+   dipakai agar status reveal tidak terhapus saat React mengganti className
+   (mis. kartu di-flip/dipilih). .reveal-in tetap didukung untuk CSS lama.
    Fallback otomatis: jika observer tertunda atau gagal, elemen tetap muncul
    dalam 450ms agar konten tidak pernah hilang / tersangkut. */
 @keyframes auto-reveal-fallback {
@@ -1342,7 +1344,8 @@ html.js-reveal :where(
   animation: none !important;
 }
 
-html.js-reveal .reveal-in {
+html.js-reveal .reveal-in,
+html.js-reveal [data-reveal='in'] {
   opacity: 1;
   translate: 0 0;
   animation: none;
