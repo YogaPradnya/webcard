@@ -12,15 +12,22 @@ const DB_RETRY_DELAY_MS = 500;
 // Custom fetch dengan per-request timeout via AbortController.
 // Libsql client HTTP transport pakai global fetch tanpa timeout,
 // sehingga bisa hang selamanya bila sqld tidak merespons.
-function fetchWithTimeout(url, init) {
+//
+// WAJIB cache: 'no-store'. @libsql/client mode HTTP mengirim query lewat
+// fetch global; di server Next.js fetch tsb ikut Data Cache. Tanpa ini hasil
+// query per-user bisa tersimpan selamanya (XP/history terlihat beku) sampai
+// container di-restart. Gejalanya muncul setelah pindah Turso libsql:// ke
+// sqld https:// (HTTP transport).
+export function fetchWithTimeout(url, init = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), DB_FETCH_TIMEOUT_MS);
   // Gabungkan signal: libsql mungkin kirim signal sendiri.
-  const origSignal = init?.signal;
+  const origSignal = init.signal;
   if (origSignal) {
     origSignal.addEventListener('abort', () => ctrl.abort(), { once: true });
   }
-  return fetch(url, { ...init, signal: ctrl.signal }).finally(() => clearTimeout(t));
+  return fetch(url, { ...init, cache: 'no-store', signal: ctrl.signal })
+    .finally(() => clearTimeout(t));
 }
 
 function createRawClient() {
