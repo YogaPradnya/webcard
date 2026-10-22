@@ -29,6 +29,9 @@ export const runtime = 'nodejs';
 async function POST_impl(req, _ctx, session) {
   const { body, error: bodyErr } = await parseJson(req);
   if (bodyErr) return bodyErr;
+  if (Array.isArray(body.items) && body.items.length > 100) {
+    return jsonFail('Daftar kartu terlalu panjang.', 400);
+  }
   const rawItems = Array.isArray(body.items) && body.items.length
     ? body.items
     : [{ charName: body.charName, amount: body.amount }];

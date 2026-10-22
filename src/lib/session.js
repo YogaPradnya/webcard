@@ -26,6 +26,9 @@ export function sealSession(payload) {
     id: String(payload.id),
     key: String(payload.key),
     username: String(payload.username || ''),
+    // Kedaluwarsa di dalam ciphertext: cookie tidak bisa dipakai selamanya
+    // hanya karena browser mengabaikan Max-Age.
+    exp: Number(payload.exp) || (Date.now() + sessionMaxAgeSeconds() * 1000),
   });
   const enc = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
@@ -45,6 +48,7 @@ export function unsealSession(sealed) {
     const text = Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
     const obj = JSON.parse(text);
     if (!obj || obj.id == null) return null;
+    if (!Number.isFinite(Number(obj.exp)) || Number(obj.exp) <= Date.now()) return null;
     return { id: String(obj.id), key: String(obj.key || ''), username: String(obj.username || '') };
   } catch {
     return null;

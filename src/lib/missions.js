@@ -206,13 +206,32 @@ export async function claimMissionWithDb(db, userId, username, periodKind, missi
     }
     return { ok: false, error: 'Gagal klaim misi.', status: 500, cause: insertError };
   }
-  const { getUserXp } = await import('./userCardsRepo.js');
-  const curXp = await getUserXp(db, userId);
-  const newXp = curXp + m.xp;
+  // XP ditambah secara atomik (bukan read-modify-write) supaya klaim misi
+  // yang bersamaan dengan top-up/gacha tidak saling menimpa.
+  let xpRes;
+  try {
+    xpRes = await db.execute({
+      sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+              xp = MAX(0, user_stats.xp + ?),
+              username = CASE WHEN user_stats.username IS NULL OR user_stats.username = ''
+                THEN excluded.username ELSE user_stats.username END
+            RETURNING xp`,
+      args: [String(userId), String(username || ''), m.xp, calcLevel(m.xp), m.xp],
+    });
+  } catch (xpError) {
+    // XP gagal masuk -> lepas lagi klaim agar user bisa retry. Tanpa ini,
+    // klaim tersimpan permanen dengan xp=0 dan user tidak pernah dapat hadiah.
+    await db.execute({
+      sql: 'DELETE FROM mission_claims WHERE user_id = ? AND period = ? AND mission_id = ?',
+      args: [String(userId), period, m.id],
+    }).catch(() => {});
+    return { ok: false, error: 'Gagal menambah XP misi.', status: 500, cause: xpError };
+  }
+  const newXp = Math.max(0, Number(xpRes?.rows?.[0]?.xp) || 0);
   await db.execute({
-    sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level, username = excluded.username`,
-    args: [String(userId), String(username || ''), newXp, calcLevel(newXp)],
-  });
+    sql: 'UPDATE user_stats SET level = ? WHERE user_id = ?',
+    args: [calcLevel(newXp), String(userId)],
+  }).catch(() => {});
   return { ok: true, xp: m.xp, newXp };
 }

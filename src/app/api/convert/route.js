@@ -20,12 +20,28 @@ async function POST_impl(req, _ctx, session) {
     await ensureQuantityColumn();
     const db = getDb();
     const owned = await getUserCollection(session.id);
-    let totalXp = 0;
-    const converted = [];
+
+    // Gabungkan item duplikat SEBELUM validasi. Tanpa ini, dua entri dengan
+    // nama sama masing-masing lolos cek `qty <= has.quantity`, lalu total
+    // yang dikonversi bisa melebihi stok (dan XP tercipta dari kartu hantu).
+    const requested = new Map();
     for (const it of items) {
       const name = String(it?.charName || '').trim();
-      const qty = Math.max(1, Math.floor(Number(it?.qty) || 0));
-      if (!name) return jsonFail('Nama kartu tidak valid.', 400);
+      const qty = Math.floor(Number(it?.qty));
+      if (!name || !Number.isFinite(qty) || qty < 1) {
+        return jsonFail('Nama/jumlah kartu tidak valid.', 400);
+      }
+      const key = name.toLowerCase();
+      const prev = requested.get(key);
+      requested.set(key, { charName: prev?.charName || name, qty: (prev?.qty || 0) + qty });
+    }
+    if (requested.size === 0) return jsonFail('Pilih minimal 1 kartu.', 400);
+
+    let totalXp = 0;
+    const converted = [];
+    for (const item of requested.values()) {
+      const name = item.charName;
+      const qty = item.qty;
       const has = owned[name.toLowerCase()];
       if (!has) {
         return jsonFail(`Kamu tidak punya ${name}.`, 400);
@@ -44,31 +60,78 @@ async function POST_impl(req, _ctx, session) {
     if (totalXp <= 0) {
       return jsonFail('Tidak ada XP yang didapat.', 400);
     }
-    for (const c of converted) {
-      const has = owned[c.charName.toLowerCase()];
-      if (has.quantity === c.qty) {
+
+    // Potong stok secara kondisional. Bila stok berubah di tengah jalan,
+    // kembalikan potongan sebelumnya (best-effort) dan minta user retry.
+    const applied = [];
+    const rollbackCards = async () => {
+      for (const c of applied) {
         await db.execute({
-          sql: 'DELETE FROM user_cards WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
-          args: [String(session.id), c.charName],
-        });
-      } else {
-        await db.execute({
-          sql: 'UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
+          sql: 'UPDATE user_cards SET quantity = quantity + ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?)',
           args: [c.qty, String(session.id), c.charName],
-        });
+        }).catch(() => {});
       }
+    };
+    for (const c of converted) {
+      let res;
+      try {
+        res = await db.execute({
+          sql: 'UPDATE user_cards SET quantity = quantity - ? WHERE user_id = ? AND LOWER(char_name) = LOWER(?) AND quantity >= ?',
+          args: [c.qty, String(session.id), c.charName, c.qty],
+        });
+      } catch (updateError) {
+        await rollbackCards();
+        invalidateBookCache(session.id);
+        console.error('[CONVERT] Gagal memotong stok:', updateError.message);
+        return jsonFail('Gagal memotong kartu. Tidak ada yang dikonversi.', 500);
+      }
+      const changed = Number(res.rowsAffected ?? res.changes ?? 0);
+      if (changed === 0) {
+        await rollbackCards();
+        invalidateBookCache(session.id);
+        return jsonFail('Stok kartu berubah. Muat ulang lalu coba lagi.', 409);
+      }
+      applied.push(c);
     }
-    const xpRes = await db.execute({ sql: 'SELECT xp, username FROM user_stats WHERE user_id = ?', args: [String(session.id)] });
-    const curXp = xpRes.rows.length > 0 ? Number(xpRes.rows[0].xp) || 0 : 0;
-    const curName = xpRes.rows.length > 0 && xpRes.rows[0].username ? String(xpRes.rows[0].username) : (session.username || '');
-    const newXp = curXp + totalXp;
+
+    let xpRes;
+    try {
+      xpRes = await db.execute({
+        sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
+              ON CONFLICT(user_id) DO UPDATE SET
+                xp = MAX(0, user_stats.xp + ?),
+                username = CASE WHEN user_stats.username IS NULL OR user_stats.username = ''
+                  THEN excluded.username ELSE user_stats.username END
+              RETURNING xp`,
+        args: [String(session.id), String(session.username || ''), totalXp, calcLevel(totalXp), totalXp],
+      });
+    } catch (xpError) {
+      await rollbackCards();
+      invalidateBookCache(session.id);
+      console.error('[CONVERT] Gagal menambah XP:', xpError.message);
+      return jsonFail('Gagal menambah XP. Kartu tidak jadi dikonversi.', 500);
+    }
+
+    const newXp = Math.max(0, Number(xpRes?.rows?.[0]?.xp) || 0);
+    const level = calcLevel(newXp);
     await db.execute({
-      sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level, username = excluded.username`,
-      args: [String(session.id), curName, newXp, calcLevel(newXp)],
-    });
+      sql: 'UPDATE user_stats SET level = ? WHERE user_id = ?',
+      args: [level, String(session.id)],
+    }).catch(() => {});
+    // Baru hapus baris kosong setelah XP sukses; kalau XP gagal, rollback
+    // masih bisa menambah quantity karena row-nya belum dihapus.
+    await db.execute({
+      sql: 'DELETE FROM user_cards WHERE user_id = ? AND quantity <= 0',
+      args: [String(session.id)],
+    }).catch(() => {});
     invalidateBookCache(session.id);
-    return jsonOk({ converted, totalXp, xpBefore: curXp, xpAfter: newXp, level: calcLevel(newXp) });
+    return jsonOk({
+      converted,
+      totalXp,
+      xpBefore: Math.max(0, newXp - totalXp),
+      xpAfter: newXp,
+      level,
+    });
   } catch (e) {
     console.error('[CONVERT]', e.message);
     return jsonFail('Gagal konversi.', 500);

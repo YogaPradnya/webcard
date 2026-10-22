@@ -21,10 +21,11 @@ async function GET_impl(req, _ctx, session) {
   const myQty = Math.max(1, parseInt(params.get('myQty'), 10) || 1);
   let myItemsRaw = [];
   const myItemsParam = String(params.get('myItems') || '').trim();
+  if (myItemsParam.length > 5000) return jsonFail('Daftar kartu terlalu panjang.', 400);
   if (myItemsParam) {
     try {
       const parsed = JSON.parse(myItemsParam);
-      if (Array.isArray(parsed)) myItemsRaw = parsed;
+      if (Array.isArray(parsed)) myItemsRaw = parsed.slice(0, 100);
     } catch { /* abaikan, fallback legacy */ }
   }
   if (!myItemsRaw.length && myCharName) myItemsRaw = [{ charName: myCharName, amount: myQty }];
@@ -99,6 +100,9 @@ async function POST_impl(req, _ctx, session) {
   const { body, error: bodyErr } = await parseJson(req);
   if (bodyErr) return bodyErr;
   const code = normalizeTradeCode(body.code);
+  if (Array.isArray(body.myItems) && body.myItems.length > 100) {
+    return jsonFail('Daftar kartu terlalu panjang.', 400);
+  }
   const rawItems = Array.isArray(body.myItems) && body.myItems.length
     ? body.myItems
     : [{ charName: body.myCharName, amount: body.myAmount }];

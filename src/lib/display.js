@@ -105,14 +105,21 @@ export async function customizeDisplayCard(userId, cardId, input = {}) {
   const borderColor = borderType === 'custom' ? cleanHex(input.borderColor) : '';
   if (borderType === 'custom' && !borderColor) return { ok: false, error: 'Warna custom harus hex (contoh #a855f7).' };
   const description = String(input.description || '').trim().slice(0, 280);
-  await getDb().execute({
+  // Conditional update: dua tab yang menyimpan bersamaan tidak bisa
+  // melewati MAX_DISPLAY_EDITS karena sama-sama membaca `used` lama.
+  const upd = await getDb().execute({
     sql: `UPDATE user_display_cards
           SET image_url = ?, border_type = ?, border_color = ?, description = ?,
               edits_used = edits_used + 1
-          WHERE id = ? AND user_id = ?`,
-    args: [imageUrl || null, borderType, borderColor, description, Number(cardId), String(userId)],
+          WHERE id = ? AND user_id = ? AND COALESCE(edits_used, 0) < ?
+          RETURNING edits_used`,
+    args: [imageUrl || null, borderType, borderColor, description, Number(cardId), String(userId), MAX_DISPLAY_EDITS],
   });
-  return { ok: true, editsLeft: MAX_DISPLAY_EDITS - used - 1 };
+  const newUsed = Number(upd.rows?.[0]?.edits_used);
+  if (!Number.isFinite(newUsed) && Number(upd.rowsAffected ?? upd.changes ?? 0) === 0) {
+    return { ok: false, error: 'Jatah ubah habis (3x).' };
+  }
+  return { ok: true, editsLeft: Math.max(0, MAX_DISPLAY_EDITS - (Number.isFinite(newUsed) ? newUsed : used + 1)) };
 }
 
 // Guard: nama ini kartu display milik user? (tolak battle/trade/gacha/convert).

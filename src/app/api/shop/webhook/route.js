@@ -118,9 +118,10 @@ async function POST_impl(req) {
       if (!r.fulfilled && !r.alreadyPaid) {
         outcome = `paid:gagal(${r.reason || 'unknown'})`;
         console.warn('[SHOP WEBHOOK] Gagal penuhi:', orderId, r.reason);
-      } else {
-        outcome = r.alreadyPaid ? 'paid:already' : 'paid:fulfilled';
+        // Jangan ack: biarkan Tripay retry agar user tidak kehilangan item/XP.
+        return jsonFail('Gagal memproses pesanan.', 500);
       }
+      outcome = r.alreadyPaid ? 'paid:already' : 'paid:fulfilled';
       return ack();
     }
 

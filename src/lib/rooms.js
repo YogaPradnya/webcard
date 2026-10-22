@@ -4,7 +4,6 @@ import { createBattle, act as engineAct, aiChoose } from './engine.js';
 import { calcLevel } from './level.js';
 import { jakartaDateKey } from './jakartaTime.js';
 import { randomDigits } from './codes.js';
-import { getUserXp } from './userCardsRepo.js';
 
 export const TURN_TIMEOUT_MS = 60 * 1000;
 // Forfeit: 2 menit tanpa aksi manual dianggap menyerah (permintaan user).
@@ -269,6 +268,9 @@ export function trimBattleLog(battle) {
 }
 
 export async function saveRoom(room) {
+  // Request yang kalah CAS finish tidak boleh menulis ulang state lama:
+  // pemenang CAS mungkin belum sempat menyimpan result/XP-nya.
+  if (room?._skipSave) return;
   trimBattleLog(room.battle);
   await getDb().execute({
     sql: `UPDATE battle_rooms SET state = ?, turn = ?, status = ?, winner = ?, result = ?,
@@ -428,25 +430,35 @@ async function awardXpFor(db, userId, username, won, rewards) {
       PRIMARY KEY (user_id, day_key)
     )
   `);
+  // Klaim slot harian secara atomik. Cek SELECT lalu UPDATE terpisah bisa
+  // meloloskan dua battle bersamaan dan melewati dailyCap.
+  const cap = Math.max(0, Number(rewards.dailyCap) || 0);
+  if (cap <= 0) return { gain: 0, capped: true };
   const playRes = await db.execute({
-    sql: 'SELECT plays FROM battle_daily WHERE user_id = ? AND day_key = ?',
-    args: [String(userId), dayKey],
-  });
-  const plays = playRes.rows.length > 0 ? Number(playRes.rows[0].plays) || 0 : 0;
-  if (plays >= rewards.dailyCap) return { gain: 0, capped: true };
-  const gain = won ? rewards.winXp : rewards.loseXp;
-  await db.execute({
     sql: `INSERT INTO battle_daily (user_id, day_key, plays) VALUES (?, ?, 1)
-          ON CONFLICT(user_id, day_key) DO UPDATE SET plays = plays + 1`,
-    args: [String(userId), dayKey],
+          ON CONFLICT(user_id, day_key) DO UPDATE SET plays = plays + 1
+          WHERE battle_daily.plays < ?
+          RETURNING plays`,
+    args: [String(userId), dayKey, cap],
   });
-  const curXp = await getUserXp(db, userId);
-  const newXp = curXp + gain;
-  await db.execute({
+  if (!playRes.rows || playRes.rows.length === 0) return { gain: 0, capped: true };
+  const gain = won ? rewards.winXp : rewards.loseXp;
+  // Atomic increment: dua battle yang selesai bersamaan tidak saling
+  // menimpa XP satu sama lain.
+  const xpRes = await db.execute({
     sql: `INSERT INTO user_stats (user_id, username, xp, level) VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id) DO UPDATE SET xp = excluded.xp, level = excluded.level`,
-    args: [String(userId), String(username || ''), newXp, calcLevel(newXp)],
+          ON CONFLICT(user_id) DO UPDATE SET
+            xp = MAX(0, user_stats.xp + ?),
+            username = CASE WHEN user_stats.username IS NULL OR user_stats.username = ''
+              THEN excluded.username ELSE user_stats.username END
+          RETURNING xp`,
+    args: [String(userId), String(username || ''), gain, calcLevel(gain), gain],
   });
+  const newXp = Math.max(0, Number(xpRes?.rows?.[0]?.xp) || 0);
+  await db.execute({
+    sql: 'UPDATE user_stats SET level = ? WHERE user_id = ?',
+    args: [calcLevel(newXp), String(userId)],
+  }).catch(() => {});
   return { gain, capped: false, newXp };
 }
 
@@ -460,11 +472,35 @@ export async function finishIfOver(room) {
   const lastLog = Array.isArray(battle.log) ? battle.log[battle.log.length - 1] : null;
   const reason = lastLog?.type === 'forfeit' ? 'forfeit' : lastLog?.type === 'surrender' ? 'surrender' : lastLog?.type === 'end' ? 'ko' : 'battle';
   const xp = {};
-  // XP + leaderboard hanya untuk PvP. Vs AI: tanpa XP, tanpa leaderboard.
-  if (room.mode !== 'pvp') {
+  // Klaim finish secara atomik untuk semua mode. XP tetap hanya untuk PvP,
+  // tetapi CAS ini juga mencegah dua request mencatat misi/riwayat dua kali.
+  let claimed = false;
+  if (!room.xpPaid) {
+    const db = getDb();
+    const claim = await db.execute({
+      sql: 'UPDATE battle_rooms SET xp_paid = 1 WHERE code = ? AND COALESCE(xp_paid, 0) = 0',
+      args: [String(room.code)],
+    });
+    const claimedRows = Number(claim.rowsAffected ?? claim.changes ?? 0);
+    if (claimedRows === 0) {
+      const fresh = await getRoom(room.code).catch(() => null);
+      if (fresh) {
+        room.status = fresh.status;
+        room.winner = fresh.winner;
+        room.result = fresh.result || room.result;
+        room.xpPaid = true;
+        room.updatedAt = fresh.updatedAt;
+      }
+      // Jangan saveRoom dari jalur ini; pemenang CAS yang berhak menulis.
+      room._skipSave = true;
+      return { finished: true, xp: room.result?.xp || {} };
+    }
     room.xpPaid = true;
+    claimed = true;
+  }
+  if (room.mode !== 'pvp') {
     room.result = { winner: room.winner, xp, reason };
-  } else if (!room.xpPaid) {
+  } else if (claimed) {
     const db = getDb();
     const rewards = await readBattleRewards();
     const humans = [
@@ -488,7 +524,6 @@ export async function finishIfOver(room) {
         xp[String(h.id)] = { gain: 0, capped: false };
       }
     }
-    room.xpPaid = true;
     room.result = { winner: room.winner, xp, reason };
   } else {
     room.result = { winner: room.winner, xp: room.result?.xp || xp, reason };

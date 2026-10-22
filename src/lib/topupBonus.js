@@ -297,9 +297,26 @@ export async function claimTopupBonus(userId, username, milestoneId, opts = {}) 
   // membaca baris yang sudah ada dan tidak menggandakan kartu.
   const existing = await getClaimRow(db, userId, period, m.id);
   if (existing) {
-    return existing.cards.length > 0
-      ? { ok: true, alreadyClaimed: true, period, milestoneId: m.id, cards: existing.cards }
-      : { ok: true, alreadyClaimed: true, pending: true, period, milestoneId: m.id, cards: [] };
+    if (existing.cards.length > 0) {
+      return { ok: true, alreadyClaimed: true, period, milestoneId: m.id, cards: existing.cards };
+    }
+    // Baris klaim kosong = proses grant sebelumnya mati di tengah jalan.
+    // Beri masa lease singkat agar request yang masih berjalan tidak
+    // dianggap stuck, lalu ambil alih dengan CAS (claimed_at lama).
+    const PENDING_CLAIM_LEASE_MS = 2 * 60 * 1000;
+    const age = Date.now() - (Number(existing.claimedAt) || 0);
+    if (age < PENDING_CLAIM_LEASE_MS) {
+      return { ok: true, alreadyClaimed: true, pending: true, period, milestoneId: m.id, cards: [] };
+    }
+    const freed = await db.execute({
+      sql: `DELETE FROM topup_bonus_claims
+            WHERE user_id = ? AND period = ? AND milestone_id = ? AND claimed_at = ?`,
+      args: [String(userId), period, m.id, Number(existing.claimedAt) || 0],
+    });
+    if (Number(freed.rowsAffected ?? freed.changes ?? 0) === 0) {
+      return { ok: true, alreadyClaimed: true, pending: true, period, milestoneId: m.id, cards: [] };
+    }
+    // Lanjut ke INSERT di bawah; PK tetap menjadi mutex bila ada balapan.
   }
 
   try {

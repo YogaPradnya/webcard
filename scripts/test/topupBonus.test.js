@@ -181,6 +181,37 @@ describe('state bonus top-up bulanan', () => {
     assert.equal(retry.cards.length, 1);
   });
 
+  it('klaim pending basi diambil alih, pending baru tidak dobel', async () => {
+    const db = await makeDb();
+    await addOrder(db, { orderId: 'o1', amountIdr: 50000, paidAt: octMs(2) });
+    await getTopupBonusState('u1', { db, now: NOW_OCT, launchAt: 0, ensureTables: true });
+    await db.execute({
+      sql: `INSERT INTO topup_bonus_claims (user_id, period, milestone_id, amount_idr, cards_json, claimed_at)
+            VALUES (?, ?, ?, ?, '[]', ?)`,
+      args: ['u1', '2026-10', 'topup_50k', 50000, Date.now()],
+    });
+
+    let calls = 0;
+    const grant = async () => { calls++; return { granted: [fakeEpic], requested: [] }; };
+
+    const fresh = await claimTopupBonus('u1', 'Tester', 'topup_50k', {
+      db, now: NOW_OCT, launchAt: 0, ensureTables: true, grant,
+    });
+    assert.equal(fresh.pending, true);
+    assert.equal(calls, 0);
+
+    await db.execute({
+      sql: 'UPDATE topup_bonus_claims SET claimed_at = ? WHERE user_id = ?',
+      args: [Date.now() - 3 * 60 * 1000, 'u1'],
+    });
+    const recovered = await claimTopupBonus('u1', 'Tester', 'topup_50k', {
+      db, now: NOW_OCT, launchAt: 0, ensureTables: true, grant,
+    });
+    assert.equal(recovered.ok, true);
+    assert.equal(recovered.cards.length, 1);
+    assert.equal(calls, 1);
+  });
+
   it('order bonus paket lama (sebelum fitur live) dianggap sudah diklaim', async () => {
     const db = await makeDb();
     const launchAt = octMs(21); // fitur live 21 Okt

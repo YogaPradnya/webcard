@@ -162,7 +162,7 @@ export function calcPower(rarity, level, charName = '') {
 
 async function countCardOwners(db, charName) {
   try {
-    const excl = parseStockExclusions();
+    const excl = parseExcludedUsernames();
     const res = await db.execute({
       sql: `SELECT COUNT(*) AS c FROM user_cards WHERE char_name = ?${stockExclusionClause(excl)}`,
       args: [charName, ...excl],
@@ -175,6 +175,31 @@ async function countCardOwners(db, charName) {
 
 async function getCard(db, userId, charName) {
   return getUserCard(db, userId, charName);
+}
+
+// INSERT dengan cek stok di statement yang sama. Cek COUNT lalu INSERT
+// terpisah bisa overshoot saat dua user menarik kartu yang sama bersamaan.
+async function insertCardIfStock(db, userId, username, picked, rarity, power, imageUrl, limit) {
+  if (!Number.isFinite(limit)) {
+    await db.execute({
+      sql: `INSERT INTO user_cards (user_id, username, char_name, anime, rarity, level, power, image_url, quantity, pulled_at)
+            VALUES (?, ?, ?, ?, ?, 1, ?, ?, 1, CURRENT_TIMESTAMP)`,
+      args: [String(userId), String(username || ''), picked.name, picked.anime, rarity, power, imageUrl],
+    });
+    return true;
+  }
+  const excl = parseExcludedUsernames();
+  const clause = stockExclusionClause(excl);
+  const res = await db.execute({
+    sql: `INSERT INTO user_cards (user_id, username, char_name, anime, rarity, level, power, image_url, quantity, pulled_at)
+          SELECT ?, ?, ?, ?, ?, 1, ?, ?, 1, CURRENT_TIMESTAMP
+          WHERE (SELECT COUNT(*) FROM user_cards WHERE char_name = ?${clause}) < ?`,
+    args: [
+      String(userId), String(username || ''), picked.name, picked.anime, rarity, power, imageUrl,
+      picked.name, ...excl, Number(limit),
+    ],
+  });
+  return Number(res.rowsAffected ?? res.changes ?? 0) > 0;
 }
 
 // Pilih kartu tersedia: lewati milik sendiri bila unik (L/M) + stok global habis.
@@ -379,11 +404,20 @@ export async function performWebPulls(userId, username, count, todayKey) {
   const pulls = [];
   const rng = Math.random;
   let consolationTotal = 0;
+  const paidTotalFor = (paidCount) => (n === 10 && paidCount === 10
+    ? costTotal
+    : Math.ceil((costTotal / n) * paidCount));
+  // Refund proporsional untuk pull yang tidak terpakai + XP hiburan.
+  const refundFor = (paidCount) => Math.max(0, costTotal - paidTotalFor(paidCount)) + consolationTotal;
+  try {
   for (let i = 0; i < n; i++) {
     const rolledRarity = rollRarity(rng, config.rates);
     const selection = await pickAvailableCard(db, userId, rolledRarity, pools, rng, stockLimits);
     if (!selection) {
-      if (pulls.length === 0) return { error: 'SOLD_OUT', costTotal, cost: config.cost };
+      if (pulls.length === 0) {
+        await creditXp(db, userId, costTotal);
+        return { error: 'SOLD_OUT', costTotal, cost: config.cost };
+      }
       break;
     }
     const picked = selection.picked;
@@ -403,17 +437,25 @@ export async function performWebPulls(userId, username, count, todayKey) {
       power = calcPower(rarity, 1, picked.name);
       imageUrl = resolveArt(art, picked.name);
       try {
-        await db.execute({
-          sql: `INSERT INTO user_cards (user_id, username, char_name, anime, rarity, level, power, image_url, quantity, pulled_at)
-                VALUES (?, ?, ?, ?, ?, 1, ?, ?, 1, CURRENT_TIMESTAMP)`,
-          args: [String(userId), String(username || ''), picked.name, picked.anime, rarity, power, imageUrl],
-        });
+        const inserted = await insertCardIfStock(
+          db, userId, username, picked, rarity, power, imageUrl, stockLimits[rarity],
+        );
+        if (!inserted) {
+          const stockError = new Error('stock race');
+          stockError.code = 'STOCK_RACE';
+          throw stockError;
+        }
       } catch (e) {
-        // Balapan stok unik (L/M diambil user lain bersamaan): fallback downgrade sekali.
-        if (isUniqueRarityWeb(rarity) && String(e.message || '').toLowerCase().includes('unique')) {
+        // Balapan stok (L/M diambil user lain bersamaan): fallback downgrade sekali.
+        const isUniqueRace = isUniqueRarityWeb(rarity)
+          && String(e.message || '').toLowerCase().includes('unique');
+        if (isUniqueRace || e.code === 'STOCK_RACE') {
           const fb = await pickAvailableCard(db, userId, RARITY_DOWNGRADE[rarity] || 'Common', pools, rng, stockLimits);
           if (!fb) {
-            if (pulls.length === 0) return { error: 'SOLD_OUT', costTotal, cost: config.cost };
+            if (pulls.length === 0) {
+              await creditXp(db, userId, costTotal);
+              return { error: 'SOLD_OUT', costTotal, cost: config.cost };
+            }
             break;
           }
           const fbExisting = await getCard(db, userId, fb.picked.name);
@@ -433,11 +475,16 @@ export async function performWebPulls(userId, username, count, todayKey) {
           } else {
             const fbPower = calcPower(fb.rarity, 1, fb.picked.name);
             const fbArt = resolveArt(art, fb.picked.name);
-            await db.execute({
-              sql: `INSERT INTO user_cards (user_id, username, char_name, anime, rarity, level, power, image_url, quantity, pulled_at)
-                    VALUES (?, ?, ?, ?, ?, 1, ?, ?, 1, CURRENT_TIMESTAMP)`,
-              args: [String(userId), String(username || ''), fb.picked.name, fb.picked.anime, fb.rarity, fbPower, fbArt],
-            });
+            const fbInserted = await insertCardIfStock(
+              db, userId, username, fb.picked, fb.rarity, fbPower, fbArt, stockLimits[fb.rarity],
+            );
+            if (!fbInserted) {
+              if (pulls.length === 0) {
+                await creditXp(db, userId, costTotal);
+                return { error: 'SOLD_OUT', costTotal, cost: config.cost };
+              }
+              break;
+            }
             pulls.push({ charName: fb.picked.name, anime: fb.picked.anime, rarity: fb.rarity, level: 1, power: fbPower, imageUrl: fbArt, isNew: true, stacked: false, downgraded: true, stockLeft: fb.stockLeft });
           }
           continue;
@@ -477,14 +524,25 @@ export async function performWebPulls(userId, username, count, todayKey) {
       isNew, stacked: !isNew && !capped, capped, quantity, xpBonus, downgraded, stockLeft: selection.stockLeft,
     });
   }
+  } catch (e) {
+    // Error tak terduga setelah debit: kembalikan XP untuk pull yang belum
+    // menghasilkan kartu, plus XP hiburan yang sudah terkumpul.
+    const refundOnError = refundFor(pulls.length);
+    if (refundOnError > 0) {
+      await creditXp(db, userId, refundOnError).catch((err) => {
+        console.error('[GACHA] Gagal refund setelah error:', err.message);
+      });
+    }
+    throw e;
+  }
 
   // Bayar proporsional bila pull berhenti dini (SOLD_OUT): cost per pull dibulatkan.
   // XP hiburan (cap penuh) ditambahkan setelah bayar.
   // Debit SUDAH terjadi atomik di depan; di sini hanya refund selisih + bonus
   // via kredit relatif (tidak pernah menimpa XP milik penulis lain).
   const paidCount = pulls.length;
-  const paidTotal = n === 10 && paidCount === 10 ? costTotal : Math.ceil((costTotal / n) * paidCount);
-  const refund = Math.max(0, costTotal - paidTotal) + consolationTotal;
+  const paidTotal = paidTotalFor(paidCount);
+  const refund = refundFor(paidCount);
   await creditXp(db, userId, refund);
   const newXp = await getUserXp(db, userId);
   await db.execute({
@@ -557,7 +615,7 @@ export async function stockSummary(pool, stocks) {
   const db = getDb();
   const out = { Mythic: null, Legendary: null, Epic: null };
   try {
-    const excl = parseStockExclusions();
+    const excl = parseExcludedUsernames();
     const res = await db.execute({
       sql: `SELECT LOWER(char_name) AS n, COUNT(*) AS c FROM user_cards WHERE rarity IN ('Mythic','Legendary','Epic')${stockExclusionClause(excl)} GROUP BY LOWER(char_name)`,
       args: [...excl],
