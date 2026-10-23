@@ -1,14 +1,20 @@
 # KartuYogaa — Book Kartu Anime
 
-Galeri book 265 kartu anime (gacha/trade/battle PvP, shop, misi). Login tanpa password: tekan **Dapatkan Kode**
-di web, ketik `.login KODE` di chat Animein dari akunmu, web langsung masuk.
+Galeri book 265 kartu anime (gacha/trade/battle PvP, shop, misi). Login punya dua
+metode:
+
+1. **Username/email + password Animein** — diverifikasi server-to-server, password
+   tidak disimpan.
+2. **Kode Login** — tekan **Dapatkan Kode** di tab "Kode Login", lalu ketik
+   `.login KODE` di chat Animein dari akun yang sudah `.daftar`. Web langsung masuk.
+
 ID yang dipakai identik dengan `user_id` di database bot, jadi status kartu
 milik/belum otomatis nyambung dengan hasil `.gacha` di chat.
 
 - Kartu yang **sudah punya**: tampil jelas + `★level`, power, badge Pajangan.
 - Kartu yang **belum punya**: gambar abu-abu, nama tetap tampil.
 
-Tanpa password, tanpa request ke API Animein — bebas blokir Cloudflare.
+Kode login berlaku 5 menit, sekali pakai, dan wajib diawali `.daftar` di chat.
 
 ## Env terpisah
 
@@ -33,10 +39,10 @@ npm install
 npm run dev
 ```
 
-Buka http://localhost:3000 → otomatis ke `/book` → diminta kode `.pair`.
+Buka http://localhost:3000 → otomatis ke `/book` → diminta login.
 
 > Bot juga butuh `CARDS_WEB_URL` di `.env` bot (URL publik web ini) agar
-> balasan `.pair` menyertakan link web. Contoh lokal: `http://localhost:3000`.
+> balasan `.login` menyertakan link web. Contoh lokal: `http://localhost:3000`.
 
 ## Deploy VPS (produksi saat ini: kartu.yogaa.web.id)
 
@@ -68,7 +74,8 @@ request path dilarang DDL.
 
 | Route | Fungsi |
 | --- | --- |
-| `POST /api/auth/code` | Buat kode login 6 huruf |
+| `POST /api/auth/login` | Login username/email + password Animein |
+| `POST /api/auth/code` | Buat kode login 6 huruf (metode kedua) |
 | `GET /api/auth/code/status` | Polling status klaim (buat sesi) |
 | `POST /api/auth/logout` | Hapus cookie sesi |
 | `GET /api/auth/me` | Username otomatis dari sesi (database bot) |

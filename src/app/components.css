@@ -13,6 +13,37 @@
   }
 }
 
+/* ===== Login: tab metode password / kode bot ===== */
+.login-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface-soft);
+}
+
+.login-tab {
+  flex: 1;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: calc(var(--r-md) - 3px);
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+}
+
+.login-tab.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
 /* ===== Trade ===== */
 .trade-code-big {
   font-size: 40px;

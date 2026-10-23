@@ -2,9 +2,9 @@ import { randomBytes, createHash } from 'node:crypto';
 import { getDb } from './db.js';
 import { isSchemaReady } from './schema.js';
 
-// Fallback lama: kode login lahir di WEB; endpoint dipertahankan untuk kompatibilitas.
-// UI utama sekarang memakai username/email + password Animein; route kode
-// dipertahankan untuk rollback.
+// Metode login kedua: kode 6 huruf lahir di WEB, lalu diklaim user lewat
+// `.login KODE` di bot. UI utama tetap punya dua tab: password Animein dan
+// kode dari bot. Route dipertahankan sebagai satu paket dengan UI-nya.
 
 export const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';

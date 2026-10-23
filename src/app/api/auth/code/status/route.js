@@ -28,10 +28,15 @@ function getTokens(req) {
   return [...new Set(out)];
 }
 
-// GET /api/auth/code/status — polling: pending / claimed (buat sesi) / expired.
+function noStore(res) {
+  res.headers.set('Cache-Control', 'no-store');
+  return res;
+}
+
+// GET /api/auth/code/status — polling: pending / claimed (buat sesi) / expired / unregistered.
 async function GET_impl(req) {
   const tokens = getTokens(req);
-  if (tokens.length === 0) return jsonOk({ status: 'expired' });
+  if (tokens.length === 0) return noStore(jsonOk({ status: 'expired' }));
 
   try {
     await ensureLoginCodeTable();
@@ -52,25 +57,39 @@ async function GET_impl(req) {
         break;
       }
     }
-    if (!row) return jsonOk({ status: 'expired' });
+    if (!row) return noStore(jsonOk({ status: 'expired' }));
     // Kode masih menunggu klaim: kembalikan juga code + expiresAt agar
     // halaman login bisa pulih sendiri setelah browser di-refresh.
     if (!row.user_id) {
-      return jsonOk({
+      return noStore(jsonOk({
         status: 'pending',
         code: String(row.code || ''),
         expiresAt: Number(row.expires_at) || 0,
-      });
+      }));
     }
 
     const userId = String(row.user_id);
-    const username = String(row.username || '');
-    await db.execute({ sql: 'DELETE FROM web_login_codes WHERE token_hash = ?', args: [hashToken(token)] });
+    // Defense-in-depth: pastikan akun bot yang mengklaim sudah terdaftar.
+    // Bot juga sudah menolak user tanpa user_stats, ini jaring kedua.
+    const userRes = await db.execute({
+      sql: 'SELECT username FROM user_stats WHERE user_id = ?',
+      args: [userId],
+    });
+    if (userRes.rows.length === 0) {
+      await db.execute({ sql: 'DELETE FROM web_login_codes WHERE token_hash = ?', args: [hashToken(token)] });
+      return noStore(jsonOk({ status: 'unregistered' }));
+    }
+
+    const username = String(userRes.rows[0].username || row.username || '');
+    // Sengaja TIDAK menghapus baris di sini: kalau respons polling pertama
+    // hilang di jaringan, polling berikutnya tetap bisa membuat sesi.
+    // Baris tetap hangus otomatis lewat cleanup expires_at (5 menit), dan
+    // bot menolak klaim ulang karena user_id sudah terisi.
     const sealed = sealSession({ id: userId, key: '', username });
     const response = jsonOk({ status: 'claimed', username });
     response.headers.append('Set-Cookie', 'login_token=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
     response.headers.append('Set-Cookie', sessionCookieHeader(sealed, sessionMaxAgeSeconds()));
-    return response;
+    return noStore(response);
   } catch (e) {
     console.error('[LOGIN STATUS]', e.message);
     return jsonFail('Gagal cek status.', 500);
