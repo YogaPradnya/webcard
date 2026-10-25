@@ -78,8 +78,11 @@
 
 .dot-Damage { background: #e5484d; }
 .dot-Tank { background: #9a6a3b; }
-.dot-Support { background: #16a34a; }
+.dot-Healer { background: #16a34a; }
+.dot-Support { background: #2c67e9; }
 .dot-Assist { background: #2c67e9; }
+.dot-Assassin { background: #b91c1c; }
+.dot-Mage { background: #9d86e8; }
 
 .tier-title {
   font-size: 13px;
@@ -230,22 +233,38 @@
   color: var(--ink) !important;
 }
 
-.role-Support {
+.role-Healer {
   background: var(--pastel-green) !important;
   border-color: var(--pastel-green-bd) !important;
   color: var(--ink) !important;
 }
 
+.role-Support,
 .role-Assist {
   background: var(--pastel-blue) !important;
   border-color: var(--pastel-blue-bd) !important;
   color: var(--ink) !important;
 }
 
+.role-Assassin {
+  background: var(--pastel-red) !important;
+  border-color: #b91c1c !important;
+  color: var(--ink) !important;
+}
+
+.role-Mage {
+  background: var(--pastel-purple) !important;
+  border-color: var(--pastel-purple-bd) !important;
+  color: var(--ink) !important;
+}
+
 [data-theme='dark'] .role-Damage { background: #4a1626 !important; border-color: #ff7a9c !important; color: #ffd9e2 !important; }
 [data-theme='dark'] .role-Tank { background: #3d2a12 !important; border-color: #d9a86c !important; color: #f5e3c8 !important; }
-[data-theme='dark'] .role-Support { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
+[data-theme='dark'] .role-Healer { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
+[data-theme='dark'] .role-Support,
 [data-theme='dark'] .role-Assist { background: #16295e !important; border-color: #7fb0ec !important; color: #d9e7ff !important; }
+[data-theme='dark'] .role-Assassin { background: #4a1626 !important; border-color: #ff7a9c !important; color: #ffd9e2 !important; }
+[data-theme='dark'] .role-Mage { background: #2a1f5e !important; border-color: #b39dff !important; color: #e6defc !important; }
 
 /* ===== Status badge bernada pastel ===== */
 .status-badge {
@@ -276,6 +295,12 @@
   color: var(--ink) !important;
 }
 
+.st-silence {
+  background: var(--pastel-purple) !important;
+  border-color: var(--fx-silence) !important;
+  color: var(--ink) !important;
+}
+
 .st-focus {
   background: var(--pastel-lime) !important;
   border-color: var(--pastel-lime-bd) !important;
@@ -286,6 +311,7 @@
 [data-theme='dark'] .st-heal { background: #0e3b24 !important; border-color: #4ade80 !important; color: #d3f5e0 !important; }
 [data-theme='dark'] .st-burn { background: #3d1f0e !important; border-color: #f59e5e !important; color: #ffe3c8 !important; }
 [data-theme='dark'] .st-stun { background: #2a1f5e !important; border-color: #b39dff !important; color: #e6defc !important; }
+[data-theme='dark'] .st-silence { background: #2a1f5e !important; border-color: #b39dff !important; color: #e6defc !important; }
 [data-theme='dark'] .st-focus { background: #2a3a10 !important; border-color: #a3e636 !important; color: #eefbcf !important; }
 
 /* ===== Efek skill bernada di detail kartu ===== */

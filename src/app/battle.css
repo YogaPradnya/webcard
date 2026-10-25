@@ -873,3 +873,159 @@
     opacity: 0 !important;
   }
 }
+
+/* ===== Tombol skill: nama asli + long-press detail ===== */
+.btn.skill-btn {
+  flex: 1 1 150px;
+  min-width: 0;
+  max-width: 240px;
+  min-height: 48px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  line-height: 1.15;
+  text-align: left;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.skill-btn-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.skill-btn-slot {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  border: 1.5px solid currentColor;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.skill-btn-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.skill-btn-meta {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.btn.skill-btn.skill-btn-locked {
+  opacity: 0.55;
+  cursor: help;
+}
+
+.btn.skill-btn.skill-btn-locked:active {
+  transform: none;
+}
+
+/* ===== Modal detail skill (long-press) ===== */
+.skill-info-modal {
+  max-width: 440px;
+}
+
+.skill-info-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.skill-info-head .skill-btn-slot {
+  min-width: 32px;
+  height: 26px;
+  font-size: 11px;
+  background: var(--accent-grad);
+  border-color: var(--hairline-strong);
+  color: var(--on-primary);
+  opacity: 1;
+}
+
+.skill-info-owner {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.skill-info-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.skill-info-meta span {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  background: var(--hairline-soft);
+  border: 1px solid var(--hairline-strong);
+}
+
+.skill-info-desc {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+  margin-bottom: 10px;
+}
+
+.skill-info-extra {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.skill-info-modal .btn {
+  width: 100%;
+}
+
+/* Status silence */
+.fx-silence {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  font-size: 14px;
+  z-index: 3;
+  pointer-events: none;
+  animation: silencePulse 1.3s ease-in-out infinite;
+}
+
+@keyframes silencePulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+
+@media (max-width: 720px) {
+  .btn.skill-btn {
+    flex: 1 1 128px;
+    max-width: none;
+  }
+}

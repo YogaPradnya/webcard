@@ -56,6 +56,9 @@
   --role-assist-deep: #2648b6;
   --fx-burn: #ea580c;
   --fx-stun: #7c5cd6;
+  --fx-silence: #7c3aed;
+  --fx-execute: #e11d48;
+  --fx-splash: #0891b2;
 }
 
 .sidebar-user {

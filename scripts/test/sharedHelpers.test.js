@@ -24,6 +24,16 @@ describe('shared helpers', () => {
     assert.equal(sanitizePoolInput([{ name: 'A', anime: 'X', tier: 'Common' }, { name: 'a', anime: 'Y', tier: 'Rare' }]), null);
     assert.equal(sanitizePoolInput([{ name: 'A', anime: 'X', tier: 'Common' }]).length, 1);
   });
+  it('sanitizePoolInput pertahankan role valid, buang role asing', () => {
+    assert.deepEqual(
+      sanitizePoolInput([{ name: 'A', anime: 'X', tier: 'Epic', role: 'Mage' }]),
+      [{ name: 'A', anime: 'X', tier: 'Epic', role: 'Mage' }],
+    );
+    assert.deepEqual(
+      sanitizePoolInput([{ name: 'A', anime: 'X', tier: 'Epic', role: 'Bogus' }]),
+      [{ name: 'A', anime: 'X', tier: 'Epic' }],
+    );
+  });
   it('cleanHex 3 digit', () => {
     assert.equal(cleanHex('#abc'), '#aabbcc');
     assert.equal(cleanHex('zzz'), '');

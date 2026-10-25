@@ -16,8 +16,10 @@ import { postJson } from '@/lib/postJson';
 import { TIER_COLORS } from '@/lib/tiers';
 import { displayBorderColor, displayCardStyle } from '@/lib/displayBorder';
 import { effectTone } from '@/lib/format';
+import { effectDescription } from '@/lib/skillInfo';
 
 const TIERS = ['All', 'Mythic', 'Legendary', 'Epic', 'Rare', 'Common'];
+const ROLES = ['All', 'Damage', 'Tank', 'Healer', 'Support', 'Assassin', 'Mage'];
 const PAGE_SIZE = 24;
 
 function shortName(name) {
@@ -40,6 +42,9 @@ const EFFECT_LABELS = {
   surge: 'Cons+',
   weaken: 'Weaken',
   focus: 'Fokus',
+  execute: 'Execute',
+  splash: 'Splash',
+  silence: 'Silence',
 };
 
 const SORTS = [
@@ -59,6 +64,7 @@ export default function BookPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tier, setTier] = useState('All');
+  const [roleFilter, setRoleFilter] = useState('All');
   const [query, setQuery] = useState('');
   const [ownedFilter, setOwnedFilter] = useState('all');
   const [animeFilter, setAnimeFilter] = useState('All');
@@ -117,7 +123,7 @@ export default function BookPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [tier, query, ownedFilter, animeFilter, sort]);
+  }, [tier, roleFilter, query, ownedFilter, animeFilter, sort]);
 
   const animeList = useMemo(() => {
     const s = new Set(cards.map((c) => c.anime).filter(Boolean));
@@ -128,6 +134,7 @@ export default function BookPage() {
     const q = query.trim().toLowerCase();
     const out = cards.filter((c) => {
       if (tier !== 'All' && c.tier !== tier) return false;
+      if (roleFilter !== 'All' && c.stats?.role !== roleFilter) return false;
       if (animeFilter !== 'All' && c.anime !== animeFilter) return false;
       if (ownedFilter === 'owned' && !c.owned) return false;
       if (ownedFilter === 'missing' && c.owned) return false;
@@ -144,7 +151,7 @@ export default function BookPage() {
       level: (a, b) => (b.level || 0) - (a.level || 0),
     }[sort] || ((a, b) => 0);
     return [...out].sort(by);
-  }, [cards, tier, query, ownedFilter, animeFilter, sort]);
+  }, [cards, tier, roleFilter, query, ownedFilter, animeFilter, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -535,6 +542,19 @@ export default function BookPage() {
             </button>
           ))}
         </div>
+        <div className="chip-row" role="tablist" aria-label="Filter role">
+          {ROLES.map((r) => (
+            <button
+              key={r}
+              className={roleFilter === r ? 'chip active' : 'chip'}
+              onClick={() => setRoleFilter(r)}
+              aria-pressed={roleFilter === r}
+            >
+              {r !== 'All' ? <span className={`role-dot dot-${r}`} aria-hidden="true" /> : null}
+              {r === 'All' ? 'Semua role' : r}
+            </button>
+          ))}
+        </div>
         <div className="chip-row">
           {[
             ['all', 'Semua'],
@@ -644,7 +664,7 @@ export default function BookPage() {
                       <div className="flip-stat">
                         Skill <b>{c.stats.skill}</b> / Cons <b>{c.stats.cons}</b>
                       </div>
-                      <div className="flip-stat">
+                      <div className="flip-stat" title={effectDescription(c.stats.effect, c.stats.effectVal)}>
                         Efek <b className={effectTone(c.stats.effect)}>{EFFECT_LABELS[c.stats.effect] || c.stats.effect}</b>
                       </div>
                       {c.stats.skill2Name ? (
@@ -653,7 +673,7 @@ export default function BookPage() {
                           <div className="flip-stat">
                             Skill2 <b>{c.stats.skill2}</b> / Cons <b>{c.stats.cons2}</b>
                           </div>
-                          <div className="flip-stat">
+                          <div className="flip-stat" title={effectDescription(c.stats.effect2, c.stats.effectVal2)}>
                             Efek <b className={effectTone(c.stats.effect2)}>{EFFECT_LABELS[c.stats.effect2] || c.stats.effect2}</b>
                           </div>
                         </>

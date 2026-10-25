@@ -89,6 +89,7 @@ export function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTo
           {f.burn ? <span className="status-badge st-burn">BURN</span> : null}
           {f.regen ? <span className="status-badge st-heal">REGEN</span> : null}
           {f.stun ? <span className="status-badge st-stun">STUN</span> : null}
+          {f.silenced > 0 ? <span className="status-badge st-silence">SILENCE</span> : null}
           {f.weaken > 0 ? <span className="status-badge">WEAK</span> : null}
           {f.focus ? <span className="status-badge st-focus">FOKUS</span> : null}
         </div>
@@ -107,6 +108,7 @@ export function FighterCard({ f, active, art, fx, foe, onTap, tappable, selectTo
         <span className="fx-ember" aria-hidden="true"><i /><i /><i /></span>
       ) : null}
       {f.alive && f.stun ? <span className="fx-stun" aria-hidden="true">💫</span> : null}
+      {f.alive && f.silenced > 0 ? <span className="fx-silence" aria-hidden="true">🔇</span> : null}
       {f.alive && f.regen ? <span className="fx-regen" aria-hidden="true">+{f.regen.amount || ''}</span> : null}
       {!f.alive ? <span className="ko-stamp">KO</span> : null}
     </div>

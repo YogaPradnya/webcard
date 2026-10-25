@@ -9,6 +9,7 @@ import { optImg } from '@/lib/images';
 import { fetchJson } from '@/lib/fetchJson';
 import { readBattleCardsCache, writeBattleCardsCache } from '@/lib/battleLobby';
 import { fmtClock, effectTone } from '@/lib/format';
+import { isAllyEffect, isHealEffect, skillDetail, effectLabel } from '@/lib/skillInfo';
 import { useMe } from '@/hooks/useMe';
 import { ConsPips, FighterCard, CountUp } from '@/components/BattleCards';
 
@@ -26,8 +27,9 @@ function pickAutoTeam(all) {
   const team = [];
   const tank = byRole('Tank')[0];
   if (tank) team.push(tank.name);
-  const sup = byRole('Support').find((c) => !team.includes(c.name));
-  if (sup) team.push(sup.name);
+  // Healer dulu; fallback Support/Assist untuk cache lama sebelum DB di-seed ulang.
+  const healer = byRole('Healer')[0] || byRole('Support')[0] || byRole('Assist')[0];
+  if (healer) team.push(healer.name);
   const rest = [...pool].sort((a, b) => scoreCard(b) - scoreCard(a));
   for (const c of rest) {
     if (team.length >= 3) break;
@@ -43,7 +45,17 @@ function describeLog(ev) {
     case 'start': return `Battle mulai! (${ev.first === 'player' ? 'kamu' : 'lawan'} jalan duluan)`;
     case 'cons': return `+${ev.cons} cons untuk tim ${ev.side === 'player' ? 'biru' : 'merah'}`;
     case 'basic': return `${who} menyerang ${ev.target} (-${ev.dmg || 0})${ev.absorbed ? `, ${ev.absorbed} terserap shield` : ''}`;
-    case 'skill': return `${who} memakai ${ev.skill || 'skill'} ke ${ev.target} (-${ev.dmg || 0})${ev.crit ? ' CRIT!' : ''}${ev.status && ev.status !== 'none' ? ` [${ev.status}]` : ''}${ev.absorbed ? `, ${ev.absorbed} terserap` : ''}`;
+    case 'skill': {
+      let text = `${who} memakai ${ev.skill || 'skill'} ke ${ev.target} (-${ev.dmg || 0})`;
+      if (ev.crit) text += ' CRIT!';
+      if (ev.execute) text += ' EXECUTE!';
+      if (ev.status && !['none', 'execute', 'splash'].includes(ev.status)) text += ` [${ev.status}]`;
+      if (ev.absorbed) text += `, ${ev.absorbed} terserap`;
+      if (ev.splash?.length) {
+        text += ` • splash: ${ev.splash.map((s) => `${s.name} (-${s.dmg}${s.absorbed ? `, ${s.absorbed} terserap` : ''})`).join(', ')}`;
+      }
+      return text;
+    }
     case 'heal': return `${who} memulihkan ${ev.target} (+${ev.amount || 0})`;
     case 'regen': return `${who} memberi regen ke ${ev.target} (+${ev.amount || 0}/giliran)`;
     case 'hot': return `${ev.target} regen (+${ev.amount || 0})`;
@@ -120,9 +132,14 @@ export default function BattlePage() {
   const [st, setSt] = useState(null);
   const [acting, setActing] = useState(false);
   const [askSurrender, setAskSurrender] = useState(false);
+  const [skillInfo, setSkillInfo] = useState(null);
   const [fx, setFx] = useState(null);
   const fxTimer = useRef(null);
   const seenLog = useRef(0);
+  const longPressTimer = useRef(null);
+  const longPressFired = useRef(false);
+  const pressStart = useRef(null);
+  const skillInfoAt = useRef(0);
 
   // Targeting manual: { type: 'basic'|'skill'|'skill2', kind: 'foe'|'ally', fx: effect }
   const [pending, setPending] = useState(null);
@@ -150,7 +167,7 @@ export default function BattlePage() {
     burn: '#ea580c', crit: '#65a30d', heavy: '#ea580c', double: '#ea580c',
     shield: '#2c67e9', bulwark: '#2c67e9', regen: '#15803d', heal: '#15803d',
     energize: '#15803d', surge: '#65a30d', weaken: '#7c5cd6', focus: '#b8860b',
-    slam: '#0a0a0a',
+    slam: '#0a0a0a', execute: '#e11d48', splash: '#0891b2', silence: '#7c3aed',
   };
 
   function fireProjectile(fromKey, toKey, color, dur = 420) {
@@ -262,6 +279,11 @@ export default function BattlePage() {
       return;
     }
     const slot = type === 'skill2' ? 2 : 1;
+    const fxName = slot === 2 ? atk.effect2 : atk.effect;
+    if (atk.silenced > 0) {
+      flashHint('Skill terkunci oleh SILENCE. Pakai ATK biasa atau ganti kartu.');
+      return;
+    }
     // P4.2: jangan arm skill bila cons kurang — beri tahu kebutuhan, bukan diam.
     const okCons = type === 'skill2' ? canSkill2 : canSkill;
     if (!okCons) {
@@ -269,17 +291,62 @@ export default function BattlePage() {
       flashHint(`Butuh ${need} cons (kamu ${myTeam?.cons || 0}). Pakai ATK dulu.`);
       return;
     }
-    const fxName = slot === 2 ? atk.effect2 : atk.effect;
-    const allyKind = atk.role === 'Support' || fxName === 'shield' || fxName === 'bulwark';
+    const allyKind = isAllyEffect(fxName);
     setPending((p) => (p?.type === type ? null : { type, kind: allyKind ? 'ally' : 'foe', fx: fxName || 'skill' }));
   }
 
   // Kartu teman yang valid untuk pending ally (heal/energize butuh yang terluka).
   function allyValid(f) {
     if (!f?.alive) return false;
-    if (pending?.fx === 'heal' || pending?.fx === 'energize') return f.hp < f.maxHp;
+    if (isHealEffect(pending?.fx) && pending?.fx !== 'regen') return f.hp < f.maxHp;
     return true;
   }
+
+  function clearLongPress() {
+    clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+  }
+
+  function startSkillPress(fighter, slot, e) {
+    if (!fighter) return;
+    clearLongPress();
+    longPressFired.current = false;
+    pressStart.current = { x: e.clientX, y: e.clientY };
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      skillInfoAt.current = Date.now();
+      setSkillInfo({ ...skillDetail(fighter, slot), owner: fighter.name, role: fighter.role });
+      try { navigator.vibrate?.(12); } catch { /* perangkat tidak mendukung */ }
+    }, 500);
+  }
+
+  function moveSkillPress(e) {
+    const start = pressStart.current;
+    if (!start) return;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) clearLongPress();
+  }
+
+  function endSkillPress() {
+    clearLongPress();
+    pressStart.current = null;
+    // Pointerup bisa jatuh ke backdrop (mouse), sehingga click tombol tidak
+    // selalu datang untuk mereset flag. Reset setelah click event selesai
+    // agar long-press tidak "menelan" klik berikutnya.
+    if (longPressFired.current) {
+      setTimeout(() => { longPressFired.current = false; }, 0);
+    }
+  }
+
+  function onSkillClick(type, slot) {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
+    if (slot) setSkillInfo(null);
+    armAction(type);
+  }
+
+  useEffect(() => () => clearTimeout(longPressTimer.current), []);
 
   function rageMult(battle) {
     return Math.min(1.3, 1 + 0.1 * Math.floor((battle?.turnCount || 0) / 10));
@@ -297,8 +364,8 @@ export default function BattlePage() {
   function toneForEffect(fx) {
     if (['heal', 'regen', 'energize'].includes(fx)) return 'tone-heal';
     if (['shield', 'bulwark'].includes(fx)) return 'tone-shield';
-    if (['burn', 'heavy', 'crit', 'double', 'slam'].includes(fx)) return 'tone-atk';
-    if (['surge', 'weaken', 'focus'].includes(fx)) return 'tone-arcane';
+    if (['burn', 'heavy', 'crit', 'double', 'slam', 'execute', 'splash'].includes(fx)) return 'tone-atk';
+    if (['surge', 'weaken', 'focus', 'silence'].includes(fx)) return 'tone-arcane';
     return '';
   }
 
@@ -307,7 +374,9 @@ export default function BattlePage() {
     if (!ev) return {};
     if (ev.type === 'ko' || ev.type === 'end') return { color: 'var(--ink)', fontWeight: 800 };
     if (ev.type === 'heal' || ev.type === 'hot' || ev.type === 'regen') return { color: 'var(--success)', fontWeight: 700 };
-    if ((ev.type === 'basic' || ev.type === 'skill') && ev.crit) return { color: 'var(--error)', fontWeight: 700 };
+    if (ev.type === 'skill' && ev.status === 'silence') return { color: 'var(--role-assist)', fontWeight: 700 };
+    if ((ev.type === 'basic' || ev.type === 'skill') && (ev.crit || ev.execute)) return { color: 'var(--error)', fontWeight: 700 };
+    if ((ev.type === 'basic' || ev.type === 'skill') && ev.splash?.length) return { color: '#0891b2', fontWeight: 700 };
     if (ev.type === 'basic' || ev.type === 'skill') return { color: 'var(--body)' };
     return { color: 'var(--muted)' };
   }
@@ -323,6 +392,7 @@ export default function BattlePage() {
     if (ef === 'heavy') m = (sk.val || 100) / 100;
     else if (ef === 'slam') m = 0.9;
     else if (ef === 'bulwark' || ef === 'surge' || ef === 'weaken' || ef === 'focus') m = 0.7;
+    else if (ef === 'silence') m = 0.75;
     else if (ef === 'double') m = ((sk.val || 60) / 100) * 2;
     return {
       lo: Math.max(1, Math.round(sk.dmg * m * 0.9 * mult)),
@@ -1226,9 +1296,9 @@ export default function BattlePage() {
   const foeTeam = st?.battle?.[foeSide];
   const myTurn = st && st.status === 'ongoing' && !st.battle.over && st.turn === me?.id;
   const activeFighter = myTeam?.fighters[myTeam?.active];
-  const canSkill = activeFighter && myTeam && activeFighter.alive && myTeam.cons >= activeFighter.cons;
+  const canSkill = activeFighter && myTeam && activeFighter.alive && !(activeFighter.silenced > 0) && myTeam.cons >= activeFighter.cons;
   const hasSkill2 = Boolean(activeFighter?.skill2Name) && (activeFighter?.skill2 || 0) > 0;
-  const canSkill2 = activeFighter && myTeam && activeFighter.alive && hasSkill2 && myTeam.cons >= (activeFighter.cons2 ?? 99);
+  const canSkill2 = activeFighter && myTeam && activeFighter.alive && !(activeFighter.silenced > 0) && hasSkill2 && myTeam.cons >= (activeFighter.cons2 ?? 99);
   const fLeft = forfeitLeft();
 
   function fxFor(name, side) {
@@ -1518,7 +1588,7 @@ export default function BattlePage() {
                       setPicked(team);
                       setVanguard(team[0] || '');
                     }}
-                    title="Otomatis: 1 Tank + 1 Support + kartu terkuat"
+                    title="Otomatis: 1 Tank + 1 Healer + kartu terkuat"
                   >
                     ⚡ Auto Tim
                   </button>
@@ -1546,7 +1616,7 @@ export default function BattlePage() {
                   </select>
                 </div>
                 <div className="chip-row" style={{ marginBottom: 12 }} role="radiogroup" aria-label="Filter role">
-                  {['All', 'Damage', 'Tank', 'Support', 'Assist'].map((r) => (
+                  {['All', 'Damage', 'Tank', 'Healer', 'Support', 'Assassin', 'Mage'].map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -1872,6 +1942,9 @@ export default function BattlePage() {
                 {hint ? (
                   <div className="action-hint">{hint}</div>
                 ) : null}
+                {activeFighter?.silenced > 0 ? (
+                  <div className="action-hint">🔒 {activeFighter.name} terkena SILENCE — skill terkunci. Pakai ATK atau ganti kartu.</div>
+                ) : null}
                 {myTurn && !acting ? (
                   <div className="action-bar">
                     <button
@@ -1882,23 +1955,43 @@ export default function BattlePage() {
                       ATK ({activeFighter?.basic})
                     </button>
                     <button
-                      className={`${pending?.type === 'skill' ? 'btn armed' : 'btn'} ${toneForEffect(activeFighter?.effect)}`}
-                      style={{ width: 'auto' }}
-                      disabled={!canSkill}
-                      onClick={() => armAction('skill')}
-                      title={activeFighter ? (canSkill ? `${activeFighter.skillName} — ${activeFighter.cons} cons` : `Butuh ${activeFighter.cons} cons (kamu ${myTeam?.cons || 0})`) : ''}
+                      type="button"
+                      className={`btn skill-btn ${pending?.type === 'skill' ? 'armed' : ''} ${toneForEffect(activeFighter?.effect)} ${canSkill ? '' : 'skill-btn-locked'}`}
+                      aria-disabled={!canSkill}
+                      onPointerDown={(e) => startSkillPress(activeFighter, 1, e)}
+                      onPointerMove={moveSkillPress}
+                      onPointerUp={endSkillPress}
+                      onPointerLeave={endSkillPress}
+                      onPointerCancel={endSkillPress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onClick={() => onSkillClick('skill', 1)}
+                      title={activeFighter ? `${activeFighter.skillName} — ${activeFighter.cons} cons\n${effectLabel(activeFighter.effect)}. Tahan untuk detail.` : ''}
                     >
-                      Skill ({activeFighter?.cons} cons)
+                      <span className="skill-btn-top">
+                        <span className="skill-btn-slot">S1</span>
+                        <span className="skill-btn-name">{activeFighter?.skillName || 'Skill 1'}</span>
+                      </span>
+                      <span className="skill-btn-meta">{effectLabel(activeFighter?.effect)} · {activeFighter?.cons ?? 6} cons</span>
                     </button>
                     {hasSkill2 ? (
                       <button
-                        className={`${pending?.type === 'skill2' ? 'btn armed' : 'btn'} ${toneForEffect(activeFighter?.effect2)}`}
-                        style={{ width: 'auto' }}
-                        disabled={!canSkill2}
-                        onClick={() => armAction('skill2')}
-                        title={activeFighter ? (canSkill2 ? `${activeFighter.skill2Name} — ${activeFighter.cons2} cons (★5)` : `Butuh ${activeFighter.cons2} cons (kamu ${myTeam?.cons || 0})`) : ''}
+                        type="button"
+                        className={`btn skill-btn ${pending?.type === 'skill2' ? 'armed' : ''} ${toneForEffect(activeFighter?.effect2)} ${canSkill2 ? '' : 'skill-btn-locked'}`}
+                        aria-disabled={!canSkill2}
+                        onPointerDown={(e) => startSkillPress(activeFighter, 2, e)}
+                        onPointerMove={moveSkillPress}
+                        onPointerUp={endSkillPress}
+                        onPointerLeave={endSkillPress}
+                        onPointerCancel={endSkillPress}
+                        onContextMenu={(e) => e.preventDefault()}
+                        onClick={() => onSkillClick('skill2', 2)}
+                        title={activeFighter ? `${activeFighter.skill2Name} — ${activeFighter.cons2} cons (★5)\n${effectLabel(activeFighter.effect2)}. Tahan untuk detail.` : ''}
                       >
-                        Skill2 ({activeFighter?.cons2} cons)
+                        <span className="skill-btn-top">
+                          <span className="skill-btn-slot">S2</span>
+                          <span className="skill-btn-name">{activeFighter?.skill2Name || 'Skill 2'}</span>
+                        </span>
+                        <span className="skill-btn-meta">{effectLabel(activeFighter?.effect2)} · {activeFighter?.cons2 ?? 8} cons</span>
                       </button>
                     ) : null}
                     {pending ? (
@@ -1911,7 +2004,7 @@ export default function BattlePage() {
                         ? '🎯 Ketuk kartu AKTIF lawan untuk menyerang.'
                         : pending?.kind === 'ally'
                           ? '💚 Ketuk kartu timmu untuk heal / shield.'
-                          : '1) Pilih ATK/Skill, 2) ketuk kartu aktif lawan. Skill heal/shield → ketuk teman. Ketuk kartu cadangan untuk ganti.'}
+                          : '1) Pilih ATK/Skill, 2) ketuk kartu aktif lawan. Skill heal/shield → ketuk teman. Ketuk kartu cadangan untuk ganti. Tahan tombol skill untuk detail.'}
                     </div>
                   </div>
                 ) : null}
@@ -2005,6 +2098,43 @@ export default function BattlePage() {
 
             </div>
           )}
+          {skillInfo ? (
+            <div
+              className="modal-backdrop"
+              onClick={() => {
+                // Jangan tutup karena pointerup dari long-press yang sama.
+                if (Date.now() - skillInfoAt.current < 300) return;
+                setSkillInfo(null);
+              }}
+              role="presentation"
+            >
+              <div
+                className="modal-card skill-info-modal"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Detail skill ${skillInfo.name}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="skill-info-head">
+                  <span className="skill-btn-slot">S{skillInfo.slot}</span>
+                  <div>
+                    <div className="section-title" style={{ marginBottom: 2 }}>{skillInfo.name}</div>
+                    <div className="skill-info-owner">{skillInfo.owner} · {skillInfo.role}</div>
+                  </div>
+                </div>
+                <div className="skill-info-meta">
+                  <span>{effectLabel(skillInfo.effect)}</span>
+                  <span>{skillInfo.cons} cons</span>
+                  <span>DMG {skillInfo.dmg}</span>
+                </div>
+                <div className="skill-info-desc">{skillInfo.description}</div>
+                <div className="skill-info-extra">Kombo: skill beruntun memberi +25% damage.</div>
+                <button type="button" className="btn" onClick={() => setSkillInfo(null)}>
+                  Tutup
+                </button>
+              </div>
+            </div>
+          ) : null}
           {askSurrender ? (
             <ConfirmModal
               title="Menyerah?"

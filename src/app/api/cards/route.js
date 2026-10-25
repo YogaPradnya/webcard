@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 
 
-// GET /api/cards[?owned=1] — 265 kartu + flag owned per user login.
+// GET /api/cards[?owned=1] — 306 kartu + flag owned per user login.
 // owned=1: hanya kartu milik (ringkas untuk trade/convert).
 async function GET_impl(req, _ctx, session) {
 

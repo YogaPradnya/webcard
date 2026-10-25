@@ -18,7 +18,7 @@ export function effectTone(effect) {
   const e = String(effect || 'none');
   if (['heal', 'regen', 'energize'].includes(e)) return 'fx-heal';
   if (['shield', 'bulwark'].includes(e)) return 'fx-shield';
-  if (['surge', 'focus'].includes(e)) return 'fx-assist';
+  if (['surge', 'focus', 'silence'].includes(e)) return 'fx-assist';
   if (e === 'none') return '';
   return 'fx-dmg';
 }

@@ -1,6 +1,6 @@
 # KartuYogaa — Book Kartu Anime
 
-Galeri book 265 kartu anime (gacha/trade/battle PvP, shop, misi). Login punya dua
+Galeri book 306 kartu anime (gacha/trade/battle PvP, shop, misi). Login punya dua
 metode:
 
 1. **Username/email + password Animein** — diverifikasi server-to-server, password
@@ -108,8 +108,9 @@ filter cari/role/tier + preset tim tersimpan (5 slot, localStorage) + difficulty
 AI (Easy/Normal/Hard) → lawan AI atau buat/gabung room PvP via **kode 6 angka**.
 
 - **Arena interaktif**: tiap giliran pilih ATK biasa / Skill (bayar cons) /
-  Ganti kartu. Cons milik tim (maks 10): ATK +1, tiap assist +1/giliran
-  (maks +2). Tanpa cons hanya bisa ATK biasa. Support heal 1 kartu tim.
+  Ganti kartu. Cons milik tim (maks 20): ATK +1, tiap Support/assist
+  +1/giliran (maks +2). Tanpa cons hanya bisa ATK biasa. Healer memulihkan
+  1 kartu tim.
 - **Menunggu lawan**: ilustrasi logo + kode room + animasi pulse, tombol
   Cek Lagi/Batal (hangus 5 menit).
 - **Timer forfeit 2 menit**: countdown terlihat. Diam 2 menit = otomatis
@@ -158,13 +159,16 @@ Rate, stok global, dan cost ikut `settings` yang sama dengan bot/dashboard.
 - **Login**: tombol Salin `.login KODE` (tanpa QR sesuai permintaan).
 
 - Stat tiap kartu: HP, ATK biasa, Skill (damage + cons), Role
-  (Damage/Tank/Support/Assist). Sama di semua user, beda tiap kartu.
+  (Damage/Tank/Healer/Support/Assassin/Mage). Sama di semua user, beda tiap kartu.
 - Tiap skill punya **efek khusus yang beragam**: Heavy, Crit, Burn (DoT),
   Double, Shield, Stun (Slam), Heal, Regen (HoT), Energize (Heal+Cons),
-  Surge, Weaken, Fokus — plus **kombo chain** (+25% bila skill dipakai
-  beruntun oleh tim yang sama).
-- Cons milik tim (maks 10): ATK +1, tiap assist di tim +1/giliran (maks +2).
-  Tanpa cons hanya bisa ATK biasa. Support heal 1 kartu tim, bukan damage.
+  Surge, Weaken, Fokus, **Execute**, **Arcane Splash**, dan **Silence** —
+  plus **kombo chain** (+25% bila skill dipakai beruntun oleh tim yang sama).
+- Cons milik tim (maks 20): ATK +1, tiap Support/assist di tim +1/giliran
+  (maks +2). Tanpa cons hanya bisa ATK biasa. Healer memulihkan 1 kartu tim,
+  bukan damage. Support baru memberi bonus cons/weaken/fokus.
+- Tombol skill di battle menampilkan **nama skill asli**; tahan 500 ms untuk
+  membaca deskripsi lengkap, cons, damage, dan efeknya.
 - Menang +100 XP, kalah +20 XP (maks 10 battle ber-XP/hari, angka bisa diubah
   dari dashboard bot menu Web Kartu), level dihitung ulang dengan rumus bot.
   Data: `card_battle_stats` (seed: `npm run seed:battle`).

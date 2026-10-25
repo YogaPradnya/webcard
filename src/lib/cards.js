@@ -44,7 +44,7 @@ function cardCaches() {
   return c;
 }
 
-// Pool efektif: override dashboard (settings.gacha_pool) atau default 265 kartu.
+// Pool efektif: override dashboard (settings.gacha_pool) atau default 306 kartu.
 // Di-cache 60 detik: sebelumnya tiap /api/cards = 1 round-trip DB.
 async function getEffectivePool() {
   const c = cardCaches();
@@ -113,7 +113,7 @@ export async function getEffectiveArt(charName) {
 
 // Stat battle semua kartu (1 query). Hilang -> fallback generator (tetap deterministik).
 // Kolom skill2 di-backfill dari generator bila DB lama belum migrasi.
-// Di-cache 10 menit (265 baris, hampir statis) — query ini paling berat.
+// Di-cache 10 menit (306 baris, hampir statis) — query ini paling berat.
 export async function getCardStatsMap() {
   const c = cardCaches();
   if (c.stats && Date.now() - c.statsAt < STATS_TTL_MS) return c.stats;
@@ -159,7 +159,7 @@ export async function getCardStatsMap() {
 }
 
 // Panggil sekali saat boot (instrumentation) agar request pertama tidak
-// menanggung query stat 265 baris yang lambat.
+// menanggung query stat 306 baris yang lambat.
 export async function warmCardCaches() {
   await Promise.allSettled([getEffectivePool(), getArtMap(), getCardStatsMap()]);
 }
@@ -226,7 +226,7 @@ export async function getUserCollection(userId) {
 
 // Gabungan pool + status milik user + stat battle. Unowned tidak membawa level/power.
 // Batch: 4 query total (pool, art, koleksi, stat), tanpa query per kartu.
-// Cache per user 30 dtk (koleksi 265 kartu jarang berubah antar detik);
+// Cache per user 30 dtk (koleksi 306 kartu jarang berubah antar detik);
 // mutasi (gacha/convert/evolve/trade) memanggil invalidateBookCache().
 // In-flight dedupe: /api/profile/summary & buildProfileData bisa memanggil
 // getBookCards bersamaan — cukup satu rangkaian query.
